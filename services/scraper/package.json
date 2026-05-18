@@ -1,0 +1,21 @@
+{
+  "name": "sirup-scraper",
+  "version": "1.0.0",
+  "description": "Scraper untuk mengambil data proyek dari SIRUP LKPP",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": ["scraper", "lkpp", "sirup"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.7",
+    "cheerio": "^1.0.0-rc.12",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}

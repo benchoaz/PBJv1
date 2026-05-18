@@ -1,0 +1,7 @@
+#!/bin/bash
+export ANTHROPIC_API_KEY="sk-qi40E5-yhf5faXKhFGKGOA"
+export ANTHROPIC_BASE_URL="https://claude.qi-ai.cloud"
+export CLAUDE_CODE_ATTRIBUTION_HEADER="0"
+export CLAUDE_CODE_ENABLE_TELEMETRY="0"
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
+claude "$@"

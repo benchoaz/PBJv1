@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=pbj_db
+      - JWT_SECRET=your-secret-key-change-in-production
+      - JWT_EXPIRES_IN=24h
+      - PORT=8081
+    depends_on:
+      - scraper
+      - db
+    restart: unless-stopped
+    networks:
+      - pbj-network
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=pbj_db
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+    networks:
+      - pbj-network
+
+  scraper:
+    build:
+      context: ./scraper
+      dockerfile: Dockerfile
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=pbj_db
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/sirup-data
+      - SCRAPE_INTERVAL=3600000
+    depends_on:
+      - n8n
+      - db
+    restart: unless-stopped
+    networks:
+      - pbj-network
+
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=password123
+      - N8N_ENCRYPTION_KEY=your-encryption-key-change-in-production
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=db
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n_db
+      - DB_POSTGRESDB_USER=postgres
+      - DB_POSTGRESDB_PASSWORD=postgres
+    restart: unless-stopped
+    networks:
+      - pbj-network
+
+networks:
+  pbj-network:
+    driver: bridge
