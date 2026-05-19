@@ -1689,6 +1689,7 @@ export default function ProcurementPreparation() {
                       ) : (
                         <SirupInputRow
                           acc={acc}
+                          sirupPackages={sirupPackages}
                           onLink={(sirupPack) => {
                             const pack = { ...sirupPack, linkedRekening: acc.account }
                             setScrapedData(prev => {
@@ -2481,12 +2482,27 @@ export default function ProcurementPreparation() {
   )
 }
 
-// Komponen Pembantu untuk Input Manual No. SIRUP per Rekening DPA
-function SirupInputRow({ acc, onLink }) {
+// Komponen Pembantu untuk Input Manual & Otomatis No. SIRUP per Rekening DPA
+function SirupInputRow({ acc, onLink, sirupPackages = [] }) {
   const [noSirup, setNoSirup] = useState('')
   const [packName, setPackName] = useState('')
   const [pagu, setPagu] = useState(acc.pagu || 0)
   const [method, setMethod] = useState('Pengadaan Langsung')
+
+  // Auto-suggest: Cari paket SIRUP yang memiliki MAK cocok dengan kode rekening DPA ini
+  const cleanDpa = acc.account ? acc.account.replace(/[^0-9]/g, '') : ''
+  const suggestions = sirupPackages ? sirupPackages.filter(p => {
+    if (!p.mak) return false
+    const cleanSirup = p.mak.replace(/[^0-9]/g, '')
+    return cleanSirup.includes(cleanDpa) || cleanDpa.includes(cleanSirup)
+  }) : []
+
+  const handleSelectPackage = (pack) => {
+    setNoSirup(pack.noSirup || pack.no || '')
+    setPackName(pack.packName || pack.nama || '')
+    setPagu(pack.pagu || 0)
+    setMethod(pack.method || 'Pengadaan Langsung')
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -2519,15 +2535,73 @@ function SirupInputRow({ acc, onLink }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-3 bg-slate-50 border border-slate-100 rounded-lg p-3 space-y-3">
-      <div className="text-[11px] font-bold text-slate-500 uppercase">Hubungkan RUP SIRUP Secara Manual:</div>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
+    <form onSubmit={handleSubmit} className="mt-3 bg-slate-50 border border-slate-200/80 rounded-xl p-4 space-y-3.5 shadow-sm transition-all focus-within:border-indigo-400">
+      <div className="text-[11px] font-bold text-slate-500 uppercase flex items-center justify-between">
+        <span>Hubungkan RUP SIRUP:</span>
+        {sirupPackages.length > 0 && (
+          <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 animate-pulse-subtle">
+            📡 Terkoneksi ke {sirupPackages.length} Data RUP Resmi
+          </span>
+        )}
+      </div>
+
+      {/* 💡 REKOMENDASI CERDAS DARI MAK DPA */}
+      {suggestions.length > 0 && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-xs">
+          <div className="font-bold text-indigo-800 flex items-center gap-1.5 mb-1.5">
+            <span>💡</span> Rekomendasi RUP SIRUP yang Cocok:
+          </div>
+          <div className="space-y-1.5">
+            {suggestions.map((s) => (
+              <button
+                key={s.noSirup}
+                type="button"
+                onClick={() => handleSelectPackage(s)}
+                className="w-full text-left bg-white hover:bg-indigo-600 hover:text-white text-[11px] p-2 rounded-lg border border-indigo-150 transition-all font-sans flex justify-between items-center shadow-sm active:scale-[0.99]"
+              >
+                <span>
+                  <strong className="font-mono bg-indigo-50 text-indigo-700 px-1 py-0.5 rounded text-[9px] mr-1">#{s.noSirup}</strong>
+                  {s.packName} (Pagu: <strong>Rp {s.pagu?.toLocaleString()}</strong>)
+                </span>
+                <span className="bg-indigo-600 text-white font-bold px-2 py-0.5 rounded-md text-[9px] uppercase hover:bg-indigo-700">
+                  Pilih
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* SEARCHABLE SELECT DROPDOWN */}
+      {sirupPackages.length > 0 && (
+        <div className="text-xs">
+          <label className="block text-[10px] text-slate-500 font-bold mb-1">Pilih RUP dari Daftar Resmi Satker (Instan):</label>
+          <select
+            onChange={(e) => {
+              const selected = sirupPackages.find(p => p.noSirup === e.target.value)
+              if (selected) handleSelectPackage(selected)
+            }}
+            className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs cursor-pointer focus:ring-2 focus:ring-indigo-150 outline-none"
+            value={noSirup}
+          >
+            <option value="">-- Cari & Pilih Paket RUP SIRUP --</option>
+            {sirupPackages.map(p => (
+              <option key={p.noSirup} value={p.noSirup}>
+                #{p.noSirup} - {p.packName?.substring(0, 70)}... (Rp {p.pagu?.toLocaleString()})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* INPUT FORM MANUAL/EDITABLE */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div>
           <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">Nomor RUP SIRUP</label>
           <input
             type="text"
             required
-            className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded px-2 py-1 text-xs font-mono"
+            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded px-2 py-1 text-xs font-mono font-bold"
             placeholder="Contoh: 65307012"
             value={noSirup}
             onChange={(e) => setNoSirup(e.target.value)}
@@ -2538,7 +2612,7 @@ function SirupInputRow({ acc, onLink }) {
           <input
             type="text"
             required
-            className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded px-2 py-1 text-xs"
+            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded px-2 py-1 text-xs"
             placeholder="Belanja ATK Kantor..."
             value={packName}
             onChange={(e) => setPackName(e.target.value)}
@@ -2549,18 +2623,18 @@ function SirupInputRow({ acc, onLink }) {
           <input
             type="number"
             required
-            className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded px-2 py-1 text-xs font-bold text-indigo-700"
+            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded px-2 py-1 text-xs font-bold text-indigo-700"
             value={pagu}
             onChange={(e) => setPagu(e.target.value)}
           />
         </div>
       </div>
-      <div className="flex justify-between items-center pt-1">
+      <div className="flex justify-between items-center pt-1.5 border-t border-slate-100">
         <div>
           <label className="inline-flex items-center gap-1.5 text-[10px] text-slate-500 font-semibold mr-3">
             Metode:
             <select
-              className="bg-transparent border-0 font-bold text-indigo-600 focus:ring-0 p-0 text-[10px] cursor-pointer"
+              className="bg-transparent border-0 font-extrabold text-indigo-600 focus:ring-0 p-0 text-[10.5px] cursor-pointer"
               value={method}
               onChange={(e) => setMethod(e.target.value)}
             >
@@ -2573,9 +2647,9 @@ function SirupInputRow({ acc, onLink }) {
         </div>
         <button
           type="submit"
-          className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold px-3 py-1 rounded shadow transition-all"
+          className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-lg shadow-md shadow-indigo-600/10 transition-all flex items-center gap-1"
         >
-          ✓ Hubungkan Ke Rekening Ini
+          <span>✓</span> Hubungkan Ke Rekening Ini
         </button>
       </div>
     </form>
