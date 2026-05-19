@@ -1060,7 +1060,9 @@ export default function ProcurementPreparation() {
                         ocr_engine: result.ocr_engine || 'pymupdf',
                         verified: isMatched,
                         rincianCount: (r.rincian || []).length,
-                        raw_text_block: r.raw_text_block || null
+                        raw_text_block: r.raw_text_block || null,
+                        is_valid: r.is_valid !== undefined ? r.is_valid : true,
+                        validation_reason: r.validation_reason || ''
                       }
                     })
                     setDpaAccounts(mappedAccounts)
@@ -1291,8 +1293,12 @@ export default function ProcurementPreparation() {
                               >
                                 <span>⚠️</span> Verifikasi
                               </button>
+                            ) : acc.is_valid === false ? (
+                              <span className="bg-rose-50 text-rose-700 border border-rose-100 px-2.5 py-1 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 justify-center cursor-help shadow-sm hover:scale-[1.02] transition-all" title={acc.validation_reason || "Terdeteksi rincian barang terpotong di dokumen asli"}>
+                                <span>❌</span> Terpotong
+                              </span>
                             ) : (
-                              <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 justify-center">
+                              <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 justify-center cursor-help shadow-sm hover:scale-[1.02] transition-all" title={acc.validation_reason || "Rincian barang tuntas dan valid"}>
                                 <span>✓</span> Valid
                               </span>
                             )}

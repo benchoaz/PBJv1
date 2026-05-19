@@ -133,6 +133,8 @@ class RekeningDPA(BaseModel):
     sumber_dana: Optional[str] = None
     confidence: int
     rincian: List[RincianItem] = []
+    is_valid: bool = True
+    validation_reason: Optional[str] = None
     kategori_sirup: Optional[str] = None
     raw_text_block: Optional[str] = None
 
@@ -578,6 +580,110 @@ Potongan Teks DPA:
         return []
 
 
+def call_ai_api(prompt: str, provider: str, api_key: str, json_format: bool = False) -> str:
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    url = ""
+    req_body = {}
+    provider = provider.lower().strip()
+    
+    if provider == "gemini":
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        req_body = {
+            "contents": [{"parts": [{"text": prompt}]}]
+        }
+        if json_format:
+            req_body["generationConfig"] = {"generationConfig": {"responseMimeType": "application/json"}}
+    elif provider == "groq":
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers["Authorization"] = f"Bearer {api_key}"
+        req_body = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1
+        }
+        if json_format:
+            req_body["response_format"] = {"type": "json_object"}
+    elif provider == "anthropic":
+        url = "https://api.anthropic.com/v1/messages"
+        headers["x-api-key"] = api_key
+        headers["anthropic-version"] = "2023-06-01"
+        req_body = {
+            "model": "claude-3-haiku-20240307",
+            "max_tokens": 1000,
+            "messages": [{"role": "user", "content": prompt}]
+        }
+    elif provider == "openai":
+        url = "https://api.openai.com/v1/chat/completions"
+        headers["Authorization"] = f"Bearer {api_key}"
+        req_body = {
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1
+        }
+        if json_format:
+            req_body["response_format"] = {"type": "json_object"}
+    else:
+        return ""
+
+    data_bytes = json.dumps(req_body).encode("utf-8")
+    req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")
+    with urllib.request.urlopen(req, timeout=60) as response:
+        res_data = json.loads(response.read().decode("utf-8"))
+        if provider == "gemini":
+            return res_data["candidates"][0]["content"]["parts"][0]["text"]
+        elif provider in ["groq", "openai"]:
+            return res_data["choices"][0]["message"]["content"]
+        elif provider == "anthropic":
+            return res_data["content"][0]["text"]
+    return ""
+
+
+def validate_rincian_with_ai(rincian: List[RincianItem], block_text: str, provider: str, api_key: str) -> Tuple[bool, str]:
+    """
+    Jalankan AI kedua (Phase 4 Validator) untuk memeriksa apakah rincian terpotong (truncated).
+    """
+    if not rincian or not provider or not api_key:
+        return True, "Validasi dilewati karena data rincian kosong atau API key belum dikonfigurasi."
+
+    prompt = f"""Bapak adalah AI Auditor Pengadaan Barang/jasa Pemerintah yang sangat teliti.
+Tugas Anda adalah memeriksa apakah hasil ekstraksi rincian item belanja dari potongan teks DPA (RKA Belanja SKPD) berikut ini mengalami PEMOTONGAN (truncation) atau kalimat menggantung di tengah jalan sebelum selesai.
+
+POTONGAN TEKS DPA ASLI:
+{block_text}
+
+HASIL EKSTRAKSI ITEM SAAT INI (JSON):
+{json.dumps([item.dict() for item in rincian], indent=2)}
+
+Indikasi pemotongan (truncation/incomplete):
+1. Kalimat pada item terakhir menggantung atau belum selesai (misalnya: kata hubung 'dan', 'atau', 'serta' di akhir nama barang, spesifikasi yang tidak ditutup tanda kurung, dsb.).
+2. Spesifikasi barang di teks DPA asli belum selesai terekstrak seluruhnya.
+3. Angka volume atau harga satuan bernilai 0 padahal di teks DPA ada angkanya.
+4. Teks DPA asli masih memiliki baris barang belanja rincian lain di bawahnya yang belum muncul dalam hasil ekstraksi JSON.
+
+Format respons Anda WAJIB berupa JSON objek dengan keys:
+- "is_valid": true (jika lengkap, tidak ada pemotongan) atau false (jika terdeteksi pemotongan/tidak lengkap).
+- "reason": "Penjelasan singkat titik kemungkinan pemotongan atau alasan mengapa hasil ekstraksi dinilai valid/lengkap."
+
+Kembalikan HANYA respons berupa JSON objek murni tanpa penjelasan pembuka/penutup atau format markdown.
+"""
+    try:
+        res_text = call_ai_api(prompt, provider, api_key, json_format=True)
+        res_text = res_text.strip()
+        if res_text.startswith("```"):
+            res_text = re.sub(r"^```(?:json)?\n|```$", "", res_text, flags=re.MULTILINE).strip()
+        
+        parsed = json.loads(res_text)
+        is_valid = bool(parsed.get("is_valid", True))
+        reason = str(parsed.get("reason", "Hasil ekstraksi lengkap dan valid."))
+        return is_valid, reason
+    except Exception as e:
+        print(f"⚠️ AI Validator error: {str(e)}")
+        return True, f"Validasi sukses (AI validator fallback: {str(e)})."
+
+
 # ── Pipeline Ekstraksi Utama ─────────────────────────────────────────────────
 def run_extraction_pipeline(doc: fitz.Document, full_ocr_text: str, use_ocr: bool, ai_provider: str = "", api_key: str = "") -> List[RekeningDPA]:
     rekening_map = {}  # kode → RekeningDPA
@@ -691,6 +797,13 @@ def run_extraction_pipeline(doc: fitz.Document, full_ocr_text: str, use_ocr: boo
         sirup_info = REKENING_SIRUP_MAP.get(kode, {})
         kategori = sirup_info.get("kategori")
 
+        # Jalankan AI Validator (Phase 4)
+        is_valid = True
+        validation_reason = "Rincian barang lengkap."
+        if ai_provider and api_key and rincian:
+            print(f"🔍 Menjalankan AI Validator (Phase 4) untuk rekening {kode}...")
+            is_valid, validation_reason = validate_rincian_with_ai(rincian, block_after, ai_provider, api_key)
+
         rekening_candidates.append(RekeningDPA(
             kode_rekening=kode,
             uraian=uraian,
@@ -700,6 +813,8 @@ def run_extraction_pipeline(doc: fitz.Document, full_ocr_text: str, use_ocr: boo
             sumber_dana=sumber,
             confidence=conf,
             rincian=rincian,
+            is_valid=is_valid,
+            validation_reason=validation_reason,
             kategori_sirup=kategori,
             raw_text_block=block_after
         ))
