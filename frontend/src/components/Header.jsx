@@ -29,6 +29,7 @@ export default function Header() {
     { path: '/tickets', label: 'Tickets', icon: '🎫', roles: ['Admin', 'PPK', 'PP'] },
     { path: '/ppk/persiapan', label: 'PPK Persiapan', icon: '✍️', roles: ['Admin', 'PPK'] },
     { path: '/pp/panel', label: 'PP Panel', icon: '⚙️', roles: ['Admin', 'PP'] },
+    { path: '/admin/ocr', label: 'API AI OCR', icon: '🤖', roles: ['Admin', 'PPK', 'PP'] },
     { path: '/users', label: 'Users', icon: '👥', roles: ['Admin'] },
   ]
 

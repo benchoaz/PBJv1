@@ -1,6 +1,31 @@
 version: '3.8'
 
 services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://api:8081
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - pbj-network
+
+  dpa-parser:
+    build:
+      context: ./dpa-parser
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./dpa-parser/logs:/app/logs
+      - paddlex-cache:/root/.paddlex
+    networks:
+      - pbj-network
+
   api:
     build:
       context: ./backend
@@ -8,17 +33,15 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_NAME=pbj_db
+      - DATABASE_URL=host=db port=5432 user=postgres password=postgres dbname=pbj_db sslmode=disable
       - JWT_SECRET=your-secret-key-change-in-production
       - JWT_EXPIRES_IN=24h
       - PORT=8081
+      - DPA_PARSER_URL=http://dpa-parser:8000
     depends_on:
       - scraper
       - db
+      - dpa-parser
     restart: unless-stopped
     networks:
       - pbj-network
@@ -76,3 +99,6 @@ services:
 networks:
   pbj-network:
     driver: bridge
+
+volumes:
+  paddlex-cache:

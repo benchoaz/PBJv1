@@ -37,15 +37,13 @@ export function AuthProvider({ children }) {
     const defaultList = [
       { id: 1, name: 'Handik Hariyanto, S.Kom., M.Si', role: 'PPK', nip: '197909102002121004', department: 'Kecamatan Besuk', password: 'admin' },
       { id: 2, name: 'Beni Trisna Wijaya, S.Kom', role: 'PP', nip: '198205192010011010', department: 'Kecamatan Besuk', password: 'admin' },
-      { id: 3, name: 'Beni (Super Admin)', role: 'Admin', nip: 'admin', department: 'Unit Kerja Pengadaan Barang/Jasa (UKPBJ)', password: 'admin' },
-      { id: 4, name: 'Budi Santoso', role: 'PPK', nip: '198001012005011001', department: 'Dinas Pekerjaan Umum & Penataan Ruang (PUPR)', password: 'admin' },
-      { id: 5, name: 'Siti Aminah', role: 'PP', nip: '198502022010012002', department: 'Dinas Pekerjaan Umum & Penataan Ruang (PUPR)', password: 'admin' },
-      { id: 6, name: 'Ahmad Dahlan', role: 'KPA', nip: '197503032000011003', department: 'Dinas Kesehatan', password: 'admin' }
+      { id: 3, name: 'Beni (Super Admin)', role: 'Admin', nip: 'admin', department: 'Unit Kerja Pengadaan Barang/Jasa (UKPBJ)', password: 'admin' }
     ]
     const savedUsers = localStorage.getItem('pbj_users')
     let userList = []
     if (savedUsers) {
-      userList = JSON.parse(savedUsers)
+      userList = JSON.parse(savedUsers).filter(u => u.name !== 'Budi Santoso' && u.name !== 'Siti Aminah' && u.name !== 'Ahmad Dahlan')
+      localStorage.setItem('pbj_users', JSON.stringify(userList))
     } else {
       userList = defaultList
       localStorage.setItem('pbj_users', JSON.stringify(defaultList))

@@ -108,18 +108,23 @@ export default function UserManagement() {
   // Load initial state from localStorage or default list
   const [users, setUsers] = useState(() => {
     const saved = localStorage.getItem('pbj_users')
-    if (saved) return JSON.parse(saved)
+    let list = saved ? JSON.parse(saved) : []
     
-    const defaultList = [
-      { id: 1, name: 'Handik Hariyanto, S.Kom., M.Si', role: 'PPK', nip: '197909102002121004', department: 'Kecamatan Besuk', password: 'admin' },
-      { id: 2, name: 'Beni Trisna Wijaya, S.Kom', role: 'PP', nip: '198205192010011010', department: 'Kecamatan Besuk', password: 'admin' },
-      { id: 3, name: 'Beni (Super Admin)', role: 'Admin', nip: 'admin', department: 'Unit Kerja Pengadaan Barang/Jasa (UKPBJ)', password: 'admin' },
-      { id: 4, name: 'Budi Santoso', role: 'PPK', nip: '198001012005011001', department: 'Dinas Pekerjaan Umum & Penataan Ruang (PUPR)', password: 'admin' },
-      { id: 5, name: 'Siti Aminah', role: 'PP', nip: '198502022010012002', department: 'Dinas Pekerjaan Umum & Penataan Ruang (PUPR)', password: 'admin' },
-      { id: 6, name: 'Ahmad Dahlan', role: 'KPA', nip: '197503032000011003', department: 'Dinas Kesehatan', password: 'admin' }
-    ]
-    localStorage.setItem('pbj_users', JSON.stringify(defaultList))
-    return defaultList
+    // Filter out unwanted mock users permanently!
+    list = list.filter(u => u.name !== 'Budi Santoso' && u.name !== 'Siti Aminah' && u.name !== 'Ahmad Dahlan')
+    
+    if (!saved || list.length === 0) {
+      const defaultList = [
+        { id: 1, name: 'Handik Hariyanto, S.Kom., M.Si', role: 'PPK', nip: '197909102002121004', department: 'Kecamatan Besuk', password: 'admin' },
+        { id: 2, name: 'Beni Trisna Wijaya, S.Kom', role: 'PP', nip: '198205192010011010', department: 'Kecamatan Besuk', password: 'admin' },
+        { id: 3, name: 'Beni (Super Admin)', role: 'Admin', nip: 'admin', department: 'Unit Kerja Pengadaan Barang/Jasa (UKPBJ)', password: 'admin' }
+      ]
+      localStorage.setItem('pbj_users', JSON.stringify(defaultList))
+      return defaultList
+    }
+    
+    localStorage.setItem('pbj_users', JSON.stringify(list))
+    return list
   })
 
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -131,6 +136,7 @@ export default function UserManagement() {
   const [nip, setNip] = useState('')
   const [department, setDepartment] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   // Persist to localStorage whenever users list changes
   useEffect(() => {
@@ -145,6 +151,7 @@ export default function UserManagement() {
     setNip('')
     setDepartment('Badan Kepegawaian dan Pengembangan Sumber Daya Manusia')
     setPassword('')
+    setShowPassword(false)
     setIsModalOpen(true)
   }
 
@@ -156,6 +163,7 @@ export default function UserManagement() {
     setNip(user.nip)
     setDepartment(user.department)
     setPassword('') // Leave blank for edit by default
+    setShowPassword(false)
     setIsModalOpen(true)
   }
 
@@ -358,16 +366,34 @@ export default function UserManagement() {
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                   {currentEditUser ? '🔒 Reset / Ubah Password' : '🔒 Password Akses'}
                 </label>
-                <input 
-                  type="password" 
-                  className="glass-input" 
-                  value={password} 
-                  onChange={e => setPassword(e.target.value)} 
-                  placeholder={currentEditUser ? 'Kosongkan jika tidak ingin mengubah password' : 'Masukkan password akses...'}
-                  required={!currentEditUser}
-                />
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    className="glass-input pr-10" 
+                    value={password} 
+                    onChange={e => setPassword(e.target.value)} 
+                    placeholder={currentEditUser ? 'Kosongkan jika tidak ingin mengubah password' : 'Masukkan password akses...'}
+                    required={!currentEditUser}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors flex items-center justify-center"
+                  >
+                    {showPassword ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
                 {currentEditUser && (
-                  <div className="text-[10px] text-slate-400 mt-1 font-medium italic">
+                  <div className="text-[10px] text-slate-400 mt-1.5 font-medium italic">
                     *Biarkan kolom password kosong jika tidak ingin melakukan reset password.
                   </div>
                 )}

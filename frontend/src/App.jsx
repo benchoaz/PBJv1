@@ -9,6 +9,7 @@ import Login from './components/Login'
 import UserManagement from './components/UserManagement'
 import ProcurementPreparation from './components/ProcurementPreparation'
 import ProcurementPanel from './components/ProcurementPanel'
+import OcrApiKeyManager from './components/OcrApiKeyManager'
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
             <Route path="/users" element={<UserManagement />} />
             <Route path="/ppk/persiapan" element={<ProcurementPreparation />} />
             <Route path="/pp/panel" element={<ProcurementPanel />} />
+            <Route path="/admin/ocr" element={<OcrApiKeyManager />} />
           </Routes>
         </main>
       </div>

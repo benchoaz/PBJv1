@@ -34,3 +34,8 @@ out/
 # Backend Temporary
 backend/tmp/
 backend/bin/
+
+# DPA Parser logs and pycache
+dpa-parser/logs/
+dpa-parser/__pycache__/
+*.pyc

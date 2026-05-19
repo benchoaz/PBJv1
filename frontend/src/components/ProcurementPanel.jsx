@@ -42,7 +42,7 @@ export default function ProcurementPanel() {
         const pack = JSON.parse(packStr)
         const defaults = {}
         // Support up to 13 items for ATK, 3 for Kertas, 2 for Bahan Komputer
-        const itemCount = pack.noSirup === '65307012' ? 13 : pack.noSirup === '65308044' ? 3 : pack.noSirup === '65309015' ? 2 : 2
+        const itemCount = getPackageItems(pack).length || 2
         for (let i = 1; i <= itemCount; i++) {
           defaults[i] = true
         }
@@ -129,116 +129,267 @@ export default function ProcurementPanel() {
     }
   })
 
-  // Real-world Catalog Mock Data
+  // Real-world Catalog Mock Data matching Kecamatan Besuk DPA TA 2026
   const mockCatalogProducts = {
-    Laptop: [
+    ATK: [
       { 
-        id: 'L01', 
-        name: 'ASUS ExpertBook P1412CEA', 
-        vendor: 'PT ASUS Technology Indonesia (Penyedia Lokal)', 
-        price: 8200000, 
-        rating: 4.8, 
+        id: 'A01', 
+        name: 'Ballpoint / Ballpen / Pena (Ballpoint Baliner Gel)', 
+        vendor: 'CV. MANDIRI ATK PROBOLINGGO', 
+        price: 235000, 
+        rating: 4.9, 
         location: 'Kab. Probolinggo', 
-        specs: 'Intel Core i3, RAM 8GB, SSD 256GB, Win 11 Home',
-        garansi: '2 Tahun Resmi',
+        specs: 'Ballpoint gel warna hitam/biru, isi 12 buah per pack (PDN)',
+        garansi: 'Resmi',
         katalog: 'Lokal',
-        badge: 'Rekomendasi: Lokasi Terdekat & Hemat Ongkir'
+        badge: 'Rekomendasi Utama: Hemat & Terdekat'
       },
       { 
-        id: 'L02', 
-        name: 'Acer TravelMate P214', 
-        vendor: 'PT Acer Indonesia', 
-        price: 8450000, 
+        id: 'A02', 
+        name: 'Alas Triplek Kerja Kantor', 
+        vendor: 'UD. BESUK MEBEL INDAH', 
+        price: 14500, 
+        rating: 4.8, 
+        location: 'Kec. Besuk, Kab. Probolinggo', 
+        specs: 'Alas kerja triplek kayu lapis tebal kualitas premium',
+        garansi: '6 Bulan',
+        katalog: 'Lokal',
+        badge: 'Mitra Lokal Terdekat'
+      },
+      { 
+        id: 'A03', 
+        name: 'Snelhechter Map (5001 setara Diamond)', 
+        vendor: 'PT. LINTAS ATK SURABAYA', 
+        price: 108000, 
         rating: 4.7, 
         location: 'Kota Surabaya', 
-        specs: 'Intel Core i3, RAM 8GB, SSD 256GB, Win 11 Home',
-        garansi: '1 Tahun Resmi',
+        specs: 'Map snelhechter isi 50 buah setara Diamond',
+        garansi: 'Resmi',
         katalog: 'Nasional',
-        badge: 'Rekomendasi: Pilihan Umum LKPP'
-      },
-      { 
-        id: 'L03', 
-        name: 'Lenovo ThinkBook 14 G4', 
-        vendor: 'PT Lenovo Indonesia', 
-        price: 8590000, 
-        rating: 4.9, 
-        location: 'DKI Jakarta', 
-        specs: 'Intel Core i3, RAM 8GB, SSD 512GB, Win 11 Home',
-        garansi: '2 Tahun Resmi',
-        katalog: 'Nasional',
-        badge: 'Rekomendasi: Spesifikasi SSD Terbesar'
+        badge: 'Penyedia Nasional Terlengkap'
       }
     ],
-    Printer: [
+    Kertas: [
       { 
-        id: 'P01', 
-        name: 'PRINTER EPSON L121', 
+        id: 'K01', 
+        name: 'Kertas HVS F4 70 Gram (setara Sidu)', 
+        vendor: 'UD. KERTAS JAYA KRAKSAAN', 
+        price: 68000, 
+        rating: 4.9, 
+        location: 'Kec. Kraksaan, Kab. Probolinggo', 
+        specs: 'HVS F4 70 gram Sinar Dunia/Sidu asli kualitas tinggi',
+        garansi: 'Resmi',
+        katalog: 'Lokal',
+        badge: 'Rekomendasi: Harga Grosir Terdekat'
+      },
+      { 
+        id: 'K02', 
+        name: 'Kertas HVS A4 80 Gram (setara Sinar Dunia)', 
+        vendor: 'CV. MITRA UTAMA SURABAYA', 
+        price: 74500, 
+        rating: 4.8, 
+        location: 'Kota Surabaya', 
+        specs: 'HVS A4 80 gram Sinar Dunia, kertas putih cerah',
+        garansi: 'Resmi',
+        katalog: 'Nasional',
+        badge: 'Penyedia Nasional'
+      },
+      { 
+        id: 'K03', 
+        name: 'Amplop Dinas Coklat (15,5 x 25 Cm)', 
+        vendor: 'UD. KERTAS JAYA KRAKSAAN', 
+        price: 1800, 
+        rating: 4.7, 
+        location: 'Kec. Kraksaan, Kab. Probolinggo', 
+        specs: 'Amplop dinas coklat ukuran 15.5 x 25 cm, isi 100 lembar per pack',
+        garansi: 'Resmi',
+        katalog: 'Lokal',
+        badge: 'Pilihan Lokal Tercepat'
+      }
+    ],
+    Tinta: [
+      { 
+        id: 'T01', 
+        name: 'Tinta Printer Black (setara Epson 001)', 
         vendor: 'UMKK MITRA TECHNOLOGY COMPUTINDO', 
-        price: 1750000, 
+        price: 210000, 
         rating: 4.9, 
         location: 'Kota Probolinggo', 
-        specs: 'Print Only, Ink Tank System, Kecepatan Tinggi (PDN)',
-        garansi: '2 Tahun Resmi',
+        specs: 'Tinta hitam 127ml original Epson 001 (PDN)',
+        garansi: '2 Tahun Resmi Epson',
         katalog: 'Lokal',
         badge: 'Rekomendasi Utama: Mitra Terpercaya & Harga Terendah'
       },
       { 
-        id: 'P02', 
-        name: 'Printer Epson L121', 
+        id: 'T02', 
+        name: 'Tinta Printer Colour (setara Epson 001 C/M/Y)', 
         vendor: 'CV. MULTI MEDIA PROBOLINGGO UTAMA', 
-        price: 1881450, 
-        rating: 4.7, 
+        price: 125000, 
+        rating: 4.8, 
         location: 'Kota Probolinggo', 
-        specs: 'Print Only, Ink Tank, Kecepatan Tinggi (PDN)',
-        garansi: '2 Tahun',
+        specs: 'Tinta warna original Epson 001 (PDN)',
+        garansi: '2 Tahun Resmi',
         katalog: 'Lokal',
-        badge: 'Pembanding Lokal: Lokasi Terdekat'
+        badge: 'Pembanding Lokal Terdekat'
       },
       { 
-        id: 'P03', 
-        name: 'Epson L121', 
-        vendor: 'UD. BESUK INDAH COMPUTINDO JAYA', 
-        price: 2500000, 
-        rating: 4.5, 
-        location: 'Kab. Probolinggo', 
-        specs: 'Print Only, Ink Tank, Kecepatan Tinggi (PDN)',
+        id: 'T03', 
+        name: 'Paket Tinta Printer Epson 001 (Black + 3 Colour)', 
+        vendor: 'UD. KRAKSAAN INDAH COMPUTER', 
+        price: 580000, 
+        rating: 4.6, 
+        location: 'Kec. Kraksaan, Kab. Probolinggo', 
+        specs: 'Paket hemat tinta printer Epson 001 lengkap',
         garansi: '1 Tahun',
         katalog: 'Lokal',
-        badge: 'Pembanding Lokal: Kapasitas Sedang'
+        badge: 'Pembanding Lokal: Kapasitas Lengkap'
+      }
+    ],
+    Banner: [
+      { 
+        id: 'B01', 
+        name: 'Cetak Banner Flexy 340g (Plastick lembar)', 
+        vendor: 'UD. BESUK CETAK MANDIRI', 
+        price: 20000, 
+        rating: 4.9, 
+        location: 'Kec. Besuk, Kab. Probolinggo', 
+        specs: 'Cetak banner flexy 340 gram kualitas high-res, bahan plastik lembar (PDN)',
+        garansi: 'Garansi Cetak Ulang',
+        katalog: 'Lokal',
+        badge: 'Rekomendasi Utama: Mitra Besuk Terdekat & Paling Cepat'
+      },
+      { 
+        id: 'B02', 
+        name: 'Cetak Banner / Spanduk Plastick Lembar 280g', 
+        vendor: 'CV. PRINT JAYA KRAKSAAN', 
+        price: 18000, 
+        rating: 4.7, 
+        location: 'Kec. Kraksaan, Kab. Probolinggo', 
+        specs: 'Banner flexy 280 gram standar',
+        garansi: '3 Bulan',
+        katalog: 'Lokal',
+        badge: 'Pembanding Lokal Terdekat'
+      },
+      { 
+        id: 'B03', 
+        name: 'Cetak Banner SPP Ramah Lingkungan', 
+        vendor: 'CV. ECO PRINT SURABAYA', 
+        price: 25000, 
+        rating: 4.8, 
+        location: 'Kota Surabaya', 
+        specs: 'Banner flexy ramah lingkungan, bahan daur ulang (SPP)',
+        garansi: 'Resmi',
+        katalog: 'Nasional',
+        badge: 'Pilihan Pengadaan SPP Berkelanjutan'
       }
     ]
+  }
+
+  const getCommodityNames = (pack) => {
+    if (!pack) return { first: 'Laptop', second: 'Printer' }
+    const items = getPackageItems(pack)
+    return {
+      first: items[0]?.name || pack.packName || 'Produk Utama',
+      second: items[1]?.name || ''
+    }
+  }
+
+  const commodities = getCommodityNames(submittedPack)
+
+  const getCatalogProducts = (type = selectedProductType) => {
+    if (!submittedPack) return []
+    const catType = type === 'laptop' || type === 'Laptop' ? 'Laptop' : 'Printer'
+    
+    const packNameLower = submittedPack.packName.toLowerCase()
+    
+    if (packNameLower.includes('tulis') || packNameLower.includes('atk')) {
+      return catType === 'Laptop' 
+        ? mockCatalogProducts.ATK.filter(p => p.id === 'A02' || p.name.includes('Alas')) 
+        : mockCatalogProducts.ATK.filter(p => p.id !== 'A02')
+    }
+    if (packNameLower.includes('kertas') || packNameLower.includes('cover') || packNameLower.includes('hvs')) {
+      return catType === 'Laptop' 
+        ? mockCatalogProducts.Kertas.filter(p => p.id === 'K03' || p.name.includes('Amplop')) 
+        : mockCatalogProducts.Kertas.filter(p => p.id !== 'K03')
+    }
+    if (packNameLower.includes('tinta') || packNameLower.includes('komputer') || packNameLower.includes('printer')) {
+      return catType === 'Laptop' 
+        ? mockCatalogProducts.Tinta.filter(p => p.id === 'T01' || p.name.includes('Black')) 
+        : mockCatalogProducts.Tinta.filter(p => p.id !== 'T01')
+    }
+    if (packNameLower.includes('cetak') || packNameLower.includes('banner') || packNameLower.includes('spanduk')) {
+      return mockCatalogProducts.Banner
+    }
+    
+    return catType === 'Laptop' ? mockCatalogProducts.Laptop : mockCatalogProducts.Printer
   }
 
   // Handle automatic query fill from DPA/RUP
   useEffect(() => {
     if (submittedPack) {
-      setSearchQuery(selectedProductType === 'Laptop' ? 'Laptop Intel Celeron' : 'Printer EPSON L121')
+      let derivedType = 'Laptop'
+      let query = ''
+      
+      const packNameLower = submittedPack.packName.toLowerCase()
+      if (packNameLower.includes('tulis') || packNameLower.includes('atk')) {
+        derivedType = 'Printer' 
+        query = 'Ballpoint Baliner'
+      } else if (packNameLower.includes('kertas') || packNameLower.includes('cover') || packNameLower.includes('hvs')) {
+        derivedType = 'Printer'
+        query = 'Kertas HVS'
+      } else if (packNameLower.includes('tinta') || packNameLower.includes('komputer') || packNameLower.includes('printer')) {
+        derivedType = 'Laptop'
+        query = 'Tinta Printer Black'
+      } else if (packNameLower.includes('cetak') || packNameLower.includes('banner') || packNameLower.includes('spanduk')) {
+        derivedType = 'Laptop'
+        query = 'Cetak Banner'
+      } else {
+        derivedType = 'Laptop'
+        query = submittedPack.packName
+      }
+      
+      setSelectedProductType(derivedType)
+      setSearchQuery(query)
     }
-  }, [selectedProductType, submittedPack])
+  }, [submittedPack])
 
   const getPackageItems = (pack) => {
     if (!pack) return []
-    if (pack.packName?.includes('Alat Tulis') || pack.packName?.includes('ATK') || pack.mak === '5.1.02.01.001.00024') {
-      return [
-        { no: 1, name: 'Ballpoint Standard AE7', qty: 15, unit: 'Box', price: 28520 },
-        { no: 2, name: 'Map Snelhechter Plastik', qty: 150, unit: 'Pcs', price: 6200 },
-        { no: 3, name: 'Buku Agenda Kerja PPK', qty: 10, unit: 'Pcs', price: 35000 },
-        { no: 4, name: 'Spidol Whiteboard Boardmarker', qty: 50, unit: 'Pcs', price: 12500 },
-        { no: 5, name: 'Stapler Kangaro HP-45', qty: 5, unit: 'Unit', price: 64000 },
-        { no: 6, name: 'Isi Staples Kangaro No. 10', qty: 50, unit: 'Box', price: 4500 },
-        { no: 7, name: 'Cutter Kenko L-500', qty: 10, unit: 'Pcs', price: 18500 },
-        { no: 8, name: 'Isi Cutter Kenko', qty: 20, unit: 'Tube', price: 8000 },
-        { no: 9, name: 'Penghapus Whiteboard', qty: 15, unit: 'Pcs', price: 7500 },
-        { no: 10, name: 'Gunting Sedang', qty: 10, unit: 'Pcs', price: 14500 },
-        { no: 11, name: 'Lakban Hitam 2 Inch', qty: 25, unit: 'Roll', price: 19500 },
-        { no: 12, name: 'Double Tape 1 Inch', qty: 20, unit: 'Roll', price: 9500 },
-        { no: 13, name: 'Amplop Kabinet Jaya No. 90', qty: 20, unit: 'Box', price: 43500 }
-      ]
+    
+    const savedItems = localStorage.getItem(`dpa_items_${pack.noSirup}`)
+    if (savedItems) return JSON.parse(savedItems)
+    
+    const items = []
+    const packNameLower = pack.packName.toLowerCase()
+    
+    // Generates completely dynamic items matching the pagu perfectly
+    if (packNameLower.includes('tulis') || packNameLower.includes('atk')) {
+      items.push({ no: 1, name: 'Alas Catatan Kantor', qty: 6, unit: 'Buah', price: Math.round(pack.pagu * 0.05 / 6) })
+      items.push({ no: 2, name: 'Pena Ballpoint Gel', qty: 10, unit: 'Pack', price: Math.round(pack.pagu * 0.45 / 10) })
+      items.push({ no: 3, name: 'Kertas Memo Sticky Notes', qty: 15, unit: 'Buah', price: Math.round(pack.pagu * 0.20 / 15) })
+      items.push({ no: 4, name: 'Binder Clip Logam', qty: 8, unit: 'Kotak', price: Math.round(pack.pagu * 0.30 / 8) })
+    } else if (packNameLower.includes('kertas') || packNameLower.includes('cover') || packNameLower.includes('hvs')) {
+      items.push({ no: 1, name: 'Kertas HVS F4 70gr Sinar Dunia', qty: 50, unit: 'Rim', price: Math.round(pack.pagu * 0.60 / 50) })
+      items.push({ no: 2, name: 'Kertas HVS A4 80gr PaperOne', qty: 30, unit: 'Rim', price: Math.round(pack.pagu * 0.40 / 30) })
+    } else if (packNameLower.includes('tinta') || packNameLower.includes('komputer') || packNameLower.includes('printer')) {
+      items.push({ no: 1, name: 'Tinta Printer Original Black', qty: 12, unit: 'Botol', price: Math.round(pack.pagu * 0.50 / 12) })
+      items.push({ no: 2, name: 'Tinta Printer Original Colour', qty: 12, unit: 'Botol', price: Math.round(pack.pagu * 0.50 / 12) })
+    } else if (packNameLower.includes('cetak') || packNameLower.includes('banner') || packNameLower.includes('spanduk')) {
+      items.push({ no: 1, name: 'Cetak Banner Flexy 340gr (Outdoor)', qty: 15, unit: 'Meter Persegi', price: Math.round(pack.pagu / 15) })
+    } else {
+      items.push({ no: 1, name: `${pack.packName} Tipe Utama`, qty: 1, unit: 'Paket', price: Math.round(pack.pagu * 0.60) })
+      items.push({ no: 2, name: `${pack.packName} Layanan Pendukung`, qty: 1, unit: 'Paket', price: Math.round(pack.pagu * 0.40) })
     }
-    return [
-      { no: 1, name: 'Laptop (setara intel Celeron termasuk Operating Sistem)', qty: 1, unit: 'Unit', price: 8629000 },
-      { no: 2, name: '[Konsolidasi] Printer EPSON L121', qty: 1, unit: 'Unit', price: 2200000 }
-    ]
+    
+    // Adjust first item price so sum matches pack.pagu exactly
+    let sum = 0
+    items.forEach(item => sum += item.qty * item.price)
+    const diff = pack.pagu - sum
+    if (diff !== 0 && items.length > 0) {
+      items[0].price += Math.round(diff / items[0].qty)
+    }
+    
+    return items
   }
 
   const handleResetPackage = () => {
@@ -285,26 +436,47 @@ export default function ProcurementPanel() {
 
   // Automatic smart system documentation (Asisten AI)
   const handleAutoScreenshot = (type, product) => {
-    const currentCategoryProducts = mockCatalogProducts[type === 'laptop' ? 'Laptop' : 'Printer']
-    const mockScreenshotUrl = type === 'laptop'
-      ? 'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?auto=format&fit=crop&w=800&q=80'
-      : 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?auto=format&fit=crop&w=800&q=80'
+    const currentCategoryProducts = getCatalogProducts(type === 'laptop' ? 'Laptop' : 'Printer')
+    
+    let mockScreenshotUrl = 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80'
+    let realUrl = 'https://e-katalog.lkpp.go.id/product/id/standard-item-inaproc'
+    
+    if (submittedPack) {
+      const packNameLower = submittedPack.packName.toLowerCase()
+      if (packNameLower.includes('tulis') || packNameLower.includes('atk')) {
+        mockScreenshotUrl = 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80'
+        realUrl = type === 'laptop'
+          ? 'https://e-katalog.lkpp.go.id/product/id/alas-catatan-besuk-inaproc'
+          : 'https://e-katalog.lkpp.go.id/product/id/ballpoint-baliner-gel-atk'
+      } else if (packNameLower.includes('kertas') || packNameLower.includes('cover') || packNameLower.includes('hvs')) {
+        mockScreenshotUrl = 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?auto=format&fit=crop&w=800&q=80'
+        realUrl = type === 'laptop'
+          ? 'https://e-katalog.lkpp.go.id/product/id/amplop-coklat-dinas-kertas'
+          : 'https://e-katalog.lkpp.go.id/product/id/hvs-f4-70g-sidu-inaproc'
+      } else if (packNameLower.includes('tinta') || packNameLower.includes('komputer') || packNameLower.includes('printer')) {
+        mockScreenshotUrl = 'https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=800&q=80'
+        realUrl = type === 'laptop'
+          ? 'https://e-katalog.lkpp.go.id/product/id/epson-001-black-original'
+          : 'https://e-katalog.lkpp.go.id/product/id/epson-001-colour-original'
+      } else if (packNameLower.includes('cetak') || packNameLower.includes('banner') || packNameLower.includes('spanduk')) {
+        mockScreenshotUrl = 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?auto=format&fit=crop&w=800&q=80'
+        realUrl = 'https://e-katalog.lkpp.go.id/product/id/cetak-banner-flexy-340g'
+      }
+    }
 
-    const realUrl = type === 'laptop' 
-      ? 'https://e-katalog.lkpp.go.id/product/id/acer-travelmate-p214-inaproc'
-      : 'https://katalog.inaproc.id/mitra-technology-computindo/printer-epson-l121'
-
-    const maxHps = type === 'laptop' ? 8629000 : 2200000
+    const maxHps = type === 'laptop' 
+      ? (getPackageItems(submittedPack)[0]?.price || 8629000)
+      : (getPackageItems(submittedPack)[1]?.price || 2200000)
     
     // Smart AI Negotiation Logic (Ensures compliance with HPS even if Etalase price is higher)
     let aiNegotiatedPrice = product.price
     if (product.price > maxHps) {
-       aiNegotiatedPrice = maxHps - 29000 // Safely negotiate down to below HPS!
-    } else if (product.price > maxHps - 50000) {
-       aiNegotiatedPrice = product.price - 50000
+       aiNegotiatedPrice = maxHps - 1000 // Safely negotiate down to below HPS!
+    } else if (product.price > maxHps - 5000) {
+       aiNegotiatedPrice = product.price - 5000
     }
 
-    const negotiatedOngkir = type === 'laptop' ? '150000' : '120000'
+    const negotiatedOngkir = '0'
 
     const updatedDocs = {
       ...savedDocs,
@@ -376,7 +548,7 @@ export default function ProcurementPanel() {
       return
     }
     
-    const currentCategoryProducts = mockCatalogProducts[docModalType === 'laptop' ? 'Laptop' : 'Printer']
+    const currentCategoryProducts = getCatalogProducts(docModalType === 'laptop' ? 'Laptop' : 'Printer')
     const updatedDocs = {
       ...savedDocs,
       [docModalType]: {
@@ -573,8 +745,8 @@ export default function ProcurementPanel() {
                       hpsValue: '10829000',
                       techSpecs: 'Laptop dan Printer untuk operasional sekretariat',
                       dpaName: 'DPA TA. 2026 KEC. BESUK-90-95.pdf',
-                      senderName: 'Budi Santoso',
-                      senderNip: '198001012005011001',
+                      senderName: 'Handik Hariyanto, S.Kom., M.Si',
+                      senderNip: '197909102002121004',
                       senderDepartment: 'Kantor Kecamatan Besuk',
                       sentDate: '17 Mei 2026'
                     }
@@ -627,8 +799,8 @@ export default function ProcurementPanel() {
                       }}
                       className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs px-3.5 py-2.5 rounded-xl font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     >
-                      {checkedItems[1] && <option value="Laptop">💻 Laptop (HPS Maks: Rp 8.629.000)</option>}
-                      {checkedItems[2] && <option value="Printer">🖨️ Printer EPSON L121 (HPS Maks: Rp 2.200.000)</option>}
+                      {checkedItems[1] && <option value="Laptop">💻 {commodities.first} (HPS Maks: Rp {(getPackageItems(submittedPack)[0]?.price || 0).toLocaleString('id-ID')})</option>}
+                      {checkedItems[2] && commodities.second && <option value="Printer">🖨️ {commodities.second} (HPS Maks: Rp {(getPackageItems(submittedPack)[1]?.price || 0).toLocaleString('id-ID')})</option>}
                     </select>
                   </div>
 
@@ -729,7 +901,7 @@ export default function ProcurementPanel() {
                       const query = searchQuery.trim().toLowerCase()
                       
                       // 1. Filter existing list including specs, location and vendors
-                      let list = mockCatalogProducts[selectedProductType]
+                      let list = getCatalogProducts(selectedProductType)
                         .filter(p => filterKatalog === 'Nasional' || p.katalog === filterKatalog)
                         .filter(p => selectedLocations.length === 0 || selectedLocations.some(loc => p.location.includes(loc)))
                         .filter(p => {
@@ -1600,7 +1772,7 @@ export default function ProcurementPanel() {
 
       {/* Real Inaproc Upload Documentation Modal */}
       {isDocModalOpen && docModalProduct && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.4)' }} className="fixed inset-0 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 max-w-xl w-full shadow-2xl animate-scale-up max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-6">
               <div>

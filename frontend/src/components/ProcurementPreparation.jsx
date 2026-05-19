@@ -64,6 +64,8 @@ export default function ProcurementPreparation() {
     return saved ? JSON.parse(saved) : null
   })
   const [detailModalPack, setDetailModalPack] = useState(null)
+  // Modal untuk edit rincian item per rekening
+  const [rincianModal, setRincianModal] = useState(null) // { kodeRekening, uraian, items[] }
   const [hpsValue, setHpsValue] = useState(() => {
     return localStorage.getItem('pbj_hps_value') || ''
   })
@@ -73,8 +75,89 @@ export default function ProcurementPreparation() {
 
   const [matchedDpaTypes, setMatchedDpaTypes] = useState(() => {
     const saved = localStorage.getItem('pbj_matched_dpa_types')
-    return saved ? JSON.parse(saved) : ['LAPTOP', 'ATK', 'CETAK']
+    return saved ? JSON.parse(saved) : []
   })
+
+  const [dpaAccounts, setDpaAccounts] = useState(() => {
+    const saved = localStorage.getItem('pbj_dpa_accounts')
+    return saved ? JSON.parse(saved) : []
+  })
+
+  // dpaRincian: { [kode_rekening]: [{ no, nama, volume, satuan, harga_satuan, harga_total }] }
+  const [dpaRincian, setDpaRincian] = useState(() => {
+    const saved = localStorage.getItem('pbj_dpa_rincian')
+    return saved ? JSON.parse(saved) : {}
+  })
+
+  const [dpaOcrMode, setDpaOcrMode] = useState(() => {
+    return localStorage.getItem('pbj_dpa_ocr_mode') || 'local'
+  })
+
+  const [isAnalyzingDpa, setIsAnalyzingDpa] = useState(false)
+  const [sirupPackages, setSirupPackages] = useState([])
+  const [isFetchingSirup, setIsFetchingSirup] = useState(false)
+  const [sirupSearchQuery, setSirupSearchQuery] = useState('')
+
+  const fetchSirupPackages = async (targetSatkerId) => {
+    setIsFetchingSirup(true)
+    try {
+      const target = targetSatkerId || satkerId || '67081'
+      const response = await fetch(`/api/sirup/satker/${target}?tahun=2026`)
+      if (!response.ok) {
+        throw new Error(`Server returned error: ${response.status}`)
+      }
+      const data = await response.json()
+      if (data.success && data.packages) {
+        setSirupPackages(data.packages)
+      } else {
+        throw new Error(data.message || 'Gagal memformat RUP LKPP')
+      }
+    } catch (err) {
+      console.error('Error fetching SIRUP packages:', err)
+      alert('Gagal mengambil data SIRUP LKPP: ' + err.message + '\n\nPastikan koneksi internet server stabil.')
+    } finally {
+      setIsFetchingSirup(false)
+    }
+  }
+
+  // Fetch SIRUP packages automatically on mount if we don't have a package locked yet
+  useEffect(() => {
+    if (!selectedPack) {
+      fetchSirupPackages('67081') // default Kecamatan Besuk
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('pbj_dpa_accounts', JSON.stringify(dpaAccounts))
+  }, [dpaAccounts])
+
+  useEffect(() => {
+    localStorage.setItem('pbj_dpa_rincian', JSON.stringify(dpaRincian))
+  }, [dpaRincian])
+
+  const handleInlineEdit = (index, field, value) => {
+    setDpaAccounts(prev => {
+      const updated = [...prev]
+      updated[index] = {
+        ...updated[index],
+        [field]: value,
+        edited: true,
+        verified: true
+      }
+      return updated
+    })
+  }
+
+  const handleConfirmAccount = (index) => {
+    setDpaAccounts(prev => {
+      const updated = [...prev]
+      updated[index] = {
+        ...updated[index],
+        verified: true
+      }
+      return updated
+    })
+  }
 
   const [isScraping, setIsScraping] = useState(false)
   const [scrapingLogs, setScrapingLogs] = useState([])
@@ -86,40 +169,130 @@ export default function ProcurementPreparation() {
     return localStorage.getItem('pbj_is_signed') === 'true'
   })
 
+  const areAccountsCompatible = (dpaAcc, sirupMak) => {
+    if (!dpaAcc || !sirupMak) return true
+    
+    // Temukan index angka 5 yang merupakan bagian awal kode rekening belanja (5.x.xx...)
+    const indexFive = sirupMak.indexOf('5.')
+    let cleanSirup = ''
+    if (indexFive !== -1) {
+      // Ambil dari angka 5 ke belakang
+      const makAccountPart = sirupMak.substring(indexFive)
+      cleanSirup = makAccountPart.replace(/[^0-9]/g, '')
+    } else {
+      cleanSirup = sirupMak.replace(/[^0-9]/g, '')
+    }
+    
+    const cleanDpa = dpaAcc.replace(/[^0-9]/g, '')
+    if (!cleanDpa || !cleanSirup) return true
+    
+    // Cocokkan apakah kode DPA terkandung di dalam bagian rekening MAK
+    if (cleanSirup.includes(cleanDpa) || cleanDpa.includes(cleanSirup)) return true
+    
+    // Bandingkan kategori utama (6 digit pertama, misal 520205 vs 520210)
+    const prefixDpa = cleanDpa.substring(0, 6)
+    const prefixSirup = cleanSirup.substring(0, 6)
+    if (prefixDpa && prefixSirup && prefixDpa === prefixSirup) return true
+    
+    return false
+  }
+
+  const isPackageMatchedWithDpa = (pack) => {
+    if (!pack || !dpaAccounts || dpaAccounts.length === 0) return false
+    
+    // Stop words to filter out common terms from government accounts
+    const stopWords = ['belanja', 'dan', 'untuk', 'kegiatan', 'bahan', 'alat', 'kantor', 'sub', 'penyediaan', 'jasa', 'modal']
+    
+    return dpaAccounts.some(acc => {
+      // If MAK and account are incompatible, they cannot be a match!
+      if (pack.mak && acc.account && !areAccountsCompatible(acc.account, pack.mak)) {
+        return false
+      }
+
+      // 1. Direct Pagu Match (common in regional budget systems)
+      const paguDifference = Math.abs(acc.pagu - pack.pagu)
+      if (paguDifference < 1000) return true
+      
+      // 2. Dynamic Keyword Matching
+      const accWords = acc.name.toLowerCase().split(/[\s/.,()-]+/)
+      const keywords = accWords.filter(w => w.length > 2 && !stopWords.includes(w))
+      
+      const packNameLower = pack.packName.toLowerCase()
+      const hasKeywordMatch = keywords.some(kw => packNameLower.includes(kw))
+      
+      // If we have keyword overlap and the package pagu is valid, it's a match!
+      if (hasKeywordMatch && pack.pagu <= acc.pagu) {
+        return true
+      }
+      
+      return false
+    })
+  }
+
+  const getMatchingDpaAccount = (pack) => {
+    if (!pack || !dpaAccounts || dpaAccounts.length === 0) return null
+    
+    const stopWords = ['belanja', 'dan', 'untuk', 'kegiatan', 'bahan', 'alat', 'kantor', 'sub', 'penyediaan', 'jasa', 'modal']
+    
+    return dpaAccounts.find(acc => {
+      // If MAK and account are incompatible, they cannot be a match!
+      if (pack.mak && acc.account && !areAccountsCompatible(acc.account, pack.mak)) {
+        return false
+      }
+
+      // 1. Direct Pagu Match (common in regional budget systems)
+      const paguDifference = Math.abs(acc.pagu - pack.pagu)
+      if (paguDifference < 1000) return true
+      
+      // 2. Dynamic Keyword Matching
+      const accWords = acc.name.toLowerCase().split(/[\s/.,()-]+/)
+      const keywords = accWords.filter(w => w.length > 2 && !stopWords.includes(w))
+      
+      const packNameLower = pack.packName.toLowerCase()
+      const hasKeywordMatch = keywords.some(kw => packNameLower.includes(kw))
+      
+      if (hasKeywordMatch && pack.pagu <= acc.pagu) {
+        return true
+      }
+      
+      return false
+    })
+  }
+
+  /**
+   * getPackageItems — ambil rincian item dari DPA Ground Truth (hasil parser + koreksi PPK).
+   * Prioritas: (1) dpaRincian[kode_rekening cocok], (2) dpaRincian['manual_nosirup_xxx'],
+   * (3) item placeholder agar tabel tidak kosong.
+   */
   const getPackageItems = (pack) => {
     if (!pack) return []
-    if (pack.noSirup === '65307012') {
-      return [
-        { no: 1, name: 'Alas Triplek', qty: 6, unit: 'Biji', price: 15900 },
-        { no: 2, name: 'Ballpoint / Ballpen / Pena (Ballpoint Baliner)', qty: 6, unit: 'Pack', price: 239400 },
-        { no: 3, name: 'Ballpoint / Ballpen / Pena (Biasa, R6 Isi 12 Buah setara Standard)', qty: 10, unit: 'Pack', price: 38400 },
-        { no: 4, name: 'Bantalan Stempel Biasa', qty: 10, unit: 'Buah', price: 17100 },
-        { no: 5, name: 'Gunting Besar', qty: 5, unit: 'Buah', price: 32000 },
-        { no: 6, name: 'Isi Staples No. 10-1M (setara Max)', qty: 20, unit: 'Buah', price: 4700 },
-        { no: 7, name: 'Isolasi Lakban Hitam (Uk 46 mm x 12 m setara Nachi)', qty: 10, unit: 'Buah', price: 20000 },
-        { no: 8, name: 'Lem 20 Ml (setara UHU)', qty: 10, unit: 'Buah', price: 17600 },
-        { no: 9, name: 'Map Dinas F4', qty: 200, unit: 'Buah', price: 4800 },
-        { no: 10, name: 'Snelhechter Map (5001 Isi 50 Buah setara Diamond)', qty: 5, unit: 'Dus', price: 110800 },
-        { no: 11, name: 'Spidol Besar', qty: 10, unit: 'Buah', price: 11400 },
-        { no: 12, name: 'Stapler/Hechmachine Kecil', qty: 10, unit: 'Buah', price: 35400 },
-        { no: 13, name: 'Tinta Stempel 50 Ml (setara Artline)', qty: 10, unit: 'Buah', price: 32900 }
-      ]
+
+    // Cari kode rekening DPA yang cocok dengan paket ini (by pagu atau keyword)
+    const matchedAcc = getMatchingDpaAccount(pack)
+    const kodeRekening = matchedAcc?.account
+
+    // 1. Ambil rincian dari DPA Ground Truth berdasarkan kode rekening
+    if (kodeRekening && dpaRincian[kodeRekening] && dpaRincian[kodeRekening].length > 0) {
+      return dpaRincian[kodeRekening].map((r, i) => ({
+        no: i + 1,
+        name: r.nama,
+        qty: r.volume,
+        unit: r.satuan,
+        price: r.harga_satuan,
+      }))
     }
-    if (pack.noSirup === '65308044') {
-      return [
-        { no: 1, name: 'Amplop Dinas Coklat (15,5 x 25 Cm)', qty: 200, unit: 'Lembar', price: 2000 },
-        { no: 2, name: 'Kertas HVS A4 80 Gram (setara Sinar Dunia)', qty: 10, unit: 'Rim', price: 75900 },
-        { no: 3, name: 'Kertas HVS F4 70 Gram (setara Sidu)', qty: 50, unit: 'Rim', price: 69700 }
-      ]
+
+    // 2. Coba kunci noSirup langsung
+    const keyNoSirup = `nosirup_${pack.noSirup}`
+    if (dpaRincian[keyNoSirup] && dpaRincian[keyNoSirup].length > 0) {
+      return dpaRincian[keyNoSirup].map((r, i) => ({
+        no: i + 1, name: r.nama, qty: r.volume, unit: r.satuan, price: r.harga_satuan,
+      }))
     }
-    if (pack.noSirup === '65309015') {
-      return [
-        { no: 1, name: 'Tinta Printer Black (setara Epson 001)', qty: 6, unit: 'Buah', price: 228800 },
-        { no: 2, name: 'Tinta Printer Colour (setara Epson 001)', qty: 12, unit: 'Buah', price: 137300 }
-      ]
-    }
+
+    // 3. Placeholder — PPK perlu isi manual rincian
     return [
-      { no: 1, name: pack.packName, qty: 1, unit: 'Paket', price: pack.pagu }
+      { no: 1, name: '⚠️ Rincian belum tersedia — klik "Edit Rincian" pada tabel DPA di atas', qty: 1, unit: 'Paket', price: pack.pagu }
     ]
   }
 
@@ -210,7 +383,153 @@ export default function ProcurementPreparation() {
     localStorage.setItem('pbj_matched_dpa_types', JSON.stringify(matchedDpaTypes))
   }, [matchedDpaTypes])
 
-  // Mock SIRUP Data matching screenshots and LKPP structures exactly
+  // ── SIRUP Matching berbasis Kode Rekening DPA ──────────────────────────────
+  // Mapping kode rekening → kategori SIRUP (dapat di-extend sesuai DPA baru)
+  const REKENING_SIRUP_KATEGORI = {
+    '5.1.02.01.001.00024': 'ATK',
+    '5.1.02.01.001.00025': 'KERTAS',
+    '5.1.02.01.001.00029': 'KOMPUTER',
+    '5.1.02.01.001.00026': 'CETAK',
+    '5.1.02.01.001.00012': 'CETAK',
+    '5.1.02.01.001.00060': 'AIR',
+    '5.1.02.01.001.00061': 'LISTRIK',
+    '5.2.02.10.0002': 'MODAL_LAPTOP',
+  }
+
+  // Tentukan kategori SIRUP dari kode rekening DPA yang telah divalidasi PPK
+  const getDpaKategoriList = () => {
+    if (!dpaAccounts || dpaAccounts.length === 0) return []
+    const result = []
+    dpaAccounts.forEach(acc => {
+      const kode = acc.account
+      // Cek exact match dulu
+      if (REKENING_SIRUP_KATEGORI[kode]) {
+        result.push(REKENING_SIRUP_KATEGORI[kode])
+        return
+      }
+      // Fuzzy: akhiran kode rekening (5 digit terakhir)
+      const suffix = kode.split('.').slice(-1)[0]
+      const found = Object.entries(REKENING_SIRUP_KATEGORI).find(([k]) => k.endsWith(suffix))
+      if (found) { result.push(found[1]); return }
+      // Keyword dari uraian
+      const uraian = (acc.name || '').toLowerCase()
+      if (uraian.includes('tulis') || uraian.includes('atk')) result.push('ATK')
+      else if (uraian.includes('kertas') || uraian.includes('hvs')) result.push('KERTAS')
+      else if (uraian.includes('komputer') || uraian.includes('tinta') || uraian.includes('printer')) result.push('KOMPUTER')
+      else if (uraian.includes('cetak') || uraian.includes('banner')) result.push('CETAK')
+      else result.push('LAINNYA')
+    })
+    return [...new Set(result)] // deduplicate
+  }
+
+  // Data SIRUP — difilter secara dinamis berdasarkan kategori dari DPA PPK
+  const allSirupData = [
+    {
+      noSirup: '65307012',
+      packName: 'Belanja Alat/Bahan untuk Kegiatan Kantor-Alat Tulis Kantor pada sub giat Penyediaan Peralatan dan Perlengkapan Kantor',
+      pagu: 5027800, method: 'Pengadaan Langsung', sumberDana: 'APBD', tahun: '2026',
+      klpd: 'Kab. Probolinggo', satker: 'Kecamatan Besuk', volume: '1 Paket',
+      uraian: 'Belanja Alat Tulis Kantor',
+      spesifikasi: 'Sesuai Rincian DPA (Ballpoint, Map, Stapler, Tinta Stempel, dll.)',
+      pdn: 'Ya', usahaKecil: 'Ya',
+      mak: '7.01.01.2.06.0002.5.1.02.01.001.00024.',
+      pemanfaatan: 'Januari 2026 - Desember 2026',
+      jadwalKontrak: 'Januari 2026 - Desember 2026',
+      jadwalPemilihan: 'Januari 2026 - Januari 2026',
+      tglDiumumkan: '2 Januari 2026',
+      jenisPengadaan: 'Barang',
+      kategori: 'ATK'
+    },
+    {
+      noSirup: '65308044',
+      packName: 'Belanja Alat/Bahan untuk Kegiatan Kantor-Kertas dan Cover pada sub giat Penyediaan Peralatan dan Perlengkapan Kantor',
+      pagu: 4644000, method: 'Pengadaan Langsung', sumberDana: 'APBD', tahun: '2026',
+      klpd: 'Kab. Probolinggo', satker: 'Kecamatan Besuk', volume: '1 Paket',
+      uraian: 'Belanja Kertas dan Cover (Amplop Dinas, HVS A4 & F4)',
+      spesifikasi: 'Amplop Coklat 15.5x25cm, HVS A4 80gr, HVS F4 70gr',
+      pdn: 'Ya', usahaKecil: 'Ya',
+      mak: '7.01.01.2.06.0002.5.1.02.01.001.00025.',
+      pemanfaatan: 'Januari 2026 - Desember 2026',
+      jadwalKontrak: 'Januari 2026 - Desember 2026',
+      jadwalPemilihan: 'Januari 2026 - Januari 2026',
+      tglDiumumkan: '2 Januari 2026',
+      jenisPengadaan: 'Barang',
+      kategori: 'KERTAS'
+    },
+    {
+      noSirup: '65309015',
+      packName: 'Belanja Alat/Bahan untuk Kegiatan Kantor-Bahan Komputer pada sub giat Penyediaan Peralatan dan Perlengkapan Kantor',
+      pagu: 3020400, method: 'Pengadaan Langsung', sumberDana: 'APBD', tahun: '2026',
+      klpd: 'Kab. Probolinggo', satker: 'Kecamatan Besuk', volume: '1 Paket',
+      uraian: 'Tinta Printer Epson 001 Black & Colour',
+      spesifikasi: 'Tinta Printer Epson 001 Black (6 Buah) & Epson 001 Colour (12 Buah)',
+      pdn: 'Ya', usahaKecil: 'Ya',
+      mak: '7.01.01.2.06.0002.5.1.02.01.001.00029.',
+      pemanfaatan: 'Januari 2026 - Desember 2026',
+      jadwalKontrak: 'Januari 2026 - Desember 2026',
+      jadwalPemilihan: 'Januari 2026 - Januari 2026',
+      tglDiumumkan: '2 Januari 2026',
+      jenisPengadaan: 'Barang',
+      kategori: 'KOMPUTER'
+    },
+    {
+      noSirup: '65233056',
+      packName: 'Belanja Alat/Bahan untuk Kegiatan Kantor-Bahan Cetak pada sub giat Koordinasi/Sinergi Perencanaan',
+      pagu: 750000, method: 'E-Purchasing', sumberDana: 'APBD', tahun: '2026',
+      klpd: 'Kab. Probolinggo', satker: 'Kecamatan Besuk', volume: '1 Paket',
+      uraian: 'Belanja Bahan Cetak/Banner',
+      spesifikasi: 'Plastik Flexy/Banner sesuai kebutuhan',
+      pdn: 'Ya', usahaKecil: 'Ya',
+      mak: '7.01.02.2.01.0001.5.1.02.01.001.00026.',
+      pemanfaatan: 'Januari 2026 - Desember 2026',
+      jadwalKontrak: 'Januari 2026 - Desember 2026',
+      jadwalPemilihan: 'Januari 2026 - Januari 2026',
+      tglDiumumkan: '2 Januari 2026',
+      jenisPengadaan: 'Jasa Lainnya',
+      kategori: 'CETAK'
+    }
+  ]
+
+  // Filter SIRUP secara otomatis berdasarkan kategori yang ada di DPA PPK
+  const getFilteredSirupData = () => {
+    const kategoriDPA = getDpaKategoriList()
+    if (kategoriDPA.length === 0) return allSirupData // tampilkan semua jika DPA belum diupload
+    return allSirupData.filter(s =>
+      kategoriDPA.includes(s.kategori) ||
+      kategoriDPA.includes('LAINNYA') // jika ada rekening tak dikenal, tampilkan semua
+    )
+  }
+
+  const startScrapingSimulation = () => {
+    const filteredSirup = getFilteredSirupData()
+    setIsScraping(true)
+    setScrapingLogs([])
+    setScrapedData([])
+    setSelectedPack(null)
+
+    const kategoriList = getDpaKategoriList()
+    const logs = [
+      '🚀 Menginisialisasi Playwright SIRUP Scraper...',
+      `🔍 Target Satker ID: ${satkerId} — ${currentUser.department}`,
+      `📋 Rekening DPA terdeteksi: ${dpaAccounts.length} rekening (${kategoriList.join(', ')})`,
+      `📡 Memanggil endpoint SIRUP LKPP: https://sirup.inaproc.id/sirup/datatablectr/dataruppenyediasatker?tahun=2026&idSatker=${satkerId}`,
+      `🔗 Mencocokkan paket SIRUP dengan kategori DPA: [${kategoriList.join(', ')}]`,
+      `✅ Ditemukan ${filteredSirup.length} paket SIRUP yang sesuai rekening DPA Anda!`,
+    ]
+
+    logs.forEach((log, index) => {
+      setTimeout(() => {
+        setScrapingLogs(prev => [...prev, log])
+        if (index === logs.length - 1) {
+          setIsScraping(false)
+          setScrapedData(filteredSirup)
+          setStep(2)
+        }
+      }, (index + 1) * 700)
+    })
+  }
+
+  // Mock SIRUP Data matching screenshots and LKPP structures exactly — DEPRECATED, kept for reference
   const mockSirupData = [
     {
       noSirup: '65307012',
@@ -310,33 +629,7 @@ export default function ProcurementPreparation() {
     }
   ]
 
-  const startScrapingSimulation = () => {
-    setIsScraping(true)
-    setScrapingLogs([])
-    setScrapedData([])
-    setSelectedPack(null)
 
-    const logs = [
-      '🚀 Menginisialisasi Playwright Scraper...',
-      `🔍 Menghubungkan ke portal SIRUP LKPP: https://sirup.inaproc.id/sirup/home/penyediaSatker?idSatker=${satkerId}`,
-      `📡 Memanggil DataTable Endpoint: https://sirup.inaproc.id/sirup/datatablectr/dataruppenyediasatker?tahun=2026&idSatker=${satkerId}&sEcho=1&iColumns=7&sColumns=%2CnamaPaket%2C%2C%2CsumberDana%2C%2C&iDisplayStart=0&iDisplayLength=10`,
-      '🌐 Mendeteksi struktur tabel RUP dan memetakan parameter APBD...',
-      '⚡ Melakukan scraping detail paket (Kode RUP, Nama Paket, Pagu, Metode)...',
-      '🤖 Mengekstrak detail volume, spesifikasi, dan MAK untuk setiap paket...',
-      '✅ Sukses menyinkronkan data RUP!'
-    ]
-
-    logs.forEach((log, index) => {
-      setTimeout(() => {
-        setScrapingLogs(prev => [...prev, log])
-        if (index === logs.length - 1) {
-          setIsScraping(false)
-          setScrapedData(mockSirupData)
-          setStep(2)
-        }
-      }, (index + 1) * 800)
-    })
-  }
 
   const selectPackage = (pack) => {
     setSelectedPack(pack)
@@ -347,9 +640,19 @@ export default function ProcurementPreparation() {
 
   const resetFlow = () => {
     if(confirm('Apakah Anda ingin mereset DPA yang tersimpan dan membuat usulan pengadaan baru?')) {
-      localStorage.clear()
+      localStorage.removeItem('pbj_step')
+      localStorage.removeItem('pbj_dpa_name')
+      localStorage.removeItem('pbj_satker_id')
+      localStorage.removeItem('pbj_scraped_data')
+      localStorage.removeItem('pbj_selected_pack')
+      localStorage.removeItem('pbj_hps_value')
+      localStorage.removeItem('pbj_tech_specs')
+      localStorage.removeItem('pbj_matched_dpa_types')
+      localStorage.removeItem('pbj_dpa_accounts')
+      localStorage.removeItem('pbj_is_signed')
       setStep(1)
       setDpaName(null)
+      setDpaAccounts([])
       setScrapedData([])
       setSelectedPack(null)
       setHpsValue('')
@@ -366,16 +669,1055 @@ export default function ProcurementPreparation() {
           <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Persiapan Pengadaan (PPK)</h1>
           <p className="text-slate-500 mt-1">Langkah 1 - Persiapan Dokumen Pembuka Pengadaan dengan Integrasi Data SIRUP.</p>
         </div>
-        {(dpaName || scrapedData.length > 0) && (
+        {(dpaName || scrapedData.length > 0 || dpaAccounts.length > 0) && (
           <button 
             onClick={resetFlow} 
-            className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm"
+            className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-4 py-2.5 rounded-xl text-xs font-bold"
           >
-            🔄 Reset & Buat Baru
+            🔄 Reset &amp; Buat Baru
           </button>
         )}
       </div>
+      
+      {/* ── ALUR BARU: LANGKAH 1 - IDENTIFIKASI & KUNCI PAKET SIRUP LKPP ── */}
+      <div className="glass-panel p-8 mb-6 animate-slide-up">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <span>🏛️</span> Langkah 1: Kunci Rencana Umum Pengadaan (SIRUP LKPP Resmi)
+          </h2>
+          <span className="px-3 py-1 text-xs rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-semibold">Langkah 1 (Jangkar Anggaran)</span>
+        </div>
+        
+        <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+          Pilih paket pengadaan resmi Bapak yang terdaftar di portal SIRUP LKPP untuk mengunci pagu total anggaran. Jika data tidak muncul, gunakan form input manual di bawah.
+        </p>
 
+        {!selectedPack ? (
+          <div className="space-y-6">
+            {/* Filter Satker & Fetch Action */}
+            <div className="flex flex-col sm:flex-row gap-4 items-end bg-slate-50 p-5 rounded-2xl border border-slate-200/60">
+              <div className="flex-1">
+                <label className="block text-[11px] text-slate-400 font-bold uppercase mb-1.5">PILIH SATUAN KERJA (SATKER)</label>
+                <select 
+                  value={satkerId} 
+                  onChange={(e) => {
+                    setSatkerId(e.target.value)
+                    fetchSirupPackages(e.target.value)
+                  }}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="67081">Kecamatan Besuk (ID: 67081)</option>
+                  <option value="67082">Kecamatan Kraksaan (ID: 67082)</option>
+                  <option value="67083">Kecamatan Paiton (ID: 67083)</option>
+                </select>
+              </div>
+
+              <div className="flex-1">
+                <label className="block text-[11px] text-slate-400 font-bold uppercase mb-1.5">CARI NAMA PAKET ATAU NO. RUP</label>
+                <input 
+                  type="text"
+                  value={sirupSearchQuery}
+                  onChange={(e) => setSirupSearchQuery(e.target.value)}
+                  placeholder="Ketik untuk memfilter paket..."
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-medium text-slate-700 shadow-sm focus:border-indigo-500"
+                />
+              </div>
+
+              <button
+                onClick={() => fetchSirupPackages(satkerId)}
+                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold px-5 py-2.5 rounded-xl border border-indigo-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+              >
+                {isFetchingSirup ? '⚙️ Menarik Data...' : '🔄 Tarik Ulang LKPP'}
+              </button>
+            </div>
+
+            {/* List of Live LKPP Packages */}
+            <div className="border border-slate-200/80 rounded-2xl bg-white overflow-hidden shadow-sm">
+              <div className="bg-slate-50/80 px-5 py-3.5 border-b border-slate-150 flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Daftar Paket RUP Resmi LKPP Tahun 2026 ({sirupPackages.filter(p => p.packName.toLowerCase().includes(sirupSearchQuery.toLowerCase()) || p.noSirup.includes(sirupSearchQuery)).length} paket cocok)
+                </span>
+                <span className="px-2 py-0.5 text-[10px] rounded bg-emerald-100 text-emerald-800 font-bold font-mono">LIVE CONNECTION</span>
+              </div>
+
+              {isFetchingSirup ? (
+                <div className="p-12 text-center text-slate-500 space-y-2">
+                  <div className="animate-spin text-2xl inline-block">⚙️</div>
+                  <p className="text-xs font-semibold">Menghubungkan ke API SIRUP LKPP dan mengambil paket terbaru...</p>
+                </div>
+              ) : sirupPackages.length === 0 ? (
+                <div className="p-12 text-center text-slate-400">
+                  <span className="text-2xl block mb-2">📡</span>
+                  <p className="text-xs">Tidak ada data paket LKPP yang berhasil ditarik. Silakan klik tombol "Tarik Ulang LKPP" atau isi manual di bawah.</p>
+                </div>
+              ) : (
+                <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-100">
+                  {sirupPackages
+                    .filter(p => p.packName.toLowerCase().includes(sirupSearchQuery.toLowerCase()) || p.noSirup.includes(sirupSearchQuery))
+                    .map((p) => (
+                      <div key={p.noSirup} className="p-4 hover:bg-slate-50/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-colors">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[11px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded">
+                              RUP ID: #{p.noSirup}
+                            </span>
+                            <span className="text-[10px] bg-indigo-50 border border-indigo-150 text-indigo-600 font-bold px-2 py-0.5 rounded">
+                              {p.method}
+                            </span>
+                          </div>
+                          <p className="text-xs font-bold text-slate-800 pr-4">{p.packName}</p>
+                          <div className="text-[10px] text-slate-450">
+                            Sumber Dana: {p.sumberDana} | Jadwal: {p.jadwalPemilihan}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                          <span className="text-sm font-extrabold text-emerald-600 font-mono">
+                            Rp {p.pagu?.toLocaleString()}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const selected = {
+                                ...p,
+                                klpd: 'Kab. Probolinggo',
+                                satker: satkerId === '67081' ? 'Kecamatan Besuk' : 'Satker Kecamatan',
+                                volume: '1 Paket',
+                                uraian: p.packName,
+                                spesifikasi: 'Spesifikasi sesuai rincian DPA',
+                                pdn: 'Ya',
+                                usahaKecil: 'Ya',
+                                jenisPengadaan: 'Barang',
+                                mak: '7.01.01.2.06.0002'
+                              }
+                              setSelectedPack(selected)
+                              setHpsValue(p.pagu.toString())
+                              setTechSpecs(`Volume: 1 Paket\nSpesifikasi: Sesuai Rincian DPA\nNo RUP: ${p.noSirup}`)
+                              setStep(2)
+                              alert(`✅ Paket RUP #${p.noSirup} berhasil dikunci!\nSilakan lanjutkan Langkah 2 dengan mengunggah berkas rincian DPA.`);
+                            }}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg transition-all shadow-sm hover:scale-[1.03] active:scale-[0.97]"
+                          >
+                            🔒 Kunci Paket
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            {/* Fallback Input Manual (collapsible styled border) */}
+            <div className="border border-dashed border-slate-300 rounded-2xl p-5 bg-slate-50/30">
+              <h4 className="text-xs font-bold text-slate-600 uppercase mb-3 flex items-center gap-1">
+                <span>✍️</span> Opsi Alternatif: Input RUP Manual
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                <div>
+                  <label className="block text-[10px] text-slate-500 font-bold mb-1">Nomor RUP SIRUP</label>
+                  <input
+                    type="text"
+                    id="manual_no_rup"
+                    placeholder="Contoh: 65307012"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 font-bold mb-1">Nama Paket Pengadaan</label>
+                  <input
+                    type="text"
+                    id="manual_nama_paket"
+                    placeholder="Nama paket belanja..."
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-slate-500 font-bold mb-1">Pagu Anggaran (Rp)</label>
+                    <input
+                      type="number"
+                      id="manual_pagu"
+                      placeholder="Pagu RUP..."
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-extrabold text-emerald-700"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      const noRup = document.getElementById('manual_no_rup')?.value
+                      const namaPaket = document.getElementById('manual_nama_paket')?.value
+                      const paguRup = parseInt(document.getElementById('manual_pagu')?.value) || 0
+
+                      if (!noRup || !namaPaket || paguRup <= 0) {
+                        alert('Mohon isi Nomor RUP, Nama Paket, dan Pagu dengan benar.')
+                        return
+                      }
+
+                      const manualPack = {
+                        noSirup: noRup,
+                        packName: namaPaket,
+                        pagu: paguRup,
+                        method: 'Pengadaan Langsung',
+                        sumberDana: 'APBD',
+                        tahun: '2026',
+                        klpd: 'Kab. Probolinggo',
+                        satker: currentUser.department || 'Kecamatan Besuk',
+                        volume: '1 Paket',
+                        uraian: namaPaket,
+                        spesifikasi: 'Spesifikasi sesuai rincian DPA',
+                        pdn: 'Ya',
+                        usahaKecil: 'Ya',
+                        jenisPengadaan: 'Barang',
+                        mak: '7.01.01.2.06.0002'
+                      }
+                      
+                      setSelectedPack(manualPack)
+                      setHpsValue(paguRup.toString())
+                      setTechSpecs(`Volume: 1 Paket\nSpesifikasi: Sesuai Rincian DPA\nNo RUP: ${noRup}`)
+                      setStep(2)
+                      alert(`✅ Sukses mengunci Paket SIRUP RUP #${noRup} secara manual!`);
+                    }}
+                    className="bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-sm uppercase shrink-0"
+                  >
+                    Kunci Manual
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 font-mono font-bold text-xs px-2.5 py-0.5 rounded-full">
+                  RUP LOCKED: #{selectedPack.noSirup}
+                </span>
+                <span className="text-xs text-emerald-600 font-bold">✓ Pagu &amp; Nama Paket Terkunci</span>
+              </div>
+              <h4 className="text-sm font-bold text-slate-800 leading-relaxed">{selectedPack.packName}</h4>
+              <div className="text-xs text-slate-500">
+                Pagu Resmi: <strong className="text-emerald-700 text-sm">Rp {selectedPack.pagu?.toLocaleString()}</strong> | Satker: {selectedPack.satker}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                if (confirm('Ubah paket SIRUP? Data DPA yang terhubung akan disesuaikan.')) {
+                  setSelectedPack(null)
+                  setStep(1)
+                }
+              }}
+              className="text-xs text-rose-600 hover:text-rose-700 font-bold underline transition-colors shrink-0"
+            >
+              🔒 Buka Kunci / Ganti Paket
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── LANGKAH 2: UPLOAD DPA ATAU EDIT DETAIL RINCIAN ITEM BARANG ── */}
+      <div className={`glass-panel p-8 mb-6 transition-all duration-300 ${!selectedPack ? 'opacity-40 pointer-events-none' : 'animate-slide-up'}`}>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <span>📄</span> Langkah 2: Dokumen Pelaksanaan Anggaran (DPA) - Rincian Item
+          </h2>
+          <span className="px-3 py-1 text-xs rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-semibold">Langkah 2 (Rincian Item)</span>
+        </div>
+
+        <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+          Unggah file DPA PDF Bapak untuk diekstrak rincian itemnya secara otomatis, atau input manual jika file DPA merupakan hasil pemindaian (scan gambar).
+        </p>
+
+        {/* Upload Zone */}
+        <div className="border-2 border-dashed border-indigo-200/80 rounded-2xl p-6 text-center hover:border-indigo-500/50 transition-colors mb-6 bg-slate-50/50">
+          {dpaName ? (
+            <div className="text-emerald-600">
+              <span className="text-3xl block mb-1">💾</span>
+              <span className="font-bold block text-slate-700 text-xs mb-0.5">{dpaName}</span>
+              <span className="text-xs text-emerald-600 font-bold block">✔️ Berkas DPA Berhasil Terhubung ke RUP #{selectedPack?.noSirup}</span>
+              {dpaAccounts.length > 0 && (
+                <button
+                  onClick={() => {
+                    const acc = dpaAccounts[0]
+                    if (acc) {
+                      const existing = dpaRincian[acc.account] || []
+                      setRincianModal({
+                        kodeRekening: acc.account,
+                        uraian: acc.name,
+                        pagu: selectedPack.pagu,
+                        raw_text_block: acc.raw_text_block || null,
+                        items: existing.length > 0 ? existing.map((r,i) => ({...r, no: i+1})) : [
+                          { no: 1, nama: '', volume: 1, satuan: 'Buah', harga_satuan: 0, harga_total: 0 }
+                        ]
+                      })
+                    }
+                  }}
+                  className="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 mx-auto"
+                >
+                  📝 Rincian Item ({dpaAccounts[0]?.rincianCount || 0} barang terdaftar)
+                </button>
+              )}
+              <button
+                onClick={() => { setDpaName(null); setDpaAccounts([]); setDpaRincian({}); }}
+                className="mt-3 text-xs text-rose-600 hover:text-rose-700 font-bold underline transition-colors block mx-auto"
+              >
+                Hapus &amp; Upload Ulang DPA
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="text-3xl mb-3">{isAnalyzingDpa ? '⚙️' : '📂'}</div>
+              <label className="cursor-pointer">
+                <span className="btn-secondary text-xs">
+                  {isAnalyzingDpa ? 'Mengekstrak Rincian DPA...' : 'Pilih File DPA (PDF/Gambar/Excel)'}
+                </span>
+                <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls" onChange={async (e) => {
+                  const file = e.target.files[0]
+                  if (!file) return
+                  setDpaName(file.name)
+                  setIsAnalyzingDpa(true)
+                  try {
+                    // 1. Ekstrak API Key aktif dari localStorage (Groq / Gemini / OpenAI / Claude)
+                    const savedKeys = localStorage.getItem('pbj_ocr_api_keys')
+                    let activeProvider = ""
+                    let activeKey = ""
+                    if (savedKeys) {
+                      try {
+                        const keys = JSON.parse(savedKeys)
+                        // Prioritaskan Groq / Gemini sesuai tangkapan layar admin Bapak Beni
+                        if (keys.groq) {
+                          activeProvider = "groq"
+                          activeKey = keys.groq
+                        } else if (keys.gemini) {
+                          activeProvider = "gemini"
+                          activeKey = keys.gemini
+                        } else if (keys.openai) {
+                          activeProvider = "openai"
+                          activeKey = keys.openai
+                        } else if (keys.anthropic) {
+                          activeProvider = "anthropic"
+                          activeKey = keys.anthropic
+                        }
+                      } catch (errKey) {
+                        console.error('Gagal mem-parse kunci API OCR:', errKey)
+                      }
+                    }
+
+                    // 2. Persiapkan request multipart formData
+                    const formData = new FormData()
+                    formData.append('file', file)
+
+                    // 3. Masukkan header konfigurasi AI jika tersedia
+                    const headers = {}
+                    if (activeProvider && activeKey) {
+                      headers['X-AI-Provider'] = activeProvider
+                      headers['X-AI-Key'] = activeKey
+                    }
+
+                    const response = await fetch('/api/dpa/parse', { 
+                      method: 'POST', 
+                      headers: headers,
+                      body: formData 
+                    })
+
+                    if (!response.ok) {
+                      const errText = await response.text()
+                      throw new Error(`Server error ${response.status}: ${errText}`)
+                    }
+
+                    const result = await response.json()
+                    if (!result.success || !result.rekening || result.rekening.length === 0) {
+                      throw new Error('Tidak ditemukan rekening belanja di berkas DPA ini.')
+                    }
+
+                    // 4. Catat mode ekstraksi yang berhasil dilakukan (ai atau local)
+                    const returnedMode = result.ocr_mode || (activeKey ? 'ai' : 'local')
+                    setDpaOcrMode(returnedMode)
+                    localStorage.setItem('pbj_dpa_ocr_mode', returnedMode)
+
+                    // 5. Cari rekening yang paling cocok dengan kode MAK RUP yang dipilih
+                    let acc = result.rekening[0]
+                    if (selectedPack && selectedPack.mak) {
+                      const cleanRUPMak = selectedPack.mak.replace(/\./g, '')
+                      const foundAcc = result.rekening.find(r => {
+                        const cleanDpaCode = r.kode_rekening.replace(/\./g, '')
+                        return cleanRUPMak.includes(cleanDpaCode) || cleanDpaCode.includes(cleanRUPMak)
+                      })
+                      if (foundAcc) {
+                        acc = foundAcc
+                      }
+                    }
+
+                    // Petakan seluruh rekening hasil parse DPA agar tampil lengkap di tabel web view
+                    const mappedAccounts = result.rekening.map(r => {
+                      const isMatched = r.kode_rekening === acc.kode_rekening
+                      return {
+                        account: r.kode_rekening,
+                        name: r.uraian,
+                        // JIKA cocok dengan RUP terpilih, pagu wajib sama dengan pagu RUP Resmi (MAK)!
+                        pagu: isMatched && selectedPack ? selectedPack.pagu : r.pagu,
+                        confidence: r.confidence || 95,
+                        ocr_engine: result.ocr_engine || 'pymupdf',
+                        verified: isMatched,
+                        rincianCount: (r.rincian || []).length,
+                        raw_text_block: r.raw_text_block || null
+                      }
+                    })
+                    setDpaAccounts(mappedAccounts)
+
+                    // Simpan seluruh rincian sub-item per rekening secara dinamis
+                    const newRincian = {}
+                    result.rekening.forEach(r => {
+                      const isMatched = r.kode_rekening === acc.kode_rekening
+                      let rincianItems = r.rincian ? JSON.parse(JSON.stringify(r.rincian)) : []
+
+                      if (isMatched && selectedPack) {
+                        // JIKA rincian hasil parse DPA benar-benar kosong, buat rincian default
+                        if (rincianItems.length === 0) {
+                          rincianItems = [{
+                            no: 1,
+                            nama: selectedPack.packName || 'Rincian Belanja DPA',
+                            volume: 1,
+                            satuan: 'Paket',
+                            harga_satuan: selectedPack.pagu,
+                            harga_total: selectedPack.pagu,
+                            isDefault: true
+                          }]
+                        }
+                      }
+                      newRincian[r.kode_rekening] = rincianItems
+                    })
+                    setDpaRincian(newRincian)
+
+                    const ocrModeText = returnedMode === 'ai' 
+                      ? `menggunakan AI Refinement (${activeProvider.toUpperCase()})` 
+                      : 'menggunakan Parser Lokal (Tanpa AI karena API key admin kosong)';
+                    alert(`✅ DPA Berhasil Dibaca!\nEkstraksi otomatis berhasil diselaraskan ${ocrModeText} dengan RUP #${selectedPack.noSirup}.`);
+                    setStep(3)
+                  } catch (err) {
+                    console.error('DPA Parse error:', err)
+                    alert('Gagal mengekstrak DPA PDF.\n' + err.message + '\n\nSilakan gunakan input manual rincian di bawah jika berkas Anda hasil scan.')
+                    
+                    // Fallback manual agar user tidak stuck
+                    const fallbackAcc = [{
+                      account: '5.1.02.01.001.00024',
+                      name: selectedPack.packName,
+                      pagu: selectedPack.pagu,
+                      confidence: 100,
+                      ocr_engine: 'manual',
+                      verified: true,
+                      rincianCount: 0
+                    }]
+                    setDpaAccounts(fallbackAcc)
+                    setDpaRincian({ '5.1.02.01.001.00024': [] })
+                    setDpaOcrMode('local')
+                    localStorage.setItem('pbj_dpa_ocr_mode', 'local')
+                  } finally {
+                    setIsAnalyzingDpa(false)
+                  }
+                }} />
+              </label>
+
+              {/* Opsi Lewati / Isi Manual langsung */}
+              <div className="mt-3">
+                <button
+                  onClick={() => {
+                    setDpaName('Rincian_Uraian_Manual.pdf')
+                    const manualAcc = [{
+                      account: '5.1.02.01.001.00024',
+                      name: selectedPack.packName,
+                      pagu: selectedPack.pagu,
+                      confidence: 100,
+                      ocr_engine: 'manual',
+                      verified: true,
+                      rincianCount: 0
+                    }]
+                    setDpaAccounts(manualAcc)
+                    setDpaRincian({ '5.1.02.01.001.00024': [] })
+                    setRincianModal({
+                      kodeRekening: '5.1.02.01.001.00024',
+                      uraian: selectedPack.packName,
+                      pagu: selectedPack.pagu,
+                      items: [
+                        { no: 1, nama: '', volume: 1, satuan: 'Buah', harga_satuan: 0, harga_total: 0 }
+                      ]
+                    })
+                  }}
+                  className="text-xs text-indigo-600 font-bold hover:underline"
+                >
+                  Or, skip upload and fill item details manually ✍️
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+
+        {/* Hasil Analisis & Pembacaan Rekening DPA (AI OCR) - TABEL LEBAR PENUH & SANGAT MUDAH DIBACA */}
+        {dpaAccounts && dpaAccounts.length > 0 && (
+          <div className="mt-8 border-t border-slate-200 pt-6 animate-slide-up space-y-4">
+            
+            {/* Banner Informasi OCR Mode */}
+            {dpaOcrMode === 'ai' ? (
+              <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 flex items-start gap-3.5 shadow-sm">
+                <span className="text-2xl mt-0.5 animate-pulse">✨</span>
+                <div className="text-xs text-slate-700 leading-relaxed">
+                  <div className="font-extrabold text-emerald-800 flex items-center gap-1.5">
+                    <span>AI OCR Refinement Aktif</span>
+                    <span className="bg-emerald-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider animate-pulse">
+                      Engine Aktif
+                    </span>
+                  </div>
+                  <p className="mt-1 text-slate-500 font-medium">
+                    Sub-item rincian belanja di DPA ini berhasil dibaca, diperbaiki typonya, diselaraskan matematisnya secara cerdas oleh model kecerdasan buatan (AI) yang dihubungkan melalui Dashboard Admin.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/0 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3.5 shadow-sm">
+                <span className="text-2xl mt-0.5">⚠️</span>
+                <div className="text-xs text-slate-700 leading-relaxed">
+                  <div className="font-extrabold text-amber-800 flex items-center gap-1.5">
+                    <span>Parser Lokal Aktif (Tanpa AI)</span>
+                    <span className="bg-amber-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider">
+                      Mode Standar
+                    </span>
+                  </div>
+                  <p className="mt-1 text-slate-500 font-medium">
+                    Proses pembacaan DPA saat ini menggunakan Parser Regex Lokal (Tanpa AI) karena API Key belum dikonfigurasi di menu Admin. Untuk hasil pembacaan rincian sub-item yang otomatis, rapi, dan bebas typo, silakan hubungkan API Key AI Anda di menu Admin Dashboard.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-extrabold text-slate-700 uppercase tracking-wider">
+                  Hasil Analisis & Pembacaan Rekening DPA (AI OCR)
+                </h3>
+                <span className="text-xs text-indigo-600 font-medium flex items-center gap-1">
+                  <span>✏️</span> Klik pada kolom untuk melakukan Edit Inline
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setDpaAccounts(prev => prev.map(acc => ({ ...acc, verified: true })));
+                    alert('Semua rekening belanja daerah hasil pembacaan DPA Anda telah berhasil diverifikasi!');
+                  }}
+                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <span>✓</span> Verifikasi Semua Rekening
+                </button>
+              </div>
+            </div>
+
+            {/* Spacious Table with NO horizontal scrollbars and perfectly wide inputs */}
+            <div className="border border-slate-200 rounded-2xl shadow-sm bg-white p-3 w-full">
+              <table className="w-full divide-y divide-slate-100 text-left">
+                <thead className="bg-slate-50/70">
+                  <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    <th className="px-5 py-3 w-[180px]">Tingkat Keyakinan</th>
+                    <th className="px-5 py-3 w-[260px]">Kode Rekening</th>
+                    <th className="px-5 py-3">Uraian Rekening</th>
+                    <th className="px-5 py-3 text-right w-[180px]">Pagu DPA</th>
+                    <th className="px-5 py-3 text-center w-[180px]">Aksi / Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {dpaAccounts.map((acc, index) => {
+                    const confidenceVal = acc.confidence !== undefined ? acc.confidence : 85;
+                    const isHigh = confidenceVal >= 80;
+                    const isMedium = confidenceVal >= 50 && confidenceVal < 80;
+                    const isLow = confidenceVal < 50;
+                    const isUnverified = !acc.verified && (acc.pagu_method === 'fallback_max' || acc.ocr_engine === 'tesseract');
+
+                    return (
+                      <tr key={index} className="hover:bg-slate-50/40 transition-colors">
+                        {/* 1. Confidence Column */}
+                        <td className="px-5 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2.5 h-2.5 rounded-full ${isHigh ? 'bg-emerald-500 animate-pulse' : isMedium ? 'bg-amber-400' : 'bg-rose-500'}`} />
+                            <span className={`text-xs font-bold ${isHigh ? 'text-emerald-700' : isMedium ? 'text-amber-700' : 'text-rose-700'}`}>
+                              {confidenceVal}% {isUnverified && <span className="text-[10px] font-normal text-amber-500 italic ml-1">(Harap verifikasi)</span>}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 2. Kode Rekening Input */}
+                        <td className="px-5 py-2 font-mono">
+                          <input
+                            type="text"
+                            value={acc.account}
+                            onChange={(e) => handleInlineEdit(index, 'account', e.target.value)}
+                            className="w-full bg-slate-50/50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-3 py-2 text-slate-800 font-mono text-xs focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                            placeholder="Kode Rekening..."
+                          />
+                        </td>
+
+                        {/* 3. Uraian Rekening Input */}
+                        <td className="px-5 py-2">
+                          <textarea
+                            value={acc.name}
+                            onChange={(e) => handleInlineEdit(index, 'name', e.target.value)}
+                            className="w-full bg-slate-50/50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-3 py-2 text-slate-700 font-semibold text-xs focus:ring-1 focus:ring-indigo-500 outline-none transition-all resize-y min-h-[42px]"
+                            placeholder="Uraian Rekening..."
+                            rows="2"
+                          />
+                        </td>
+
+                        {/* 4. Pagu DPA Input */}
+                        <td className="px-5 py-2 text-right">
+                          <div className="flex items-center justify-end border border-slate-200 focus-within:border-indigo-500 rounded-lg px-3 py-1.5 hover:bg-slate-100/50 focus-within:bg-white transition-all w-fit ml-auto">
+                            <span className="text-xs text-slate-400 font-sans mr-1.5 select-none">Rp</span>
+                            <input
+                              type="number"
+                              value={acc.pagu}
+                              onChange={(e) => handleInlineEdit(index, 'pagu', parseInt(e.target.value) || 0)}
+                              className="bg-transparent text-right font-extrabold text-indigo-600 focus:ring-0 border-none outline-none transition-all text-xs w-28 p-0"
+                              placeholder="Pagu..."
+                            />
+                          </div>
+                        </td>
+
+                        {/* 5. Aksi / Status */}
+                        <td className="px-5 py-2 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-2">
+                            {isUnverified ? (
+                              <button
+                                onClick={() => handleConfirmAccount(index)}
+                                className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2 py-1 rounded-lg text-[10px] font-bold transition-all shadow-sm flex items-center gap-1 active:scale-95"
+                                title="Klik untuk verifikasi bahwa data ini sudah benar"
+                              >
+                                <span>⚠️</span> Verifikasi
+                              </button>
+                            ) : (
+                              <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 px-2.5 py-1 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 justify-center">
+                                <span>✓</span> Valid
+                              </span>
+                            )}
+                            <button
+                              onClick={() => {
+                                const existing = dpaRincian[acc.account] || []
+                                setRincianModal({
+                                  kodeRekening: acc.account,
+                                  uraian: acc.name,
+                                  pagu: acc.pagu,
+                                  raw_text_block: acc.raw_text_block || null,
+                                  items: existing.length > 0 ? existing.map((r,i) => ({...r, no: i+1})) : [
+                                    { no: 1, nama: '', volume: 1, satuan: 'Buah', harga_satuan: 0, harga_total: 0 }
+                                  ]
+                                })
+                              }}
+                              className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1"
+                              title="Edit rincian item barang untuk rekening ini"
+                            >
+                              📝 Rincian
+                            </button>
+                            <button
+                              onClick={() => {
+                                if(confirm('Hapus rekening belanja ini?')) {
+                                  setDpaAccounts(prev => prev.filter((_, i) => i !== index))
+                                }
+                              }}
+                              className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors"
+                              title="Hapus Rekening"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Dynamic Add Row Button */}
+            <div className="mt-3 flex justify-start">
+              <button
+                onClick={() => {
+                  setDpaAccounts(prev => [
+                    ...prev,
+                    {
+                      account: '5.1.02.01.001.00000',
+                      name: 'Belanja Barang Daerah Baru',
+                      pagu: 1000000,
+                      confidence: 100,
+                      pagu_method: 'manual',
+                      ocr_engine: 'manual',
+                      verified: true
+                    }
+                  ]);
+                }}
+                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-100 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+              >
+                <span>➕</span> Tambah Rekening Belanja Baru
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL EDIT RINCIAN ITEM ───────────────────────────────── */}
+        {rincianModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+              {/* Header */}
+              <div className="flex justify-between items-start p-6 border-b border-slate-200">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">✏️ Edit Rincian Item DPA</h3>
+                  <p className="text-xs text-slate-500 mt-1 font-mono">{rincianModal.kodeRekening} — {rincianModal.uraian}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Pagu: <span className="font-bold text-indigo-600">Rp {rincianModal.pagu?.toLocaleString()}</span></p>
+                </div>
+                <button onClick={() => setRincianModal(null)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
+              </div>
+
+              {/* Info Banner when details were not parsed automatically (System Fallback) */}
+              {rincianModal.items.some(item => item.isDefault) && (
+                <div className="mx-6 mt-4 p-4 bg-amber-50/80 border border-amber-200 rounded-xl flex items-start gap-3 shadow-sm animate-pulse-subtle">
+                  <span className="text-xl">⚠️</span>
+                  <div className="text-xs text-amber-800 leading-relaxed font-medium">
+                    <strong className="text-amber-900 font-bold block mb-0.5">Rincian Item Belanja Tidak Ditemukan Oleh OCR</strong>
+                    Sistem tidak mendeteksi rincian sub-item belanja secara otomatis dari berkas DPA Anda. Sistem telah membuat rincian default (1 Paket senilai Pagu Resmi RUP) agar Anda dapat mengisi/mengedit uraian nama spesifikasi barang secara manual di bawah tanpa terjadi selisih pagu.
+                  </div>
+                </div>
+              )}
+
+              {/* Tabel Rincian */}
+              <div className="overflow-auto flex-1 p-6">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-600 font-bold">
+                      <th className="border border-slate-200 px-3 py-2 w-8 text-center">No</th>
+                      <th className="border border-slate-200 px-3 py-2 text-left">Nama Barang / Uraian</th>
+                      <th className="border border-slate-200 px-3 py-2 w-20 text-center">Volume</th>
+                      <th className="border border-slate-200 px-3 py-2 w-24 text-center">Satuan</th>
+                      <th className="border border-slate-200 px-3 py-2 w-32 text-right">Harga Satuan (Rp)</th>
+                      <th className="border border-slate-200 px-3 py-2 w-32 text-right">Harga Total (Rp)</th>
+                      <th className="border border-slate-200 px-3 py-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rincianModal.items.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="border border-slate-200 px-2 py-1.5 text-center text-slate-500 font-bold bg-slate-50/50">{idx + 1}</td>
+                        <td className="border border-slate-200 px-3 py-2.5">
+                          <textarea
+                            rows={2}
+                            className="w-full border border-slate-200 bg-white text-slate-850 font-bold focus:outline-none focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 rounded-xl px-3 py-2 text-xs shadow-sm transition-all resize-y overflow-auto leading-relaxed"
+                            value={item.nama}
+                            placeholder="Tulis uraian / nama spesifikasi barang secara lengkap..."
+                            onChange={e => {
+                              const upd = [...rincianModal.items]
+                              upd[idx] = { ...upd[idx], nama: e.target.value }
+                              setRincianModal(prev => ({ ...prev, items: upd }))
+                            }}
+                          />
+                        </td>
+                        <td className="border border-slate-200 px-2 py-1">
+                          <input
+                            type="number" min="0"
+                            className="w-full border-0 bg-transparent focus:outline-none focus:bg-indigo-50 rounded px-1 py-0.5 text-center"
+                            value={item.volume}
+                            onChange={e => {
+                              const vol = parseFloat(e.target.value) || 0
+                              const upd = [...rincianModal.items]
+                              upd[idx] = { ...upd[idx], volume: vol, harga_total: Math.round(vol * (upd[idx].harga_satuan || 0)) }
+                              setRincianModal(prev => ({ ...prev, items: upd }))
+                            }}
+                          />
+                        </td>
+                        <td className="border border-slate-200 px-2 py-1">
+                          <select
+                            className="w-full border-0 bg-transparent focus:outline-none text-center text-xs"
+                            value={item.satuan}
+                            onChange={e => {
+                              const upd = [...rincianModal.items]
+                              upd[idx] = { ...upd[idx], satuan: e.target.value }
+                              setRincianModal(prev => ({ ...prev, items: upd }))
+                            }}
+                          >
+                            {['Buah','Unit','Rim','Lembar','Paket','Set','Pcs','Box','Botol','Dus','Kg','Meter','Roll','Pack','Biji','Lusin','Kaleng','Eksemplar'].map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="border border-slate-200 px-2 py-1">
+                          <input
+                            type="number" min="0"
+                            className="w-full border-0 bg-transparent focus:outline-none focus:bg-indigo-50 rounded px-1 py-0.5 text-right font-mono"
+                            value={item.harga_satuan}
+                            onChange={e => {
+                              const hs = parseInt(e.target.value) || 0
+                              const upd = [...rincianModal.items]
+                              upd[idx] = { ...upd[idx], harga_satuan: hs, harga_total: Math.round((upd[idx].volume || 1) * hs) }
+                              setRincianModal(prev => ({ ...prev, items: upd }))
+                            }}
+                          />
+                        </td>
+                        <td className="border border-slate-200 px-2 py-1 text-right font-mono font-bold text-indigo-700">
+                          {(item.harga_total || 0).toLocaleString()}
+                        </td>
+                        <td className="border border-slate-200 px-1 py-1 text-center">
+                          <button
+                            onClick={() => {
+                              const upd = rincianModal.items.filter((_, i) => i !== idx)
+                              setRincianModal(prev => ({ ...prev, items: upd }))
+                            }}
+                            className="text-rose-400 hover:text-rose-600 font-bold"
+                          >×</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-50 font-bold">
+                      <td colSpan="5" className="border border-slate-200 px-3 py-2 text-right text-slate-700">Total Rincian:</td>
+                      <td className="border border-slate-200 px-3 py-2 text-right font-mono text-indigo-700">
+                        {rincianModal.items.reduce((s,r) => s + (r.harga_total || 0), 0).toLocaleString()}
+                      </td>
+                      <td className="border border-slate-200"></td>
+                    </tr>
+                    <tr>
+                      <td colSpan="7" className="px-3 py-4 bg-slate-50/50">
+                        {(() => {
+                          const total = rincianModal.items.reduce((s,r) => s + (r.harga_total || 0), 0)
+                          const selisih = (rincianModal.pagu || 0) - total
+                          
+                          const handleAutoBalance = async () => {
+                            if (rincianModal.items.length === 0) return
+                            try {
+                              let activeProvider = ""
+                              let activeKey = ""
+                              // Check both possible localStorage key names for backward compatibility
+                              const savedKeys = localStorage.getItem('pbj_ocr_api_keys') || localStorage.getItem('pbj_ai_keys')
+                              if (savedKeys) {
+                                const keys = JSON.parse(savedKeys)
+                                if (keys.groq) { activeProvider = "groq"; activeKey = keys.groq }
+                                else if (keys.gemini) { activeProvider = "gemini"; activeKey = keys.gemini }
+                                else if (keys.openai) { activeProvider = "openai"; activeKey = keys.openai }
+                                else if (keys.anthropic) { activeProvider = "anthropic"; activeKey = keys.anthropic }
+                              }
+
+                              // Jika sedang di proses, kasih loading indikasi (bisa pakai alert dulu sementara)
+                              const btn = document.getElementById('btn-auto-balance')
+                              const oldText = btn ? btn.innerText : ''
+                              if (btn) {
+                                btn.innerText = '⏳ Mengolah dengan AI...'
+                                btn.disabled = true
+                                btn.classList.add('opacity-50', 'cursor-wait')
+                              }
+
+                              const payload = {
+                                items: rincianModal.items,
+                                target_pagu: rincianModal.pagu || 0,
+                                provider: activeProvider,
+                                api_key: activeKey,
+                                raw_text_block: rincianModal.raw_text_block || null
+                              }
+
+                              const res = await fetch('/api/dpa/align-rincian', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                              })
+                              
+                              if (!res.ok) throw new Error('API request failed')
+                              const data = await res.json()
+                              if (data.success && data.aligned_items) {
+                                setRincianModal(prev => ({ ...prev, items: data.aligned_items }))
+                                const modeText = data.ocr_mode === 'ai' ? `(AI Refinement via ${activeProvider.toUpperCase()})` : '(Matematika Lokal)'
+                                alert(`✅ Berhasil diselaraskan 100% dengan Pagu RUP ${modeText}!`)
+                              }
+
+                              if (btn) {
+                                btn.innerText = oldText
+                                btn.disabled = false
+                                btn.classList.remove('opacity-50', 'cursor-wait')
+                              }
+                            } catch (err) {
+                              console.error(err)
+                              alert('Gagal menyelaraskan rincian dengan AI.')
+                              // Kembalikan state button
+                              const btn = document.getElementById('btn-auto-balance')
+                              if (btn) {
+                                btn.innerText = '⚡ Selaraskan Otomatis dengan Pagu RUP'
+                                btn.disabled = false
+                                btn.classList.remove('opacity-50', 'cursor-wait')
+                              }
+                            }
+                          }
+
+                          return (
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
+                              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+                                <div>
+                                  <span className="text-slate-500 font-medium">Pagu Resmi RUP:</span>
+                                  <strong className="text-slate-800 font-bold ml-1.5">Rp {rincianModal.pagu?.toLocaleString()}</strong>
+                                </div>
+                                <div>
+                                  <span className="text-slate-500 font-medium">Total Rincian DPA:</span>
+                                  <strong className="text-indigo-700 font-bold ml-1.5">Rp {total.toLocaleString()}</strong>
+                                </div>
+                                <div className="border-l border-slate-200 h-4 hidden md:block"></div>
+                                <div>
+                                  <span className="text-slate-500 font-medium">Status Selisih:</span>
+                                  {selisih === 0 ? (
+                                    <span className="text-emerald-700 font-bold ml-1.5 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">✓ Cocok 100%</span>
+                                  ) : (
+                                    <span className={`font-bold ml-1.5 px-2 py-0.5 rounded border ${selisih > 0 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-rose-700 bg-rose-50 border-rose-200'}`}>
+                                      {selisih > 0 ? `Kurang Rp ${selisih.toLocaleString()}` : `Kelebihan Rp ${Math.abs(selisih).toLocaleString()}`}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {selisih !== 0 && (
+                                <button
+                                  type="button"
+                                  id="btn-auto-balance"
+                                  onClick={handleAutoBalance}
+                                  className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                  title="Menyelaraskan selisih anggaran secara otomatis ke item belanja terakhir"
+                                >
+                                  ⚡ Selaraskan Otomatis dengan Pagu RUP
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+                {/* Tambah baris */}
+                <button
+                  onClick={() => {
+                    const lastItem = rincianModal.items[rincianModal.items.length - 1]
+                    setRincianModal(prev => ({ ...prev, items: [...prev.items, {
+                      no: prev.items.length + 1,
+                      nama: '', volume: 1, satuan: lastItem?.satuan || 'Buah',
+                      harga_satuan: 0, harga_total: 0
+                    }]}))
+                  }}
+                  className="mt-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"
+                >
+                  ➕ Tambah Baris Item
+                </button>
+              </div>
+              {/* Footer actions */}
+              <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+                <button
+                  onClick={() => setRincianModal(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50"
+                >Batal</button>
+                <button
+                  onClick={() => {
+                    const validItems = rincianModal.items.filter(r => r.nama && r.harga_satuan > 0)
+                    setDpaRincian(prev => ({ ...prev, [rincianModal.kodeRekening]: validItems }))
+                    setDpaAccounts(prev => prev.map(acc =>
+                      acc.account === rincianModal.kodeRekening
+                        ? { ...acc, rincianCount: validItems.length, verified: true }
+                        : acc
+                    ))
+                    setRincianModal(null)
+                    alert(`✅ ${validItems.length} item rincian disimpan untuk rekening ${rincianModal.kodeRekening}`)
+                  }}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-lg shadow-indigo-600/20"
+                >💾 Simpan Rincian ke DPA Ground Truth</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Integrasi SIRUP — Input Manual No. RUP */}
+        {dpaName && (
+          <div className="border-t border-slate-100 pt-6 animate-fade-in mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-indigo-700 uppercase tracking-wider">Sinkronisasi SIRUP LKPP</h3>
+              <a
+                href={`https://sirup.inaproc.id/sirup/home/penyediaSatker?idSatker=${satkerId}`}
+                target="_blank" rel="noreferrer"
+                className="text-xs text-indigo-600 underline font-bold flex items-center gap-1 hover:text-indigo-800"
+              >
+                🌐 Buka SIRUP LKPP ↗
+              </a>
+            </div>
+
+            {/* Panduan */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 text-xs text-blue-800 leading-relaxed">
+              <strong>Cara pakai:</strong> Buka SIRUP LKPP (link di atas) → cari paket yang sesuai rekening DPA Anda → salin <strong>No. RUP</strong> dan <strong>Pagu</strong> → paste ke kolom di bawah ini per rekening.
+              <br/>Ini memastikan No. SIRUP yang tercantum di dokumen HPS &amp; DPP adalah data yang <strong>benar sesuai RUP resmi</strong> Bapak.
+            </div>
+
+            {/* Input per rekening DPA */}
+            {dpaAccounts.length > 0 ? (
+              <div className="space-y-3">
+                {dpaAccounts.map((acc, idx) => {
+                  const linked = scrapedData.find(s => s.linkedRekening === acc.account)
+                  return (
+                    <div key={idx} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                      {/* Header rekening */}
+                      <div className="flex items-start gap-2 mb-3">
+                        <span className="bg-indigo-100 text-indigo-700 font-mono text-[10px] font-bold px-2 py-0.5 rounded">{acc.account}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold text-slate-700 truncate">{acc.name}</div>
+                          <div className="text-[11px] text-slate-500">Pagu DPA: <strong className="text-emerald-700">Rp {acc.pagu?.toLocaleString()}</strong></div>
+                        </div>
+                      </div>
+
+                      {/* Status: sudah terhubung atau belum */}
+                      {linked ? (
+                        <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5">
+                          <div className="text-xs space-y-0.5">
+                            <div className="font-bold text-emerald-700">✅ Terhubung ke No. RUP SIRUP</div>
+                            <div className="font-mono text-indigo-700 font-bold">{linked.noSirup} — <span className="font-normal text-slate-700">{linked.packName?.substring(0,55)}...</span></div>
+                            <div className="text-slate-500">Pagu SIRUP: <strong>Rp {linked.pagu?.toLocaleString()}</strong> | Metode: {linked.method}</div>
+                          </div>
+                          <button
+                            onClick={() => setScrapedData(prev => prev.filter(s => s.linkedRekening !== acc.account))}
+                            className="text-rose-500 hover:text-rose-700 text-xs font-bold ml-3 shrink-0"
+                          >✎ Ubah</button>
+                        </div>
+                      ) : (
+                        <SirupInputRow
+                          acc={acc}
+                          onLink={(sirupPack) => {
+                            const pack = { ...sirupPack, linkedRekening: acc.account }
+                            setScrapedData(prev => {
+                              const filtered = prev.filter(s => s.linkedRekening !== acc.account)
+                              return [...filtered, pack]
+                            })
+                            setStep(Math.max(step, 2))
+                          }}
+                        />
+                      )}
+                    </div>
+                  )
+                })}
+
+                {/* Status keseluruhan */}
+                {scrapedData.filter(s => s.linkedRekening).length > 0 && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+                    <span className="text-xs text-emerald-800 font-bold">
+                      ✅ {scrapedData.filter(s => s.linkedRekening).length} dari {dpaAccounts.length} rekening sudah terhubung ke SIRUP
+                    </span>
+                    <button
+                      onClick={() => setStep(Math.max(step, 2))}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg"
+                    >
+                      Lihat Paket Terpilih →
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500 italic bg-slate-50 rounded-xl p-4">
+                ⬆️ Upload DPA terlebih dahulu untuk melihat daftar rekening yang perlu dipasangkan ke No. RUP SIRUP.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Grid container for subsequent steps - 3-column layout where Sidebar takes 1, Main Area takes 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Progress Sidebar */}
         <div className="glass-panel p-6 h-fit space-y-6">
@@ -408,148 +1750,17 @@ export default function ProcurementPreparation() {
           </ul>
         </div>
 
-        {/* Main Content Area */}
+        {/* Main Content Area for Steps 2, 3, and 4 */}
         <div className="lg:col-span-2 space-y-6">
-          
-          {/* Step 1: Upload DPA */}
-          <div className="glass-panel p-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-slate-800">Dokumen Pelaksanaan Anggaran (DPA)</h2>
-              <span className="px-3 py-1 text-xs rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-medium">Langkah 1 (Wajib)</span>
-            </div>
-            <p className="text-sm text-slate-500 mb-6 leading-relaxed">Sebagai dokumen pembuka pengadaan, PPK wajib mengunggah DPA awal bersama Formulir Identifikasi Kebutuhan.</p>
-            
-            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center hover:border-indigo-500/50 transition-colors mb-6 bg-slate-50/50">
-              {dpaName ? (
-                <div className="text-emerald-600">
-                  <span className="text-3xl block mb-2">💾</span>
-                  <span className="font-bold block text-slate-700 text-sm mb-1">{dpaName}</span>
-                  <span className="text-xs text-emerald-600 font-bold block">✔️ Dokumen DPA Tersimpan dalam Sistem</span>
-                  <span className="text-[11px] text-slate-500 block mt-1">Status: Siap untuk integrasi data SIRUP.</span>
-                  <button onClick={() => setDpaName(null)} className="mt-4 text-xs text-rose-600 hover:text-rose-700 font-bold underline transition-colors">Hapus DPA</button>
-                </div>
-              ) : (
-                <>
-                  <div className="text-4xl mb-4">📂</div>
-                  <label className="cursor-pointer">
-                    <span className="btn-secondary text-sm">Pilih File DPA (PDF)</span>
-                    <input type="file" className="hidden" accept=".pdf" onChange={(e) => {
-                      const file = e.target.files[0]
-                      if (file) {
-                        setDpaName(file.name)
-                        
-                        // Intelligent Client-Side PDF Content Scan (Simulating OCR/AI Analysis)
-                        const reader = new FileReader()
-                        reader.onload = (event) => {
-                          const binaryStr = event.target.result || ''
-                          const scanContent = (binaryStr + ' ' + file.name).toLowerCase()
-                          
-                          // Scan for multiple matched accounts
-                          const matchedTypes = []
-                          if (scanContent.includes('alat tulis') || scanContent.includes('atk') || scanContent.includes('5.1.02.01.001.00024') || scanContent.includes('5.027.800') || scanContent.includes('79-81')) {
-                            matchedTypes.push('ATK')
-                          }
-                          if (scanContent.includes('komputer') || scanContent.includes('laptop') || scanContent.includes('printer') || scanContent.includes('5.2.02.10.0002') || scanContent.includes('10.829.000')) {
-                            matchedTypes.push('LAPTOP')
-                          }
-                          if (scanContent.includes('cetak') || scanContent.includes('penggandaan') || scanContent.includes('5.1.02.01.001.00012') || scanContent.includes('7.664.400')) {
-                            matchedTypes.push('CETAK')
-                          }
-                          
-                          // Fallback to all three if PDF binary is unreadable (encrypted/compressed) to give PPK full transparency
-                          if (matchedTypes.length === 0) {
-                            matchedTypes.push('ATK')
-                            matchedTypes.push('CETAK')
-                            matchedTypes.push('LAPTOP')
-                          }
-                          
-                          setMatchedDpaTypes(matchedTypes)
-                          
-                          alert(`🎉 AI Engine: Sukses menganalisis DPA PDF!\nDitemukan ${matchedTypes.length} rekening belanja aktif:\n` + 
-                                matchedTypes.map(t => t === 'ATK' ? '• Belanja Alat Tulis Kantor (Rek: 5.1.02.01.001.00024)' : 
-                                                    t === 'LAPTOP' ? '• Belanja Modal Komputer (Rek: 5.2.02.10.0002)' : 
-                                                    '• Belanja Bahan Cetak & Penggandaan (Rek: 5.1.02.01.001.00012)').join('\n') +
-                                `\n\nSistem otomatis mengintegrasikan dan menyinkronkan data RUP LKPP untuk semua rekening tersebut.`);
-                        }
-                        reader.readAsText(file)
-                      }
-                    }} />
-                  </label>
-                </>
-              )}
-            </div>
-
-            {/* Integration Search SIRUP Button */}
-            {dpaName && (
-              <div className="border-t border-slate-100 pt-6 animate-fade-in">
-                <h3 className="text-sm font-bold text-indigo-700 mb-3 uppercase tracking-wider">Integrasi Otomatis SIRUP LKPP</h3>
-                <div className="flex flex-col sm:flex-row gap-4 items-center">
-                  {currentUser.role === 'PPK' ? (
-                    <div className="flex-1 w-full animate-fade-in">
-                      <label className="block text-xs text-slate-500 font-semibold mb-1">Satker / Instansi Anda (Terkunci untuk PPK)</label>
-                      <div className="glass-panel px-4 py-2 text-slate-700 text-sm font-medium flex items-center justify-between border border-indigo-100/50 bg-indigo-50/10">
-                        <div className="flex items-center gap-2">
-                          <span>🏛️</span>
-                          <span className="font-bold text-slate-800">{currentUser.department}</span>
-                        </div>
-                        <span className="bg-indigo-600/10 text-indigo-700 border border-indigo-600/20 font-mono font-bold text-xs px-2.5 py-0.5 rounded-full">
-                          ID Satker: {satkerId}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex-1 w-full animate-fade-in">
-                      <label className="block text-xs text-slate-500 font-semibold mb-1">ID Satker / Instansi (Akses Multi-Satker PP)</label>
-                      <div className="flex gap-2">
-                        <input 
-                          type="text" 
-                          className="glass-input text-sm font-mono flex-1" 
-                          value={satkerId} 
-                          onChange={(e) => setSatkerId(e.target.value)} 
-                          placeholder="Satker ID (Besuk: 67081)"
-                        />
-                        <select 
-                          className="glass-input text-xs max-w-[220px]"
-                          value={satkerId}
-                          onChange={(e) => setSatkerId(e.target.value)}
-                        >
-                          <option value="67081">Kecamatan Besuk (67081)</option>
-                          <option value="67082">Kecamatan Kraksaan (67082)</option>
-                          <option value="67083">Kecamatan Paiton (67083)</option>
-                          <option value="12345">Dinas PUPR Kab. Probolinggo (12345)</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                  <button 
-                    onClick={startScrapingSimulation} 
-                    disabled={isScraping}
-                    className="btn-primary w-full sm:w-auto h-fit mt-5 text-sm flex items-center justify-center gap-2"
-                  >
-                    {isScraping ? 'Mengambil Data...' : '🔍 Tarik & Sinkronisasi SIRUP'}
-                  </button>
-                </div>
-
-                {/* Scraping Log Display */}
-                {isScraping && (
-                  <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4 font-mono text-xs text-indigo-600 space-y-2 h-40 overflow-y-auto shadow-inner">
-                    {scrapingLogs.map((log, index) => (
-                      <div key={index} className="animate-fade-in">⚙️ {log}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
 
           {/* Step 2: Scraped Data Table */}
           {scrapedData.length > 0 && (
-            <div className="glass-panel p-6 animate-slide-up">
+            <div className="glass-panel p-6 animate-slide-up mt-6">
               <h2 className="text-xl font-bold text-slate-800 mb-2">Hasil Scraping Paket SIRUP</h2>
               <p className="text-sm text-slate-500 mb-6">Berikut adalah paket APBD yang ditemukan untuk RUP Penyedia Kecamatan Besuk. Pilih paket untuk memuat detailnya.</p>
               
-              <div className="overflow-x-auto border border-slate-100 rounded-xl shadow-sm">
-                <table className="min-w-full divide-y divide-slate-100 bg-white">
+              <div className="overflow-x-auto border border-slate-100 rounded-xl shadow-sm bg-white">
+                <table className="min-w-full divide-y divide-slate-100">
                   <thead className="bg-slate-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Kode RUP</th>
@@ -568,9 +1779,7 @@ export default function ProcurementPreparation() {
                         <td className="px-4 py-4 text-slate-700 max-w-xs font-medium" title={pack.packName}>
                           <div className="flex flex-col gap-1.5">
                             <div className="truncate">{pack.packName}</div>
-                            {((matchedDpaTypes.includes('ATK') && pack.noSirup === '65307012') || 
-                              (matchedDpaTypes.includes('LAPTOP') && pack.noSirup === '65309015') ||
-                              (matchedDpaTypes.includes('CETAK') && pack.noSirup === '65308044')) && (
+                            {isPackageMatchedWithDpa(pack) && (
                               <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-800 text-[9px] font-extrabold w-fit animate-pulse flex items-center gap-1">
                                 <span>✨</span> Cocok dengan Rincian DPA Anda
                               </span>
@@ -723,6 +1932,15 @@ export default function ProcurementPreparation() {
               className={`btn-primary ${step < 4 || !isSigned ? 'opacity-50 cursor-not-allowed' : ''}`}
               onClick={() => {
                 if(step >= 4 && isSigned) {
+                  const hasUnverified = dpaAccounts.some(acc => {
+                    return !acc.verified && (acc.pagu_method === 'fallback_max' || acc.ocr_engine === 'tesseract');
+                  });
+
+                  if (hasUnverified) {
+                    alert('⚠️ GAGAL MENGIRIM DPP!\n\nTerdapat data rekening DPA hasil OCR atau Fallback yang belum diverifikasi ("Unverified"). Silakan klik tombol "Konfirmasi Data Ini" atau edit nilai rekening tersebut terlebih dahulu pada tabel hasil OCR Langkah 1.');
+                    return;
+                  }
+
                   setStatus('Terkirim ke PP');
                   const submittedData = {
                     packName: selectedPack?.packName,
@@ -753,7 +1971,7 @@ export default function ProcurementPreparation() {
 
       {/* DOCUMENT PREVIEW MODAL (A4 PAPER SIMULATION & HIGH-FIDELITY PRINT-READY VIEW) */}
       {activeDocPreview && selectedPack && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex justify-center overflow-y-auto p-4 animate-fade-in print:p-0 print:bg-white">
+        <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.45)' }} className="fixed inset-0 backdrop-blur-md z-50 flex justify-center overflow-y-auto p-4 animate-fade-in print:p-0 print:bg-white">
           
           {/* Style Injector to override print layout strictly for A4 format */}
           <style dangerouslySetInnerHTML={{__html: `
@@ -1033,7 +2251,7 @@ export default function ProcurementPreparation() {
 
       {/* RUP LKPP Detail Sheet Modal */}
       {detailModalPack && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/85 backdrop-blur-md p-4 overflow-y-auto animate-fade-in">
+        <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.4)' }} className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md p-4 overflow-y-auto animate-fade-in">
           <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl border border-slate-100 overflow-hidden animate-zoom-in my-8">
             {/* Header */}
             <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex justify-between items-center">
@@ -1042,7 +2260,7 @@ export default function ProcurementPreparation() {
                   <span>🏛️</span> Detail Rencana Umum Pengadaan (RUP) Penyedia - SIRUP LKPP
                 </h3>
                 <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                  https://sirup.inaproc.id/sirup/home/penyediaSatker?idSatker={satkerId}
+                  https://sirup.inaproc.id/sirup/ro/penyedia/detailPaketPenyedia2020?idPaket={detailModalPack.noSirup}
                 </p>
               </div>
               <button 
@@ -1252,3 +2470,105 @@ export default function ProcurementPreparation() {
     </div>
   )
 }
+
+// Komponen Pembantu untuk Input Manual No. SIRUP per Rekening DPA
+function SirupInputRow({ acc, onLink }) {
+  const [noSirup, setNoSirup] = useState('')
+  const [packName, setPackName] = useState('')
+  const [pagu, setPagu] = useState(acc.pagu || 0)
+  const [method, setMethod] = useState('Pengadaan Langsung')
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!noSirup) {
+      alert('Silakan isi Nomor RUP SIRUP terlebih dahulu.')
+      return
+    }
+    if (!packName) {
+      alert('Silakan isi Nama Paket sesuai yang ada di portal SIRUP.')
+      return
+    }
+
+    onLink({
+      noSirup,
+      packName,
+      pagu: parseInt(pagu) || acc.pagu,
+      method,
+      sumberDana: 'APBD',
+      tahun: '2026',
+      klpd: 'Kab. Probolinggo',
+      satker: 'Kecamatan Besuk',
+      volume: '1 Paket',
+      uraian: packName,
+      spesifikasi: 'Spesifikasi Sesuai Rincian DPA',
+      pdn: 'Ya',
+      usahaKecil: 'Ya',
+      jenisPengadaan: acc.account?.includes('5.2.') ? 'Modal' : 'Barang',
+      mak: acc.account
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-3 bg-slate-50 border border-slate-100 rounded-lg p-3 space-y-3">
+      <div className="text-[11px] font-bold text-slate-500 uppercase">Hubungkan RUP SIRUP Secara Manual:</div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5">
+        <div>
+          <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">Nomor RUP SIRUP</label>
+          <input
+            type="text"
+            required
+            className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded px-2 py-1 text-xs font-mono"
+            placeholder="Contoh: 65307012"
+            value={noSirup}
+            onChange={(e) => setNoSirup(e.target.value)}
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">Nama Paket di SIRUP</label>
+          <input
+            type="text"
+            required
+            className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded px-2 py-1 text-xs"
+            placeholder="Belanja ATK Kantor..."
+            value={packName}
+            onChange={(e) => setPackName(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">Pagu RUP (Rp)</label>
+          <input
+            type="number"
+            required
+            className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded px-2 py-1 text-xs font-bold text-indigo-700"
+            value={pagu}
+            onChange={(e) => setPagu(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="flex justify-between items-center pt-1">
+        <div>
+          <label className="inline-flex items-center gap-1.5 text-[10px] text-slate-500 font-semibold mr-3">
+            Metode:
+            <select
+              className="bg-transparent border-0 font-bold text-indigo-600 focus:ring-0 p-0 text-[10px] cursor-pointer"
+              value={method}
+              onChange={(e) => setMethod(e.target.value)}
+            >
+              <option value="Pengadaan Langsung">Pengadaan Langsung</option>
+              <option value="E-Purchasing">E-Purchasing</option>
+              <option value="Penunjukan Langsung">Penunjukan Langsung</option>
+              <option value="Tender">Tender</option>
+            </select>
+          </label>
+        </div>
+        <button
+          type="submit"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold px-3 py-1 rounded shadow transition-all"
+        >
+          ✓ Hubungkan Ke Rekening Ini
+        </button>
+      </div>
+    </form>
+  )
+}
+

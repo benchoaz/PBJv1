@@ -49,6 +49,16 @@ func main() {
 	mux.HandleFunc("DELETE /api/projects/{id}", projectHandler.Delete)
 	mux.HandleFunc("GET /api/projects/stats", projectHandler.Stats)
 
+	// DPA Parser endpoints - proxy to Python PyMuPDF microservice
+	mux.HandleFunc("POST /api/dpa/parse", handlers.ParseDPA)
+	mux.HandleFunc("OPTIONS /api/dpa/parse", handlers.ParseDPAOptions)
+	mux.HandleFunc("POST /api/dpa/align-rincian", handlers.AlignRincian)
+	mux.HandleFunc("OPTIONS /api/dpa/align-rincian", handlers.AlignRincianOptions)
+	mux.HandleFunc("GET /api/dpa/health", handlers.DpaHealthCheck)
+
+	// SIRUP LKPP live proxy endpoint
+	mux.HandleFunc("GET /api/sirup/satker/{id}", handlers.GetSirupPackages)
+
 	addr := ":8080"
 	if port := os.Getenv("PORT"); port != "" {
 		addr = ":" + port
