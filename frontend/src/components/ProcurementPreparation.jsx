@@ -69,6 +69,13 @@ export default function ProcurementPreparation() {
   const [hpsValue, setHpsValue] = useState(() => {
     return localStorage.getItem('pbj_hps_value') || ''
   })
+  const [hpsPrices, setHpsPrices] = useState(() => {
+    const saved = localStorage.getItem('pbj_hps_prices')
+    return saved ? JSON.parse(saved) : {}
+  })
+  useEffect(() => {
+    localStorage.setItem('pbj_hps_prices', JSON.stringify(hpsPrices))
+  }, [hpsPrices])
   const [techSpecs, setTechSpecs] = useState(() => {
     return localStorage.getItem('pbj_tech_specs') || ''
   })
@@ -1836,8 +1843,129 @@ export default function ProcurementPreparation() {
             )}
 
             <div className="space-y-4">
+              {/* KALKULATOR HPS INTERAKTIF */}
+              {selectedPack && (
+                <div className="bg-slate-800/80 border border-slate-700 rounded-2xl p-5 space-y-4 shadow-lg">
+                  <div className="flex justify-between items-center border-b border-slate-700 pb-3">
+                    <div>
+                      <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                        <span>📊</span> Kalkulator HPS Berbasis Survei Pasar
+                      </h3>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Sesuaikan harga satuan berdasarkan survei harga pasar riil. Total HPS tidak boleh melebihi Pagu DPA.</p>
+                    </div>
+                    {(() => {
+                      const items = getPackageItems(selectedPack)
+                      const totalHps = items.reduce((sum, item) => {
+                        const price = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price
+                        return sum + (item.qty * price)
+                      }, 0)
+                      const totalPagu = items.reduce((sum, item) => sum + (item.qty * item.price), 0)
+                      const exceeds = totalHps > totalPagu
+                      return (
+                        <div className="text-right">
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border ${
+                            exceeds 
+                              ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' 
+                              : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                          }`}>
+                            {exceeds ? '⚠️ Melebihi Pagu DPA' : '✅ HPS Efisien & Valid'}
+                          </span>
+                        </div>
+                      )
+                    })()}
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left border-collapse">
+                      <thead>
+                        <tr className="text-slate-450 border-b border-slate-700 font-bold uppercase text-[9px] tracking-wider">
+                          <th className="py-2 pr-2">No</th>
+                          <th className="py-2">Nama Barang / Rincian DPA</th>
+                          <th className="py-2 text-center w-12">Qty</th>
+                          <th className="py-2 text-right">Pagu DPA (Rp)</th>
+                          <th className="py-2 text-right pl-4 w-44">Harga Satuan HPS (Rp)</th>
+                          <th className="py-2 text-right">Total HPS (Rp)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const items = getPackageItems(selectedPack)
+                          return items.map((item, idx) => {
+                            const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price
+                            const totalHpsItem = item.qty * unitHpsPrice
+                            return (
+                              <tr key={item.no || idx} className="border-b border-slate-700/50 hover:bg-slate-750/30">
+                                <td className="py-2.5 text-slate-400">{idx + 1}</td>
+                                <td className="py-2.5 font-medium text-slate-200">
+                                  {item.name}
+                                  <span className="text-[10px] text-slate-400 block font-normal">Satuan: {item.unit}</span>
+                                </td>
+                                <td className="py-2.5 text-center font-bold text-slate-300">{item.qty}</td>
+                                <td className="py-2.5 text-right font-mono text-slate-400">Rp {item.price.toLocaleString()}</td>
+                                <td className="py-2.5 text-right pl-4">
+                                  <div className="relative">
+                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">Rp</span>
+                                    <input
+                                      type="number"
+                                      value={unitHpsPrice}
+                                      onChange={(e) => {
+                                        const newPrice = parseFloat(e.target.value) || 0
+                                        setHpsPrices(prev => ({
+                                          ...prev,
+                                          [item.name]: newPrice
+                                        }))
+                                        setIsSigned(false)
+                                        if (step === 4) setStep(3)
+                                      }}
+                                      className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-lg py-1 pl-7 pr-2 text-xs font-mono font-bold text-right focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                    />
+                                  </div>
+                                </td>
+                                <td className="py-2.5 text-right font-mono font-bold text-indigo-350">
+                                  Rp {totalHpsItem.toLocaleString()}
+                                </td>
+                              </tr>
+                            )
+                          })
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {(() => {
+                    const items = getPackageItems(selectedPack)
+                    const totalHps = items.reduce((sum, item) => {
+                      const price = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price
+                      return sum + (item.qty * price)
+                    }, 0)
+                    const totalPagu = items.reduce((sum, item) => sum + (item.qty * item.price), 0)
+                    return (
+                      <div className="flex justify-between items-center pt-3 border-t border-slate-700 text-xs">
+                        <div className="text-slate-450 font-medium">
+                          Total Pagu DPA: <span className="font-bold font-mono text-slate-300">Rp {totalPagu.toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-slate-400 font-medium">Hasil Kalkulasi HPS:</span>
+                          <span className="text-sm font-extrabold font-mono text-indigo-400">Rp {totalHps.toLocaleString()}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setHpsValue(totalHps.toString())
+                              alert(`✅ Nilai HPS Resmi disetujui sebesar Rp ${totalHps.toLocaleString()} (Hasil kalkulasi survei pasar).`)
+                            }}
+                            className="bg-indigo-600 hover:bg-indigo-750 text-white font-bold px-3 py-1.5 rounded-lg transition-all text-[10px] active:scale-95 shadow-md shadow-indigo-600/10"
+                          >
+                            💾 Gunakan Sebagai HPS Resmi
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Nilai HPS Disetujui (Rp)</label>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Nilai HPS Disetujui Resmi (Rp)</label>
                 <input 
                   type="number" 
                   className="glass-input" 
@@ -2093,16 +2221,19 @@ export default function ProcurementPreparation() {
                           </tr>
                         </thead>
                         <tbody>
-                          {getPackageItems(selectedPack).map((item) => (
-                            <tr key={item.no}>
-                              <td className="border border-slate-900 p-2 text-center">{item.no}</td>
-                              <td className="border border-slate-900 p-2 text-left font-medium">{item.name}</td>
-                              <td className="border border-slate-900 p-2 text-center font-bold">{item.qty}</td>
-                              <td className="border border-slate-900 p-2 text-center">{item.unit}</td>
-                              <td className="border border-slate-900 p-2 text-right font-mono">Rp {item.price.toLocaleString()}</td>
-                              <td className="border border-slate-900 p-2 text-right font-mono font-bold">Rp {(item.qty * item.price).toLocaleString()}</td>
-                            </tr>
-                          ))}
+                          {getPackageItems(selectedPack).map((item) => {
+                            const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
+                            return (
+                              <tr key={item.no}>
+                                <td className="border border-slate-900 p-2 text-center">{item.no}</td>
+                                <td className="border border-slate-900 p-2 text-left font-medium">{item.name}</td>
+                                <td className="border border-slate-900 p-2 text-center font-bold">{item.qty}</td>
+                                <td className="border border-slate-900 p-2 text-center">{item.unit}</td>
+                                <td className="border border-slate-900 p-2 text-right font-mono">Rp {unitHpsPrice.toLocaleString()}</td>
+                                <td className="border border-slate-900 p-2 text-right font-mono font-bold">Rp {(item.qty * unitHpsPrice).toLocaleString()}</td>
+                              </tr>
+                            );
+                          })}
                           <tr className="bg-slate-50 font-bold">
                             <td colSpan="5" className="border border-slate-900 p-2 text-right">Jumlah Total Nilai HPS (Termasuk PPN & Pajak):</td>
                             <td className="border border-slate-900 p-2 text-right text-indigo-700 font-mono">Rp {parseInt(hpsValue).toLocaleString()}</td>
@@ -2160,16 +2291,19 @@ export default function ProcurementPreparation() {
                             </tr>
                           </thead>
                           <tbody>
-                            {getPackageItems(selectedPack).map((item) => (
-                              <tr key={item.no}>
-                                <td className="border border-slate-300 p-1 text-center">{item.no}</td>
-                                <td className="border border-slate-300 p-1 text-left">{item.name}</td>
-                                <td className="border border-slate-300 p-1 text-center font-bold">{item.qty}</td>
-                                <td className="border border-slate-300 p-1 text-center">{item.unit}</td>
-                                <td className="border border-slate-300 p-1 text-right font-mono">Rp {item.price.toLocaleString()}</td>
-                                <td className="border border-slate-300 p-1 text-right font-mono font-bold">Rp {(item.qty * item.price).toLocaleString()}</td>
-                              </tr>
-                            ))}
+                            {getPackageItems(selectedPack).map((item) => {
+                              const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
+                              return (
+                                <tr key={item.no}>
+                                  <td className="border border-slate-300 p-1 text-center">{item.no}</td>
+                                  <td className="border border-slate-300 p-1 text-left">{item.name}</td>
+                                  <td className="border border-slate-300 p-1 text-center font-bold">{item.qty}</td>
+                                  <td className="border border-slate-300 p-1 text-center">{item.unit}</td>
+                                  <td className="border border-slate-300 p-1 text-right font-mono">Rp {unitHpsPrice.toLocaleString()}</td>
+                                  <td className="border border-slate-300 p-1 text-right font-mono font-bold">Rp {(item.qty * unitHpsPrice).toLocaleString()}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
