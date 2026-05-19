@@ -371,12 +371,22 @@ def refine_rincian_with_ai(block_text: str, provider: str, api_key: str, is_cust
         prompt = block_text
     else:
         prompt = f"""Bapak adalah asisten AI ahli keuangan daerah dan pengadaan barang/jasa (PBJ) Indonesia.
-Tugas Anda adalah mengekstrak rincian item belanja dari potongan teks DPA (RKA Belanja SKPD) berikut ini.
-Koreksi typo OCR (seperti 'Bua1h' -> 'Buah', 'R1m' -> 'Rim', atau nominal angka dengan separator titik/koma yang salah dibaca).
-Pastikan uraian/nama barang hasil ekstraksi bersih, jelas terbaca, bebas dari prefiks kode rekening, dan mudah dipahami manusia di web view.
+Tugas Anda adalah mem-parsing secara deterministik struktur rincian belanja dari potongan teks DPA (RKA Belanja SKPD) berikut ini menggunakan alur struktur pohon (Tree Structure).
 
-FOKUS PADA DETAIL BARANG:
-- Gabungkan kelompok/kategori barang (seperti 'Printer', 'Laptop', 'Komputer') dengan merk/tipe/spesifikasi detail di bawahnya (seperti 'EPSON L121', 'Laptop Intel Celeron') agar nama barang hasil ekstraksi sangat spesifik dan detail (contoh hasil: 'Printer EPSON L121' atau 'Laptop Intel Celeron'). JANGAN menulis nama barang yang terlalu umum jika ada detail merk/spesifikasi!
+STRUKTUR POHON DPA (PARENT-CHILD-GRANDCHILD):
+- LEVEL 1 (Parent): Kode Rekening & Uraian Rekening (misal: 5.1.02.01.001.00024 - Belanja Alat Tulis Kantor). Ini adalah anchor utama.
+- LEVEL 2 (Child): Nama Barang / Item Rincian (misal: 'Ballpoint', 'Printer', 'Laptop', 'LCD Proyektor'). Satu kode rekening dapat memiliki BANYAK item rincian.
+- LEVEL 3 (Grandchild): Spesifikasi / Deskripsi Detail (misal: 'Ballpoint Baliner', 'EPSON L121', '3600 Ansi Lumens... (setara InFocus, IN 112XV)', 'lengkap monitor, keyboard, mouse').
+
+ATURAN GRUPING HIERARKIS:
+1. GABUNGKAN LEVEL 3 (Grandchild) LANGSUNG KE DALAM LEVEL 2 (Child)!
+   - Contoh: Jika ada item 'Ballpoint' dan di baris bawahnya ada spesifikasi 'Ballpoint Baliner', Anda harus menggabungkannya menjadi: 'Ballpoint (Spesifikasi: Ballpoint Baliner)'.
+   - Contoh: Jika ada item 'LCD Proyektor' dan spesifikasinya '3600 Ansi Lumens (setara InFocus, IN 112XV)', gabungkan menjadi: 'LCD Proyektor (Spesifikasi: 3600 Ansi Lumens, setara InFocus, IN 112XV)'.
+   - JANGAN PERNAH memisahkan spesifikasi menjadi item baru yang berdiri sendiri!
+2. STOP CONDITION GRUPING:
+   - Seluruh item rincian di bawah rekening aktif harus tetap dikelompokkan ke rekening yang sama sampai muncul kode rekening baru (sibling berikutnya)!
+   - Jangan memutus grouping hanya karena adanya spesifikasi baru, adanya perpindahan baris baru, pergantian sub-item, atau perpindahan halaman.
+   - Baris tanpa kode rekening baru dianggap lanjutan dari rekening aktif sebelumnya!
 
 SPAM FILTERING & GARBAGE EXCLUSION:
 - JANGAN PERNAH memasukkan baris rencana realisasi bulanan (seperti 'Januari', 'Februari', dst.), baris total/jumlah sub kegiatan (seperti 'Jumlah Anggaran Sub Kegiatan', 'Jumlah'), nama pejabat/Camat, NIP, tanda tangan, atau baris rekapitulasi ke dalam hasil ekstraksi rincian!
@@ -385,7 +395,7 @@ SPAM FILTERING & GARBAGE EXCLUSION:
 Format output WAJIB berupa JSON ARRAY murni yang berisi objek dengan format berikut (tanpa kata pengantar, penjelasan, atau pembungkus markdown ```json):
 [
   {{
-    "nama": "Uraian nama barang/jasa yang jelas",
+    "nama": "Uraian nama barang lengkap dengan spesifikasinya (Contoh: Printer EPSON L121)",
     "volume": 10.0,
     "satuan": "Buah/Rim/Paket/Unit",
     "harga_satuan": 150000,
@@ -1021,13 +1031,13 @@ POTONGAN TEKS DPA ASLI:
 DAFTAR ITEM RINCIAN SAAT INI:
 {json.dumps([item.dict() for item in req.items], indent=2)}
 
-ATURAN REFINEMENT KETAT:
-1. Cari semua item yang ada di potongan teks DPA asli. Jangan hanya terpaku pada daftar rincian saat ini. Jika di teks DPA ada item lain yang belum masuk ke daftar rincian saat ini, Anda HARUS menambahkannya!
-2. FOKUS PADA DETAIL BARANG: Gabungkan kelompok/kategori barang (seperti 'Printer', 'Laptop', 'Komputer') dengan merk/tipe/spesifikasi detail di bawahnya (seperti 'EPSON L121', 'Laptop Intel Celeron') agar nama barang hasil ekstraksi sangat spesifik dan detail (contoh hasil: 'Printer EPSON L121' or 'Laptop Intel Celeron'). JANGAN menulis nama barang yang terlalu umum jika ada detail merk/spesifikasi!
-3. JANGAN PERNAH memasukkan baris rencana realisasi bulanan (seperti 'Januari', 'Februari', dst.), baris total/jumlah sub kegiatan (seperti 'Jumlah Anggaran Sub Kegiatan', 'Jumlah'), nama pejabat/Camat, NIP, tanda tangan, atau baris rekapitulasi ke dalam hasil ekstraksi rincian!
-4. JIKA di teks DPA terdapat item dengan nominal harga/jumlah Rp 0,00 (atau Rp 0), itu berarti item tersebut sudah terhapus/dihapus, sehingga JANGAN dimasukkan ke dalam rincian!
-5. Sesuaikan volume, satuan, dan harga satuan secara wajar dan logis sesuai angka yang tertulis di teks DPA agar total penjumlahannya PAS 100% sama dengan target pagu: Rp {req.target_pagu}.
-6. Jangan mengubah uraian/nama spesifikasi barang asli secara drastis, pertahankan deskripsi aslinya!
+ATURAN REFINEMENT KETAT (PARENT-CHILD-GRANDCHILD TREE):
+1. STRUKTUR POHON DPA: Satu kode rekening (Parent) dapat memiliki BANYAK item rincian (Child), dan setiap item dapat memiliki spesifikasi detail di bawahnya (Grandchild). Anda harus memetakan rincian teks asli ke dalam struktur pohon ini!
+2. GRUPING SPESIFIKASI: Gabungkan baris spesifikasi detail (Grandchild) langsung ke dalam nama barang utamanya (Child). Contoh: 'Printer EPSON L121' atau 'Laptop setara intel Celeron'. JANGAN PERNAH mengekstrak spesifikasi sebagai item mandiri yang terpisah dari barang utamanya!
+3. JANGAN PERNAH memasukkan baris rencana realisasi bulanan (seperti 'Januari', 'Februari', dst.), baris total/jumlah sub kegiatan (seperti 'Jumlah Anggaran Sub Kegiatan', 'Jumlah'), nama pejabat/Camat, NIP, tanda tangan, atau baris rekapitulasi ke dalam rincian!
+4. STOP CONDITION GRUPING: Seluruh item rincian di bawah rekening aktif harus tetap dikelompokkan ke rekening yang sama sampai muncul kode rekening sibling berikutnya! Jangan memutus grouping hanya karena perpindahan baris atau spesifikasi.
+5. JIKA di teks DPA terdapat item dengan nominal harga/jumlah Rp 0,00 (atau Rp 0), itu berarti item tersebut sudah terhapus/dihapus, sehingga JANGAN dimasukkan ke dalam rincian!
+6. Sesuaikan volume, satuan, dan harga satuan secara wajar dan logis sesuai angka yang tertulis di teks DPA agar total penjumlahannya PAS 100% sama dengan target pagu: Rp {req.target_pagu}.
 7. Anda harus mengembalikan respons HANYA berupa array JSON yang valid tanpa markdown formatting. Setiap elemen harus memiliki keys: "no" (int), "nama" (string), "volume" (float), "satuan" (string), "harga_satuan" (int), "harga_total" (int).
 
 Format JSON keluaran yang diwajibkan:
