@@ -363,11 +363,14 @@ def extract_rincian_from_block(block_text: str) -> List[RincianItem]:
 
 
 # ── AI Refinement: Merapikan & Membaca Rincian otomatis ──────────────────────
-def refine_rincian_with_ai(block_text: str, provider: str, api_key: str) -> List[RincianItem]:
+def refine_rincian_with_ai(block_text: str, provider: str, api_key: str, is_custom_prompt: bool = False) -> List[RincianItem]:
     if not provider or not api_key:
         return []
     
-    prompt = f"""Bapak adalah asisten AI ahli keuangan daerah dan pengadaan barang/jasa (PBJ) Indonesia.
+    if is_custom_prompt:
+        prompt = block_text
+    else:
+        prompt = f"""Bapak adalah asisten AI ahli keuangan daerah dan pengadaan barang/jasa (PBJ) Indonesia.
 Tugas Anda adalah mengekstrak rincian item belanja dari potongan teks DPA (RKA Belanja SKPD) berikut ini.
 Koreksi typo OCR (seperti 'Bua1h' -> 'Buah', 'R1m' -> 'Rim', atau nominal angka dengan separator titik/koma yang salah dibaca).
 Pastikan uraian/nama barang hasil ekstraksi bersih, jelas terbaca, bebas dari prefiks kode rekening, dan mudah dipahami manusia di web view.
@@ -1034,7 +1037,7 @@ Format JSON keluaran yang diwajibkan:
 """
     try:
         print("DEBUG: calling refine_rincian_with_ai...")
-        raw_res = refine_rincian_with_ai(prompt, req.provider, req.api_key)
+        raw_res = refine_rincian_with_ai(prompt, req.provider, req.api_key, is_custom_prompt=True)
         if raw_res:
             items_res = []
             for idx, item in enumerate(raw_res):
