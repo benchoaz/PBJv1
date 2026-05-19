@@ -625,16 +625,29 @@ def run_extraction_pipeline(doc: fitz.Document, full_ocr_text: str, use_ocr: boo
         block = full_text[pos_start:pos_end]
         block_after = full_text[pos_start + len(kode):pos_end]
 
-        # Pagu: cari nominal terbesar di blok
-        nominals = NOMINAL.findall(block_after)
+        # Pagu: Cari nominal yang tertulis di baris yang sama dengan kode rekening, atau 1-2 baris setelahnya
         pagu = 0
-        for n in nominals:
-            try:
-                v = int(n.replace('.', ''))
-                if v > pagu and v >= 100000:
-                    pagu = v
-            except:
-                pass
+        lines_in_block = block.split('\n')
+        if lines_in_block:
+            line_with_kode = lines_in_block[0]
+            n_on_line = NOMINAL.findall(line_with_kode)
+            if n_on_line:
+                try:
+                    # Ambil nominal terakhir di baris yang mengandung kode rekening
+                    pagu = int(n_on_line[-1].replace('.', ''))
+                except:
+                    pass
+            
+            # Jika tidak ketemu di baris pertama, cari di baris berikutnya (maksimal 2 baris ke depan)
+            if pagu == 0 and len(lines_in_block) > 1:
+                for next_l in lines_in_block[1:3]:
+                    n_next = NOMINAL.findall(next_l)
+                    if n_next:
+                        try:
+                            pagu = int(n_next[0].replace('.', ''))
+                            break
+                        except:
+                            pass
 
         if pagu == 0:
             continue
