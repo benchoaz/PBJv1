@@ -37,7 +37,7 @@ REKENING_FULL = re.compile(r'\b5\.[12]\.\d{2}\.\d{2}\.\d{3}\.\d{5}\b')
 REKENING_MAK = re.compile(r'\b\d+(?:\.\d+)*\.5\.[12]\.\d{2}\.\d{2}\.\d{3}\.\d{5}\b')
 REKENING_PERMENDAGRI = re.compile(r'\b\d{1,2}\.\d{2}\.\d{2}\.\d{1,2}\.\d{3}\b')
 
-NOMINAL = re.compile(r'\b(\d{1,3}(?:\.\d{3})+)(?:,\d{0,2})?\b')
+NOMINAL = re.compile(r'(?<!\d\.)(?:Rp\.?\s*)?(\d{1,3}(?:\.\d{3})+)(?:,\d{0,2})?\b(?!\.\d)', re.IGNORECASE)
 SATUAN_LIST = ['Unit','Buah','Rim','Lembar','Paket','Set','Bh','Pcs','Box','Keping',
                'Roll','Botol','Liter','Kg','M','Meter','Dus','Lusin','Pasang','Eksemplar',
                'Biji','Pack','Tube','Kaleng','Pkt','Porsi','Kegiatan','Kgt','Rol','Lbr',
@@ -375,7 +375,9 @@ Pastikan uraian/nama barang hasil ekstraksi bersih, jelas terbaca, bebas dari pr
 FOKUS PADA DETAIL BARANG:
 - Gabungkan kelompok/kategori barang (seperti 'Printer', 'Laptop', 'Komputer') dengan merk/tipe/spesifikasi detail di bawahnya (seperti 'EPSON L121', 'Laptop Intel Celeron') agar nama barang hasil ekstraksi sangat spesifik dan detail (contoh hasil: 'Printer EPSON L121' atau 'Laptop Intel Celeron'). JANGAN menulis nama barang yang terlalu umum jika ada detail merk/spesifikasi!
 
-JIKA di teks DPA terdapat item dengan nominal harga/jumlah Rp 0,00 (atau Rp 0), itu berarti item tersebut sudah terhapus/dihapus, sehingga JANGAN dimasukkan ke dalam hasil ekstraksi!
+SPAM FILTERING & GARBAGE EXCLUSION:
+- JANGAN PERNAH memasukkan baris rencana realisasi bulanan (seperti 'Januari', 'Februari', dst.), baris total/jumlah sub kegiatan (seperti 'Jumlah Anggaran Sub Kegiatan', 'Jumlah'), nama pejabat/Camat, NIP, tanda tangan, atau baris rekapitulasi ke dalam hasil ekstraksi rincian!
+- JIKA di teks DPA terdapat item dengan nominal harga/jumlah Rp 0,00 (atau Rp 0), itu berarti item tersebut sudah terhapus/dihapus, sehingga JANGAN dimasukkan ke dalam hasil ekstraksi!
 
 Format output WAJIB berupa JSON ARRAY murni yang berisi objek dengan format berikut (tanpa kata pengantar, penjelasan, atau pembungkus markdown ```json):
 [
@@ -1018,11 +1020,12 @@ DAFTAR ITEM RINCIAN SAAT INI:
 
 ATURAN REFINEMENT KETAT:
 1. Cari semua item yang ada di potongan teks DPA asli. Jangan hanya terpaku pada daftar rincian saat ini. Jika di teks DPA ada item lain yang belum masuk ke daftar rincian saat ini, Anda HARUS menambahkannya!
-2. FOKUS PADA DETAIL BARANG: Gabungkan kelompok/kategori barang (seperti 'Printer', 'Laptop', 'Komputer') dengan merk/tipe/spesifikasi detail di bawahnya (seperti 'EPSON L121', 'Laptop Intel Celeron') agar nama barang hasil ekstraksi sangat spesifik dan detail (contoh hasil: 'Printer EPSON L121' atau 'Laptop Intel Celeron'). JANGAN menulis nama barang yang terlalu umum jika ada detail merk/spesifikasi!
-3. JIKA di teks DPA terdapat item dengan nominal harga/jumlah Rp 0,00 (atau Rp 0), itu berarti item tersebut sudah terhapus/dihapus, sehingga JANGAN dimasukkan ke dalam rincian!
-4. Sesuaikan volume, satuan, dan harga satuan secara wajar dan logis sesuai angka yang tertulis di teks DPA agar total penjumlahannya PAS 100% sama dengan target pagu: Rp {req.target_pagu}.
-5. Jangan mengubah uraian/nama spesifikasi barang asli secara drastis, pertahankan deskripsi aslinya!
-6. Anda harus mengembalikan respons HANYA berupa array JSON yang valid tanpa markdown formatting. Setiap elemen harus memiliki keys: "no" (int), "nama" (string), "volume" (float), "satuan" (string), "harga_satuan" (int), "harga_total" (int).
+2. FOKUS PADA DETAIL BARANG: Gabungkan kelompok/kategori barang (seperti 'Printer', 'Laptop', 'Komputer') dengan merk/tipe/spesifikasi detail di bawahnya (seperti 'EPSON L121', 'Laptop Intel Celeron') agar nama barang hasil ekstraksi sangat spesifik dan detail (contoh hasil: 'Printer EPSON L121' or 'Laptop Intel Celeron'). JANGAN menulis nama barang yang terlalu umum jika ada detail merk/spesifikasi!
+3. JANGAN PERNAH memasukkan baris rencana realisasi bulanan (seperti 'Januari', 'Februari', dst.), baris total/jumlah sub kegiatan (seperti 'Jumlah Anggaran Sub Kegiatan', 'Jumlah'), nama pejabat/Camat, NIP, tanda tangan, atau baris rekapitulasi ke dalam hasil ekstraksi rincian!
+4. JIKA di teks DPA terdapat item dengan nominal harga/jumlah Rp 0,00 (atau Rp 0), itu berarti item tersebut sudah terhapus/dihapus, sehingga JANGAN dimasukkan ke dalam rincian!
+5. Sesuaikan volume, satuan, dan harga satuan secara wajar dan logis sesuai angka yang tertulis di teks DPA agar total penjumlahannya PAS 100% sama dengan target pagu: Rp {req.target_pagu}.
+6. Jangan mengubah uraian/nama spesifikasi barang asli secara drastis, pertahankan deskripsi aslinya!
+7. Anda harus mengembalikan respons HANYA berupa array JSON yang valid tanpa markdown formatting. Setiap elemen harus memiliki keys: "no" (int), "nama" (string), "volume" (float), "satuan" (string), "harga_satuan" (int), "harga_total" (int).
 
 Format JSON keluaran yang diwajibkan:
 [
