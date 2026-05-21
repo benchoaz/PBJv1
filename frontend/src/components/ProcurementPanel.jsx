@@ -438,29 +438,23 @@ export default function ProcurementPanel() {
   const handleAutoScreenshot = (type, product) => {
     const currentCategoryProducts = getCatalogProducts(type === 'laptop' ? 'Laptop' : 'Printer')
     
-    let mockScreenshotUrl = 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80'
-    let realUrl = 'https://e-katalog.lkpp.go.id/product/id/standard-item-inaproc'
+    let mockScreenshotUrl = '/screenshots/hvs_a4_search.png'
+    let realUrl = 'https://katalog.inaproc.id/search'
     
     if (submittedPack) {
       const packNameLower = submittedPack.packName.toLowerCase()
       if (packNameLower.includes('tulis') || packNameLower.includes('atk')) {
-        mockScreenshotUrl = 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80'
-        realUrl = type === 'laptop'
-          ? 'https://e-katalog.lkpp.go.id/product/id/alas-catatan-besuk-inaproc'
-          : 'https://e-katalog.lkpp.go.id/product/id/ballpoint-baliner-gel-atk'
+        mockScreenshotUrl = '/screenshots/ballpoint_detail.png'
+        realUrl = 'https://katalog.inaproc.id/aura-mandiri-sejati/pulpen-gel-hitam/barang'
       } else if (packNameLower.includes('kertas') || packNameLower.includes('cover') || packNameLower.includes('hvs')) {
-        mockScreenshotUrl = 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?auto=format&fit=crop&w=800&q=80'
-        realUrl = type === 'laptop'
-          ? 'https://e-katalog.lkpp.go.id/product/id/amplop-coklat-dinas-kertas'
-          : 'https://e-katalog.lkpp.go.id/product/id/hvs-f4-70g-sidu-inaproc'
+        mockScreenshotUrl = '/screenshots/hvs_a4_detail.png'
+        realUrl = 'https://katalog.inaproc.id/berkah-aulia-ilmu/kertas-hvs-a4-80-gram/barang'
       } else if (packNameLower.includes('tinta') || packNameLower.includes('komputer') || packNameLower.includes('printer')) {
-        mockScreenshotUrl = 'https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=800&q=80'
-        realUrl = type === 'laptop'
-          ? 'https://e-katalog.lkpp.go.id/product/id/epson-001-black-original'
-          : 'https://e-katalog.lkpp.go.id/product/id/epson-001-colour-original'
+        mockScreenshotUrl = '/screenshots/tinta_printer_detail.png'
+        realUrl = 'https://katalog.inaproc.id/rosida-nasution/tinta-printer-epson/barang'
       } else if (packNameLower.includes('cetak') || packNameLower.includes('banner') || packNameLower.includes('spanduk')) {
-        mockScreenshotUrl = 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?auto=format&fit=crop&w=800&q=80'
-        realUrl = 'https://e-katalog.lkpp.go.id/product/id/cetak-banner-flexy-340g'
+        mockScreenshotUrl = '/screenshots/map_snelhechter_search.png'
+        realUrl = 'https://katalog.inaproc.id/search?keyword=map%20folder%20snelhechter'
       }
     }
 
@@ -513,12 +507,12 @@ export default function ProcurementPanel() {
     // Check if documentation already exists to pre-populate, or set defaults
     const existing = savedDocs[type]
     if (existing && existing.selectedProduct && existing.selectedProduct.id === product.id) {
-      setDocRealUrl(existing.url || `https://e-katalog.lkpp.go.id/product/id/${product.id}`)
+      setDocRealUrl(existing.url || `https://katalog.lkpp.go.id/search?q=${product.id}`)
       setDocRealScreenshot(existing.screenshot)
       setDocNegotiatedPrice(existing.negotiatedPrice || product.price)
       setDocNegotiatedOngkir(existing.negotiatedOngkir || '150000')
     } else {
-      setDocRealUrl(`https://e-katalog.lkpp.go.id/product/id/${product.id}`)
+      setDocRealUrl(`https://katalog.lkpp.go.id/search?q=${product.id}`)
       setDocRealScreenshot(null)
       setDocNegotiatedPrice(product.price - 100000) // Default discount Rp 100rb as standard baseline
       setDocNegotiatedOngkir('150000')
@@ -1809,7 +1803,7 @@ export default function ProcurementPanel() {
                   type="url" 
                   value={docRealUrl} 
                   onChange={e => setDocRealUrl(e.target.value)} 
-                  placeholder="https://e-katalog.lkpp.go.id/product/id/..." 
+                  placeholder="https://katalog.lkpp.go.id/search?q=..." 
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none text-sm transition-all font-mono text-slate-700 bg-slate-50/50"
                   required
                 />

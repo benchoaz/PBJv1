@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import { AuthProvider } from './hooks/useAuth'
 import Header from './components/Header'
 import ProjectList from './components/ProjectList'
@@ -10,13 +10,17 @@ import UserManagement from './components/UserManagement'
 import ProcurementPreparation from './components/ProcurementPreparation'
 import ProcurementPanel from './components/ProcurementPanel'
 import OcrApiKeyManager from './components/OcrApiKeyManager'
+import TemplateSuratManager from './components/TemplateSuratManager'
 
 function App() {
+  const location = useLocation();
+  const isLoginPage = location.pathname === '/login';
+
   return (
     <AuthProvider>
-      <div className="min-h-screen flex bg-slate-50/30 relative">
-        <Header />
-        <main className="flex-1 min-w-0 p-8 lg:p-12 overflow-y-auto">
+      <div className={`min-h-screen flex bg-slate-50/30 relative ${isLoginPage ? 'bg-white' : ''}`}>
+        {!isLoginPage && <Header />}
+        <main className={`flex-1 min-w-0 ${isLoginPage ? 'p-0 h-screen overflow-hidden' : 'p-8 lg:p-12 overflow-y-auto'}`}>
           <Routes>
             <Route path="/" element={<ProjectList />} />
             <Route path="/login" element={<Login />} />
@@ -27,6 +31,7 @@ function App() {
             <Route path="/ppk/persiapan" element={<ProcurementPreparation />} />
             <Route path="/pp/panel" element={<ProcurementPanel />} />
             <Route path="/admin/ocr" element={<OcrApiKeyManager />} />
+            <Route path="/admin/templates" element={<TemplateSuratManager />} />
           </Routes>
         </main>
       </div>

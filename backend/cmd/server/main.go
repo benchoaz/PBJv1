@@ -59,6 +59,10 @@ func main() {
 	// SIRUP LKPP live proxy endpoint
 	mux.HandleFunc("GET /api/sirup/satker/{id}", handlers.GetSirupPackages)
 
+	// AI Survey endpoint
+	mux.HandleFunc("POST /api/survey/run", handlers.RunSurvey)
+	mux.HandleFunc("OPTIONS /api/survey/run", handlers.RunSurveyOptions)
+
 	addr := ":8080"
 	if port := os.Getenv("PORT"); port != "" {
 		addr = ":" + port

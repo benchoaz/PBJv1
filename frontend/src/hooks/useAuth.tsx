@@ -16,6 +16,11 @@ export function AuthProvider({ children }) {
         if (role.toLowerCase() === 'kpa') role = 'KPA'
         parsed.role = role
       }
+      // Auto-migrate: if old single department string exists, convert to array
+      if (parsed && parsed.department && !parsed.departments) {
+        parsed.departments = [parsed.department]
+        parsed.activeDepartment = parsed.department
+      }
       return parsed
     } catch (e) {
       return null
@@ -23,7 +28,7 @@ export function AuthProvider({ children }) {
   })
   const [loading, setLoading] = useState(false)
 
-  const login = async (nip, password) => {
+  const login = async (nip, password, customRole, customDepartment) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -35,9 +40,9 @@ export function AuthProvider({ children }) {
     
     // Load registered users from User Management to cross-reference NIP
     const defaultList = [
-      { id: 1, name: 'Handik Hariyanto, S.Kom., M.Si', role: 'PPK', nip: '197909102002121004', department: 'Kecamatan Besuk', password: 'admin' },
-      { id: 2, name: 'Beni Trisna Wijaya, S.Kom', role: 'PP', nip: '198205192010011010', department: 'Kecamatan Besuk', password: 'admin' },
-      { id: 3, name: 'Beni (Super Admin)', role: 'Admin', nip: 'admin', department: 'Unit Kerja Pengadaan Barang/Jasa (UKPBJ)', password: 'admin' }
+      { id: 1, name: 'Handik Hariyanto, S.Kom., M.Si', role: 'PPK', nip: '197909102002121004', departments: ['Kecamatan Besuk'], password: 'admin' },
+      { id: 2, name: 'Beni Trisna Wijaya, S.Kom', role: 'PP', nip: '198205192010011010', departments: ['Kecamatan Besuk', 'Kecamatan Kraksaan'], password: 'admin' },
+      { id: 3, name: 'Beni (Super Admin)', role: 'Admin', nip: 'admin', departments: ['Unit Kerja Pengadaan Barang/Jasa (UKPBJ)'], password: 'admin' }
     ]
     const savedUsers = localStorage.getItem('pbj_users')
     let userList = []
@@ -62,31 +67,69 @@ export function AuthProvider({ children }) {
     }
     
     // Auto-detect details or generate default
-    let finalRole = matchedUser ? matchedUser.role : 'PPK'
+    let finalRole = customRole || (matchedUser ? matchedUser.role : 'PP')
     if (finalRole.toLowerCase() === 'admin') finalRole = 'Admin'
     if (finalRole.toLowerCase() === 'ppk') finalRole = 'PPK'
     if (finalRole.toLowerCase() === 'pp') finalRole = 'PP'
     if (finalRole.toLowerCase() === 'kpa') finalRole = 'KPA'
     
+    // Resolve departments array (backward-compatible)
+    let userDepartments = []
+    if (matchedUser) {
+      if (matchedUser.departments && Array.isArray(matchedUser.departments)) {
+        userDepartments = matchedUser.departments
+      } else if (matchedUser.department) {
+        userDepartments = [matchedUser.department]
+      }
+    }
+    if (userDepartments.length === 0) {
+      userDepartments = ['Kecamatan Besuk']
+    }
+
+    // Determine active department
+    let activeDept = userDepartments[0]
+    if (customDepartment && userDepartments.includes(customDepartment)) {
+      activeDept = customDepartment
+    } else if (customDepartment) {
+      // If custom department specified but not in list, still use it (override from login)
+      activeDept = customDepartment
+    }
+
     const enrichedUser = matchedUser ? {
       ...data.user,
       name: matchedUser.name,
       username: matchedUser.name,
       role: finalRole,
       nip: matchedUser.nip,
-      department: matchedUser.department
+      departments: userDepartments,
+      department: activeDept,
+      activeDepartment: activeDept
     } : {
       ...data.user,
-      name: 'Pegawai Baru',
-      username: 'Pegawai Baru',
+      name: 'User ' + nip,
+      username: 'User ' + nip,
       role: finalRole,
       nip: nip,
-      department: 'Kecamatan Besuk' // Default
+      departments: customDepartment ? [customDepartment] : ['Kecamatan Besuk'],
+      department: customDepartment || 'Kecamatan Besuk',
+      activeDepartment: customDepartment || 'Kecamatan Besuk'
     }
     
     setUser(enrichedUser)
     localStorage.setItem('pbj_user', JSON.stringify(enrichedUser))
     return data
+  }
+
+  // Switch active department without re-login
+  const switchDepartment = (newDept) => {
+    if (!user) return
+    const updated = {
+      ...user,
+      department: newDept,
+      activeDepartment: newDept
+    }
+    setUser(updated)
+    localStorage.setItem('pbj_user', JSON.stringify(updated))
   }
 
   const logout = async () => {
@@ -103,7 +146,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, switchDepartment }}>
       {children}
     </AuthContext.Provider>
   )

@@ -30,6 +30,7 @@ export default function Header() {
     { path: '/ppk/persiapan', label: 'PPK Persiapan', icon: '✍️', roles: ['Admin', 'PPK'] },
     { path: '/pp/panel', label: 'PP Panel', icon: '⚙️', roles: ['Admin', 'PP'] },
     { path: '/admin/ocr', label: 'API AI OCR', icon: '🤖', roles: ['Admin', 'PPK', 'PP'] },
+    { path: '/admin/templates', label: 'Template Surat', icon: '📝', roles: ['Admin'] },
     { path: '/users', label: 'Users', icon: '👥', roles: ['Admin'] },
   ]
 

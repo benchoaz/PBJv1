@@ -35,6 +35,27 @@ export default function ProcurementPreparation() {
     return '67081' // Fallback
   }
 
+  const [docSettings, setDocSettings] = useState(() => {
+    const saved = localStorage.getItem('pbj_doc_settings');
+    const defaultSettings = {
+      showKop: true,
+      namaPemda: 'PEMERINTAH KABUPATEN PROBOLINGGO',
+      namaInstansi: 'DINAS KOPERASI, USAHA MIKRO, PERDAGANGAN DAN PERINDUSTRIAN',
+      alamatLengkap: 'Jl. Raya Dringu No. 81, Probolinggo. Telp: (0335) 422118, Email: dkupp@probolinggokab.go.id, Kode Pos: 67271',
+      paperSize: 'A4',
+      marginTop: 15,
+      marginBottom: 20,
+      marginLeft: 25,
+      marginRight: 20,
+      formatNomorSurat: '027/{nomor}/DKUPP/2026'
+    };
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { ...defaultSettings, ...parsed };
+    }
+    return defaultSettings;
+  });
+
   const [step, setStep] = useState(() => {
     return parseInt(localStorage.getItem('pbj_step') || '1')
   })
@@ -172,6 +193,103 @@ export default function ProcurementPreparation() {
   
   // Document generation & preview states
   const [activeDocPreview, setActiveDocPreview] = useState(null) // 'hps' | 'dpp' | null
+
+  const [isSurveying, setIsSurveying] = useState(false);
+  const [surveyData, setSurveyData] = useState(null);
+  const [surveyProgress, setSurveyProgress] = useState('');
+  const [surveyProgressPercent, setSurveyProgressPercent] = useState(0);
+
+  const getPacketCategory = (packName) => {
+    if (!packName) return 'ATK';
+    const name = packName.toLowerCase();
+    if (name.includes('makan') || name.includes('minum') || name.includes('mamin') || name.includes('snack') || name.includes('konsumsi')) return 'Mamin';
+    if (name.includes('laptop') || name.includes('printer') || name.includes('komputer') || name.includes('kendaraan') || name.includes('mesin') || name.includes('elektronik') || name.includes('modal')) return 'Modal';
+    if (name.includes('kertas sektoral') || name.includes('seragam dinas') || name.includes('konsolidasi')) return 'Konsolidasi';
+    return 'ATK';
+  };
+
+  
+  const runAiSurvey = async () => {
+    if (!selectedPack) return;
+    setIsSurveying(true);
+    setSurveyProgressPercent(0);
+    setSurveyProgress('Menghubungkan ke asisten survei AI riil (Puppeteer)...');
+    
+    const category = getPacketCategory(selectedPack.packName);
+    const items = getPackageItems(selectedPack);
+    
+    const requestItems = items.map(item => ({
+      name: item.name,
+      query: item.name,
+      fallbackPrice: item.price
+    }));
+
+    try {
+      setSurveyProgress(`Mengeksekusi Chrome Headless... Mohon tunggu (Estimasi ${items.length * 15} detik)`);
+      setSurveyProgressPercent(10);
+      
+      // Server ini sekarang menggunakan Service Node.js baru di port 3001
+      const response = await fetch('http://localhost:3001/api/survey/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: requestItems })
+      });
+
+      if (!response.ok) {
+        throw new Error('Gagal mengeksekusi survei: ' + response.statusText);
+      }
+
+      setSurveyProgressPercent(90);
+      setSurveyProgress('Menganalisis hasil tangkapan layar riil...');
+      const results = await response.json();
+      
+      const newHpsPrices = {};
+      let totalHpsEstimate = 0;
+
+      // Integrate real results
+      results.forEach((res, index) => {
+        const qty = items[index].qty || 1;
+        newHpsPrices[res.name] = res.price;
+        totalHpsEstimate += (res.price * qty);
+      });
+
+      setSurveyProgressPercent(95);
+      await new Promise(r => setTimeout(r, 500));
+
+      setSurveyData({
+        category,
+        products: results.map((r, i) => ({
+          id: 'ITEM-' + i,
+          name: r.name,
+          vendor: r.vendor,
+          price: r.price,
+          link: r.link,
+          img: r.img,
+          searchImg: r.searchImg,
+          success: r.success
+        })),
+        timestamp: new Date().toLocaleString('id-ID')
+      });
+      
+      setHpsPrices(newHpsPrices);
+      setHpsValue(totalHpsEstimate.toString());
+      
+      setSurveyProgressPercent(100);
+      setIsSurveying(false);
+      setTimeout(() => setSurveyProgressPercent(0), 1000);
+      
+      alert('⚡ Asisten AI: Survei Referensi Harga LKPP Inaproc selesai! Hasil tangkapan layar asli telah dilampirkan ke dokumen.');
+      
+    } catch (err) {
+      console.error(err);
+      setIsSurveying(false);
+      setSurveyProgress('');
+      setSurveyProgressPercent(0);
+      alert('Gagal melakukan survei riil: ' + err.message);
+    }
+  };
+
+
   const [isSigned, setIsSigned] = useState(() => {
     return localStorage.getItem('pbj_is_signed') === 'true'
   })
@@ -672,6 +790,40 @@ export default function ProcurementPreparation() {
       setActiveDocPreview(null)
     }
   }
+
+  const handleExportWord = () => {
+    const printSheet = document.getElementById('print-sheet');
+    if (!printSheet) return;
+    const htmlContent = printSheet.innerHTML;
+    const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head>
+        <meta charset='utf-8'>
+        <title>Dokumen</title>
+        <style>
+          body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; }
+          @page WordSection1 {
+            size: ${docSettings.paperSize === 'F4' ? '8.5in 13in' : '8.27in 11.69in'};
+            margin: ${docSettings.marginTop}mm ${docSettings.marginRight}mm ${docSettings.marginBottom}mm ${docSettings.marginLeft}mm;
+          }
+          div.WordSection1 { page: WordSection1; }
+        </style>
+      </head>
+      <body>
+        <div class="WordSection1">
+          ${htmlContent}
+        </div>
+      </body>
+    </html>`;
+    const blob = new Blob(['\ufeff', header], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Dokumen_${activeDocPreview}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="animate-fade-in pb-12">
@@ -1845,13 +1997,20 @@ export default function ProcurementPreparation() {
             <div className="space-y-4">
               {/* KALKULATOR HPS INTERAKTIF */}
               {selectedPack && (
-                <div className="bg-slate-800/80 border border-slate-700 rounded-2xl p-5 space-y-4 shadow-lg">
-                  <div className="flex justify-between items-center border-b border-slate-700 pb-3">
-                    <div>
-                      <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-                        <span>📊</span> Kalkulator HPS Berbasis Survei Pasar
-                      </h3>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Sesuaikan harga satuan berdasarkan survei harga pasar riil. Total HPS tidak boleh melebihi Pagu DPA.</p>
+                <div className="bg-white border border-slate-250 shadow-xl shadow-slate-100/40 rounded-2xl p-6 space-y-4 transition-all duration-300">
+                  <div className="flex justify-between items-center border-b border-slate-200/80 pb-3.5">
+                    <div className="flex items-start gap-2.5">
+                      <div className="bg-indigo-50 p-2 rounded-xl border border-indigo-100 mt-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
+                      </div>
+                      <div>
+                        <h3 className="text-[13px] font-bold text-slate-900 uppercase tracking-wide">
+                          Kalkulator HPS Berbasis Survei Pasar
+                        </h3>
+                        <p className="text-[10.5px] text-slate-500 mt-0.5 font-sans leading-relaxed">
+                          Sesuaikan harga satuan berdasarkan survei harga pasar riil terbaru di Kabupaten Probolinggo.
+                        </p>
+                      </div>
                     </div>
                     {(() => {
                       const items = getPackageItems(selectedPack)
@@ -1863,12 +2022,22 @@ export default function ProcurementPreparation() {
                       const exceeds = totalHps > totalPagu
                       return (
                         <div className="text-right">
-                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border ${
+                          <span className={`text-[10px] font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 ${
                             exceeds 
-                              ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' 
-                              : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                           }`}>
-                            {exceeds ? '⚠️ Melebihi Pagu DPA' : '✅ HPS Efisien & Valid'}
+                            {exceeds ? (
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-rose-600"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                Melebihi Pagu DPA
+                              </>
+                            ) : (
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-600"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                HPS Efisien & Valid
+                              </>
+                            )}
                           </span>
                         </div>
                       )
@@ -1878,13 +2047,13 @@ export default function ProcurementPreparation() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left border-collapse">
                       <thead>
-                        <tr className="text-slate-450 border-b border-slate-700 font-bold uppercase text-[9px] tracking-wider">
-                          <th className="py-2 pr-2">No</th>
-                          <th className="py-2">Nama Barang / Rincian DPA</th>
-                          <th className="py-2 text-center w-12">Qty</th>
-                          <th className="py-2 text-right">Pagu DPA (Rp)</th>
-                          <th className="py-2 text-right pl-4 w-44">Harga Satuan HPS (Rp)</th>
-                          <th className="py-2 text-right">Total HPS (Rp)</th>
+                        <tr className="text-slate-500 border-b border-slate-200 font-bold uppercase text-[9px] tracking-wider bg-slate-50/50">
+                          <th className="py-2.5 px-3 w-8 text-center rounded-l-xl">No</th>
+                          <th className="py-2.5 px-2">Nama Barang / Rincian DPA</th>
+                          <th className="py-2.5 px-2 text-center w-12">Qty</th>
+                          <th className="py-2.5 px-2 text-right">Pagu DPA (Rp)</th>
+                          <th className="py-2.5 px-4 text-right w-44">Harga Satuan HPS (Rp)</th>
+                          <th className="py-2.5 px-3 text-right rounded-r-xl">Total HPS (Rp)</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1894,17 +2063,17 @@ export default function ProcurementPreparation() {
                             const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price
                             const totalHpsItem = item.qty * unitHpsPrice
                             return (
-                              <tr key={item.no || idx} className="border-b border-slate-700/50 hover:bg-slate-750/30">
-                                <td className="py-2.5 text-slate-400">{idx + 1}</td>
-                                <td className="py-2.5 font-medium text-slate-200">
+                              <tr key={item.no || idx} className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors">
+                                <td className="py-3 px-3 text-center text-slate-400 font-bold">{idx + 1}</td>
+                                <td className="py-3 px-2 font-bold text-slate-800">
                                   {item.name}
-                                  <span className="text-[10px] text-slate-400 block font-normal">Satuan: {item.unit}</span>
+                                  <span className="text-[10px] text-slate-450 block font-normal mt-0.5">Satuan: {item.unit}</span>
                                 </td>
-                                <td className="py-2.5 text-center font-bold text-slate-300">{item.qty}</td>
-                                <td className="py-2.5 text-right font-mono text-slate-400">Rp {item.price.toLocaleString()}</td>
-                                <td className="py-2.5 text-right pl-4">
-                                  <div className="relative">
-                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">Rp</span>
+                                <td className="py-3 px-2 text-center font-bold text-slate-700">{item.qty}</td>
+                                <td className="py-3 px-2 text-right font-mono text-slate-500">Rp {item.price.toLocaleString()}</td>
+                                <td className="py-3 px-4 text-right">
+                                  <div className="relative inline-block w-full">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">Rp</span>
                                     <input
                                       type="number"
                                       value={unitHpsPrice}
@@ -1917,11 +2086,11 @@ export default function ProcurementPreparation() {
                                         setIsSigned(false)
                                         if (step === 4) setStep(3)
                                       }}
-                                      className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-lg py-1 pl-7 pr-2 text-xs font-mono font-bold text-right focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl py-1.5 pl-8 pr-3 text-xs font-mono font-bold text-right focus:border-indigo-500 focus:ring-2 focus:ring-indigo-150 outline-none transition-all"
                                     />
                                   </div>
                                 </td>
-                                <td className="py-2.5 text-right font-mono font-bold text-indigo-350">
+                                <td className="py-3 px-3 text-right font-mono font-bold text-indigo-650">
                                   Rp {totalHpsItem.toLocaleString()}
                                 </td>
                               </tr>
@@ -1940,22 +2109,23 @@ export default function ProcurementPreparation() {
                     }, 0)
                     const totalPagu = items.reduce((sum, item) => sum + (item.qty * item.price), 0)
                     return (
-                      <div className="flex justify-between items-center pt-3 border-t border-slate-700 text-xs">
-                        <div className="text-slate-450 font-medium">
-                          Total Pagu DPA: <span className="font-bold font-mono text-slate-300">Rp {totalPagu.toLocaleString()}</span>
+                      <div className="flex flex-col sm:flex-row gap-3 justify-between items-center pt-4 border-t border-slate-200 text-xs">
+                        <div className="text-slate-500 font-medium">
+                          Total Pagu DPA: <span className="font-bold font-mono text-slate-850 bg-slate-100 px-2 py-1 rounded-lg">Rp {totalPagu.toLocaleString()}</span>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-slate-400 font-medium">Hasil Kalkulasi HPS:</span>
-                          <span className="text-sm font-extrabold font-mono text-indigo-400">Rp {totalHps.toLocaleString()}</span>
+                        <div className="flex flex-wrap items-center justify-end gap-3.5">
+                          <span className="text-slate-600 font-semibold">Hasil Kalkulasi HPS:</span>
+                          <span className="text-sm font-extrabold font-mono text-indigo-650 bg-indigo-50/50 border border-indigo-100/50 px-2.5 py-1 rounded-lg">Rp {totalHps.toLocaleString()}</span>
                           <button
                             type="button"
                             onClick={() => {
                               setHpsValue(totalHps.toString())
                               alert(`✅ Nilai HPS Resmi disetujui sebesar Rp ${totalHps.toLocaleString()} (Hasil kalkulasi survei pasar).`)
                             }}
-                            className="bg-indigo-600 hover:bg-indigo-750 text-white font-bold px-3 py-1.5 rounded-lg transition-all text-[10px] active:scale-95 shadow-md shadow-indigo-600/10"
+                            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 font-bold px-4 py-2 rounded-xl transition-all text-[11px] active:scale-95 shadow-sm flex items-center gap-1"
                           >
-                            💾 Gunakan Sebagai HPS Resmi
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-600"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                            Gunakan Sebagai HPS Resmi
                           </button>
                         </div>
                       </div>
@@ -1964,11 +2134,60 @@ export default function ProcurementPreparation() {
                 </div>
               )}
 
+              
+              {/* Asisten AI Survei */}
+              <div className="mb-6 bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-sm font-bold text-indigo-800 flex items-center gap-2"><span>🤖</span> Asisten Survei HPS & Referensi Inaproc</h4>
+                  <p className="text-xs text-slate-600 mt-1 max-w-lg">Gunakan AI untuk mencari referensi harga pasar dari e-Katalog secara otomatis. Bukti URL & Screenshot akan dilampirkan di DPP.</p>
+                </div>
+                
+                {isSurveying && (
+                  <div className="mb-4">
+                    <div className="flex justify-between text-[10px] font-bold text-emerald-800 mb-1.5 px-1">
+                      <span className="truncate pr-2">{surveyProgress}</span>
+                      <span className="shrink-0">{surveyProgressPercent}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden shadow-inner">
+                      <div 
+                        className="bg-emerald-500 h-full rounded-full transition-all duration-300 ease-out relative"
+                        style={{ width: `${surveyProgressPercent}%` }}
+                      >
+                        <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <button 
+                  onClick={runAiSurvey}
+                  disabled={isSurveying}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2 whitespace-nowrap disabled:opacity-70"
+                >
+                  {isSurveying ? '⏳ Mensimulasikan Pencarian...' : '⚡ Mulai Survei Otomatis'}
+                </button>
+              </div>
+              
+              {surveyData && (
+                <div className="mb-6 bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
+                  <div className="text-xs font-bold text-emerald-800 mb-2 flex items-center gap-1"><span>✅</span> Referensi Harga Inaproc Ditemukan (Kategori: {surveyData.category})</div>
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {surveyData.products.map(p => (
+                      <div key={p.id} className="bg-white border border-emerald-100 p-2 rounded-lg min-w-[200px] text-[10px]">
+                        <div className="font-bold text-slate-700 truncate">{p.name}</div>
+                        <div className="text-emerald-600 font-mono font-bold mt-1">Rp {p.price.toLocaleString('id-ID')}</div>
+                        <div className="text-slate-500 mt-1 truncate">{p.vendor}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Nilai HPS Disetujui Resmi (Rp)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Nilai HPS Disetujui Resmi (Rp)</label>
                 <input 
                   type="number" 
-                  className="glass-input" 
+                  className="glass-input text-slate-850 font-bold text-sm bg-slate-50" 
                   value={hpsValue} 
                   onChange={(e) => {
                     setHpsValue(e.target.value)
@@ -2125,53 +2344,75 @@ export default function ProcurementPreparation() {
                 position: absolute !important;
                 left: 0 !important;
                 top: 0 !important;
-                width: 210mm !important;
-                min-height: 297mm !important;
-                margin: 0 !important;
-                padding: 20mm !important;
-                box-shadow: none !important;
-                border: none !important;
+              }
+              @page {
+                size: ${docSettings.paperSize === 'F4' ? '215mm 330mm' : 'A4'} portrait; 
+                margin: ${docSettings.marginTop}mm ${docSettings.marginRight}mm ${docSettings.marginBottom}mm ${docSettings.marginLeft}mm !important; 
               }
             }
           `}} />
-
-          {/* Modal Header controls (Hidden during print) */}
-          <div className="fixed top-4 left-4 right-4 flex justify-between items-center z-50 bg-slate-900/90 border border-white/10 px-6 py-3.5 rounded-2xl shadow-xl backdrop-blur-md max-w-4xl mx-auto print:hidden">
-            <div className="text-white text-xs font-semibold uppercase tracking-wider">
+          <div className="fixed top-4 left-4 right-4 flex justify-between items-center z-50 bg-white/95 border border-slate-200/90 px-6 py-3.5 rounded-2xl shadow-2xl backdrop-blur-md max-w-4xl mx-auto print:hidden transition-all duration-300">
+            <div className="text-slate-800 text-[11px] font-bold uppercase tracking-wider flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-indigo-650 animate-pulse"></span>
               Pratinjau Dokumen Resmi {activeDocPreview === 'hps' ? 'Surat Penetapan HPS' : 'Dokumen Persiapan Pengadaan (DPP)'}
             </div>
             <div className="flex items-center gap-3">
               <button 
                 onClick={() => window.print()}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-lg shadow-indigo-600/20"
+                className="bg-emerald-600 hover:bg-emerald-750 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-md shadow-emerald-600/10"
               >
                 🖨️ Cetak / Unduh PDF
               </button>
               <button 
-                onClick={() => setActiveDocPreview(null)}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-4 py-2 rounded-xl transition-colors border border-slate-700"
+                onClick={handleExportWord}
+                className="bg-blue-600 hover:bg-blue-750 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-md shadow-blue-600/10"
               >
+                📥 Export Word (.doc)
+              </button>
+              <button 
+                onClick={() => setActiveDocPreview(null)}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-4 py-2 rounded-xl transition-all border border-slate-200 flex items-center gap-1"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 Tutup
               </button>
             </div>
-          </div>
+            </div>
 
           {/* White Paper A4 Sheet */}
           <div 
             id="print-sheet" 
-            className="bg-white text-slate-900 w-full max-w-[21cm] min-h-[29.7cm] p-[2cm] shadow-2xl rounded-sm my-20 font-serif leading-relaxed text-[12px] flex flex-col justify-between border border-slate-200 relative print:my-0 print:border-none print:shadow-none"
+            className="bg-white text-slate-900 w-full shadow-2xl rounded-sm my-20 font-serif leading-relaxed text-[12px] border border-slate-200 relative print:my-0 print:border-none print:shadow-none mx-auto"
+            style={{
+              width: docSettings.paperSize === 'F4' ? '215mm' : '210mm',
+              minHeight: docSettings.paperSize === 'F4' ? '330mm' : '297mm',
+              paddingTop: `${docSettings.marginTop}mm`,
+              paddingRight: `${docSettings.marginRight}mm`,
+              paddingBottom: `${docSettings.marginBottom}mm`,
+              paddingLeft: `${docSettings.marginLeft}mm`,
+            }}
           >
             <div>
               {/* KOP SURAT DINAS / SATKER */}
-              <div className="text-center border-b-4 border-double border-slate-900 pb-3 mb-6 relative">
-                <div className="text-[14px] font-bold tracking-wider uppercase">Pemerintah Kabupaten Probolinggo</div>
-                <div className="text-[15px] font-bold tracking-widest uppercase mt-0.5">{currentUser.department}</div>
-                <div className="text-[10px] font-normal italic mt-1 text-slate-600 font-sans">
-                  {currentUser.department.includes('Bago') ? 'Jl. Raya Bago No. 176, Besuk, Kabupaten Probolinggo, Jawa Timur 67281' : 
-                   currentUser.department.includes('PUPR') ? 'Jl. Raya Panglima Sudirman No. 45, Kraksaan, Kabupaten Probolinggo, Jawa Timur 67282' :
-                   'Komp. Perkantoran Pemerintah Kabupaten Probolinggo, Jawa Timur 67282'}
+              {docSettings.showKop && (
+                <div className="w-full mb-6" style={{ pageBreakInside: 'avoid', fontFamily: '"Times New Roman", Times, serif' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', borderBottom: '3px solid black', marginBottom: '2px' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ width: '15%', verticalAlign: 'middle', textAlign: 'center', paddingBottom: '10px' }}>
+                           <img src="https://upload.wikimedia.org/wikipedia/commons/2/29/Garuda_Pancasila_Coat_of_Arms_of_Indonesia.svg" alt="Garuda" style={{ width: '70px', height: 'auto', display: 'inline-block' }} />
+                        </td>
+                        <td style={{ width: '85%', textAlign: 'center', verticalAlign: 'middle', paddingBottom: '10px' }}>
+                           <div style={{ fontWeight: 'bold', fontSize: '14pt', textTransform: 'uppercase', lineHeight: '1.2' }}>{docSettings.namaPemda}</div>
+                           <div style={{ fontWeight: 'bold', fontSize: '18pt', textTransform: 'uppercase', lineHeight: '1.2' }}>{docSettings.namaInstansi}</div>
+                           <div style={{ fontSize: '10pt', marginTop: '4px', fontStyle: 'italic' }}>{docSettings.alamatLengkap}</div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div style={{ width: '100%', borderBottom: '1px solid black' }}></div>
                 </div>
-              </div>
+              )}
 
               {/* DOCUMENT CONTENT */}
               {activeDocPreview === 'hps' ? (
@@ -2254,101 +2495,197 @@ export default function ProcurementPreparation() {
               ) : (
                 // DOKUMEN PERSIAPAN PENGADAAN (DPP)
                 <div className="space-y-4">
-                  <div className="text-center font-bold uppercase underline text-[13px] tracking-wide mt-2">
-                    Dokumen Persiapan Pengadaan (DPP) PPK
-                  </div>
-                  <div className="text-center font-bold text-[10px] font-sans -mt-3 text-slate-700">
-                    LAMPIRAN DOKUMEN PERSIAPAN PENGADAAN BARANG/JASA PEMERINTAH
+                  <div className="text-center font-bold uppercase text-[14px] tracking-wide mt-2">
+                    DOKUMEN PERSIAPAN<br/>E-PURCHASING
                   </div>
                   
                   <div className="pt-4 space-y-3">
-                    <p className="text-justify">
-                      Yang bertanda tangan di bawah ini, selaku Pejabat Pembuat Komitmen (PPK) pada Satuan Kerja **{currentUser.department}**, menyerahkan berkas administrasi Dokumen Persiapan Pengadaan (DPP) kepada Pejabat Pengadaan (PP) untuk segera ditindaklanjuti proses pemilihannya melalui portal E-Purchasing LKPP:
+                    <table className="w-full text-[11px] mb-4">
+                      <tbody>
+                        <tr><td className="w-48 py-1 font-semibold">Perangkat Daerah</td><td>: {currentUser.department}</td></tr>
+                        <tr><td className="py-1 font-semibold">Program</td><td>: Program Penunjang Urusan Pemerintahan Daerah</td></tr>
+                        <tr><td className="py-1 font-semibold">Kegiatan</td><td>: Penyelenggaraan Pemerintahan dan Pelayanan Publik</td></tr>
+                        <tr><td className="py-1 font-semibold">Sub Kegiatan</td><td>: Penyediaan Barang dan Jasa Perkantoran</td></tr>
+                        <tr><td className="py-1 font-semibold">Pengadaan/Pekerjaan</td><td>: {selectedPack.packName}</td></tr>
+                        <tr><td className="py-1 font-semibold">Lokasi Pekerjaan</td><td>: Komplek Perkantoran Pemerintah Daerah</td></tr>
+                        <tr><td className="py-1 font-semibold">Volume Pekerjaan</td><td>: {selectedPack.volume || '1 Paket'}</td></tr>
+                        <tr><td className="py-1 font-semibold">Uraian Pekerjaan</td><td>: Pengadaan {selectedPack.packName} untuk operasional</td></tr>
+                        <tr><td className="py-1 font-semibold">Produk Dalam Negeri</td><td>: Ya</td></tr>
+                        <tr><td className="py-1 font-semibold">Usaha Kecil</td><td>: Ya</td></tr>
+                        <tr><td className="py-1 font-semibold">Pra DIPA/DPA</td><td>: {selectedPack.praDipa ? 'Ya' : 'Tidak'}</td></tr>
+                        <tr><td className="py-1 font-semibold">Sumber Dana</td><td>: {selectedPack.sumberDana || 'APBD'} Tahun Anggaran {new Date().getFullYear()}</td></tr>
+                        <tr><td className="py-1 font-semibold">Mata Anggaran Kegiatan (MAK)</td><td className="font-mono">: {selectedPack.mak}</td></tr>
+                        <tr><td className="py-1 font-semibold">Pagu Anggaran</td><td>: Rp {selectedPack.pagu?.toLocaleString()} ({terbilang(selectedPack.pagu)} Rupiah)</td></tr>
+                        <tr><td className="py-1 font-semibold">Jenis Pengadaan</td><td>: Barang</td></tr>
+                        <tr><td className="py-1 font-semibold">Metode Pemilihan</td><td>: {getPacketCategory(selectedPack.packName) === 'Konsolidasi' ? 'E-Purchasing Konsolidasi' : 'E-Purchasing'}</td></tr>
+                        <tr><td className="py-1 font-semibold">ID/Kode SiRUP</td><td className="font-mono">: {selectedPack.noSirup}</td></tr>
+                      </tbody>
+                    </table>
+
+                    <div className="font-bold text-[12px] uppercase">I. Spesifikasi Teknis</div>
+                    <p className="text-justify text-[11px]">
+                      Penyusunan spesifikasi teknis telah menguraikan kesesuaian kebutuhan, karakteristik ukuran, bahan, kinerja, standar mutu, pengemasan, layanan pengiriman, jenis, dan kuantitas barang. Spesifikasi teknis pengadaan adalah sebagai berikut:
                     </p>
-
-                    <div className="bg-slate-50 p-4 rounded-sm border border-slate-300 space-y-2 mt-4">
-                      <div className="font-bold text-[11px] uppercase tracking-wider text-slate-800 border-b border-slate-300 pb-1 mb-2">A. Informasi Paket Rencana Umum Pengadaan (RUP)</div>
-                      <div className="grid grid-cols-3 gap-2 text-slate-700">
-                        <div className="font-semibold">Nama Paket</div><div className="col-span-2">: {selectedPack.packName}</div>
-                        <div className="font-semibold">Kode RUP</div><div className="col-span-2 font-mono">: {selectedPack.noSirup}</div>
-                        <div className="font-semibold">Metode Pengadaan</div><div className="col-span-2">: {selectedPack.method || 'E-Purchasing'}</div>
-                        <div className="font-semibold">Kode Rekening (MAK)</div><div className="col-span-2 font-mono">: {selectedPack.mak}</div>
-                        <div className="font-semibold">Pagu Anggaran</div><div className="col-span-2">: Rp {selectedPack.pagu.toLocaleString()} ({selectedPack.sumberDana})</div>
-                        <div className="font-semibold">Nilai HPS Tetap</div><div className="col-span-2 font-bold text-slate-900">: Rp {parseInt(hpsValue).toLocaleString()}</div>
-                      </div>
-                      
-                      <div className="mt-3 border-t border-slate-200 pt-3">
-                        <div className="font-bold text-[10px] text-slate-700 uppercase tracking-wide mb-1.5">Rincian Barang Sesuai DPA & RUP:</div>
-                        <table className="w-full border-collapse border border-slate-300 text-[10px]">
-                          <thead>
-                            <tr className="bg-slate-100 font-bold text-center">
-                              <td className="border border-slate-300 p-1">No</td>
-                              <td className="border border-slate-300 p-1 text-left">Nama Barang</td>
-                              <td className="border border-slate-300 p-1">Jumlah</td>
-                              <td className="border border-slate-300 p-1">Satuan</td>
-                              <td className="border border-slate-300 p-1">Harga / Satuan</td>
-                              <td className="border border-slate-300 p-1">Total</td>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {getPackageItems(selectedPack).map((item) => {
-                              const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
-                              return (
-                                <tr key={item.no}>
-                                  <td className="border border-slate-300 p-1 text-center">{item.no}</td>
-                                  <td className="border border-slate-300 p-1 text-left">{item.name}</td>
-                                  <td className="border border-slate-300 p-1 text-center font-bold">{item.qty}</td>
-                                  <td className="border border-slate-300 p-1 text-center">{item.unit}</td>
-                                  <td className="border border-slate-300 p-1 text-right font-mono">Rp {unitHpsPrice.toLocaleString()}</td>
-                                  <td className="border border-slate-300 p-1 text-right font-mono font-bold">Rp {(item.qty * unitHpsPrice).toLocaleString()}</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 mt-4">
-                      <div className="font-bold text-[11px] uppercase tracking-wider text-slate-800 border-b border-slate-300 pb-1 mb-2">B. Kelengkapan Berkas Persiapan (Checklist Lampiran)</div>
-                      
-                      <table className="w-full border-collapse border border-slate-900 text-[11px]">
+                    
+                    <div className="pl-4 space-y-2 text-[11px]">
+                      <div className="font-bold">a. Spesifikasi Jenis, Jumlah, dan Mutu Barang</div>
+                      <table className="w-full border-collapse border border-slate-900 mb-2">
                         <thead>
                           <tr className="bg-slate-100 font-bold text-center">
-                            <td className="border border-slate-900 p-2 w-8">No</td>
-                            <td className="border border-slate-900 p-2">Jenis Berkas Persiapan</td>
-                            <td className="border border-slate-900 p-2 w-28">Status Lampiran</td>
-                            <td className="border border-slate-900 p-2">Keterangan Teknis</td>
+                            <td className="border border-slate-900 p-1">No</td>
+                            <td className="border border-slate-900 p-1">Identitas/Jenis Barang</td>
+                            <td className="border border-slate-900 p-1">Spesifikasi Mutu</td>
+                            <td className="border border-slate-900 p-1">Kuantitas</td>
+                            <td className="border border-slate-900 p-1">Satuan</td>
                           </tr>
                         </thead>
                         <tbody>
-                          <tr>
-                            <td className="border border-slate-900 p-2 text-center">1</td>
-                            <td className="border border-slate-900 p-2 font-medium">Dokumen Pelaksanaan Anggaran (DPA)</td>
-                            <td className="border border-slate-900 p-2 text-center text-emerald-700 font-bold">✔️ ADA (PDF)</td>
-                            <td className="border border-slate-900 p-2 text-slate-600 font-mono text-[10px]">{dpaName}</td>
+                          {getPackageItems(selectedPack).map((item, idx) => (
+                            <tr key={item.no}>
+                              <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
+                              <td className="border border-slate-900 p-1">{item.name}</td>
+                              <td className="border border-slate-900 p-1">Sesuai Kebutuhan DPA</td>
+                              <td className="border border-slate-900 p-1 text-center">{item.qty}</td>
+                              <td className="border border-slate-900 p-1 text-center">{item.unit}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      <div className="font-bold mt-2">b. Justifikasi Teknis Dalam Penggunaan Merek</div>
+                      <p className="text-justify">
+                        {getPacketCategory(selectedPack.packName) === 'Modal' 
+                          ? 'Mengingat spesifikasi yang dibutuhkan berteknologi tinggi dan memerlukan jaminan purna jual, maka ditetapkan standar merek pabrikan yang memiliki Service Center resmi di sekitar lokasi dinas.' 
+                          : getPacketCategory(selectedPack.packName) === 'Konsolidasi'
+                          ? 'Pengadaan merujuk pada penetapan merek dan spesifikasi hasil konsolidasi terpusat Katalog Sektoral sesuai Keputusan UKPBJ.'
+                          : 'Tidak mensyaratkan merek tertentu dan mengutamakan persaingan sehat sesuai spesifikasi teknis yang dibutuhkan.'}
+                      </p>
+
+                      <div className="font-bold mt-2">c. Spesifikasi Waktu</div>
+                      <p className="text-justify">Waktu pelaksanaan pengadaan maksimal selama 14 (Empat Belas) hari kalender sejak penerbitan SP.</p>
+
+                      <div className="font-bold mt-2">d. Spesifikasi Tempat</div>
+                      <p className="text-justify">Alamat tujuan akhir: {currentUser.department.includes('Bago') ? 'Jl. Raya Bago No. 176, Besuk' : 'Komp. Perkantoran Pemerintah Kabupaten Probolinggo'}</p>
+
+                      <div className="font-bold mt-2">e. Spesifikasi Tingkat Layanan</div>
+                      <ul className="list-disc pl-4 space-y-1">
+                        <li>Produk/barang harus dalam kondisi baru dan baik.</li>
+                        <li>Barang diantarkan langsung ke alamat tujuan akhir.</li>
+                        {getPacketCategory(selectedPack.packName) === 'Mamin' && <li>Kondisi makanan higienis, bersih, terbungkus rapi, dan dikirimkan 1 Jam sebelum jadwal pelaksanaan kegiatan.</li>}
+                        {getPacketCategory(selectedPack.packName) === 'Modal' && <li>Dilengkapi jaminan garansi resmi distributor/pabrikan minimal 1 tahun.</li>}
+                        <li>Penyedia wajib mengganti barang yang rusak/tidak sesuai spesifikasi selambat-lambatnya 1x24 jam.</li>
+                      </ul>
+                    </div>
+
+                    <div className="font-bold text-[12px] uppercase mt-4">II. Prioritas Penggunaan Produk Dalam Negeri</div>
+                    <p className="text-justify text-[11px]">
+                      Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah, PPK memprioritaskan pemilihan produk dalam negeri pada Katalog Elektronik yang memiliki label Produk Dalam Negeri (PDN) atau memiliki sertifikat TKDN.
+                    </p>
+
+                    <div className="font-bold text-[12px] uppercase mt-4">III. Prioritas Penggunaan Produk dari Usaha Kecil</div>
+                    <p className="text-justify text-[11px]">
+                      Mengingat pagu paket pengadaan ini bernilai di bawah Rp15.000.000.000,00 maka pengadaan diprioritaskan kepada Penyedia dengan Kualifikasi Usaha Kecil atau Koperasi di wilayah lokal.
+                    </p>
+
+                    <div className="font-bold text-[12px] uppercase mt-4">IV. Pengumpulan Referensi Harga</div>
+                    <p className="text-justify text-[11px]">
+                      PPK telah mempersiapkan referensi harga sebagai dasar pelaksanaan negosiasi yang diambil dari Katalog Elektronik, Harga Pasar setempat, dan/atau Standar Harga Satuan.
+                    </p>
+
+                    <div className="pl-4 space-y-2 text-[11px]">
+                      <div className="font-bold">a. Informasi Katalog Elektronik Inaproc</div>
+                      {surveyData ? (
+                        <table className="w-full border-collapse border border-slate-900 mb-2">
+                          <thead>
+                            <tr className="bg-slate-100 font-bold text-center">
+                              <td className="border border-slate-900 p-1 w-8">No</td>
+                              <td className="border border-slate-900 p-1">Nama Barang</td>
+                              <td className="border border-slate-900 p-1">Penyedia Katalog</td>
+                              <td className="border border-slate-900 p-1">Harga Katalog</td>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {surveyData.products.map((p, idx) => (
+                              <tr key={p.id}>
+                                <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
+                                <td className="border border-slate-900 p-1 text-blue-700 underline">{p.name}</td>
+                                <td className="border border-slate-900 p-1">{p.vendor}</td>
+                                <td className="border border-slate-900 p-1 text-right">Rp {p.price.toLocaleString('id-ID')}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <p className="italic text-slate-500">Silakan lakukan Survei Pasar Otomatis pada panel PPK untuk memunculkan data e-Katalog.</p>
+                      )}
+
+                      <div className="font-bold mt-2">b. Informasi Harga Pasar / Standar Harga Satuan (Estimasi)</div>
+                      <p className="text-justify text-[11px] mb-2">Berdasarkan hasil kalkulasi Harga Perkiraan Sendiri (HPS) bernilai total <b>Rp {parseInt(hpsValue || 0).toLocaleString('id-ID')}</b>, dengan rincian per item sebagai berikut:</p>
+                      <table className="w-full border-collapse border border-slate-900 mb-2">
+                        <thead>
+                          <tr className="bg-slate-100 font-bold text-center">
+                            <td className="border border-slate-900 p-1 w-8">No</td>
+                            <td className="border border-slate-900 p-1">Uraian Barang</td>
+                            <td className="border border-slate-900 p-1 w-20">Harga HPS/SHS</td>
                           </tr>
-                          <tr>
-                            <td className="border border-slate-900 p-2 text-center">2</td>
-                            <td className="border border-slate-900 p-2 font-medium">Surat Keputusan Penetapan HPS Resmi</td>
-                            <td className="border border-slate-900 p-2 text-center text-emerald-700 font-bold">✔️ ADA (TTE)</td>
-                            <td className="border border-slate-900 p-2 text-slate-600 text-[10px]">Nilai: Rp {parseInt(hpsValue).toLocaleString()}</td>
-                          </tr>
-                          <tr>
-                            <td className="border border-slate-900 p-2 text-center">3</td>
-                            <td className="border border-slate-900 p-2 font-medium">Form Spesifikasi Teknis Pekerjaan (KAK)</td>
-                            <td className="border border-slate-900 p-2 text-center text-emerald-700 font-bold">✔️ ADA (TTE)</td>
-                            <td className="border border-slate-900 p-2 text-slate-600 font-mono text-[9px] whitespace-pre-line">{techSpecs}</td>
-                          </tr>
-                          <tr>
-                            <td className="border border-slate-900 p-2 text-center">4</td>
-                            <td className="border border-slate-900 p-2 font-medium">Rancangan Kontrak & Klausul Syarat Ketentuan</td>
-                            <td className="border border-slate-900 p-2 text-center text-emerald-700 font-bold">✔️ TERSEDIA</td>
-                            <td className="border border-slate-900 p-2 text-slate-600 text-[10px]">Surat Dinas Pemesanan e-Purchasing</td>
-                          </tr>
+                        </thead>
+                        <tbody>
+                          {getPackageItems(selectedPack).map((item, idx) => {
+                            const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
+                            return (
+                              <tr key={item.no}>
+                                <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
+                                <td className="border border-slate-900 p-1">{item.name}</td>
+                                <td className="border border-slate-900 p-1 text-right">Rp {unitHpsPrice.toLocaleString('id-ID')}</td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>
+
+                    <div className="font-bold text-[12px] uppercase mt-4">V. Rancangan Kontrak (Surat Pesanan)</div>
+                    <p className="text-justify text-[11px]">Draft/Rancangan Kontrak menggunakan bentuk Surat Pesanan (SP) E-Purchasing yang berlaku standar pada sistem Inaproc LKPP.</p>
+
+                    <div className="font-bold text-[12px] uppercase mt-4">VI. Rencana Metode Pemilihan Penyedia</div>
+                    <p className="text-justify text-[11px]">
+                      {getPacketCategory(selectedPack.packName) === 'Konsolidasi' 
+                        ? 'Pengadaan dilakukan secara langsung (Direct Purchasing) kepada Penyedia Konsolidasi Sektoral yang telah ditetapkan UKPBJ.'
+                        : 'E-Purchasing dengan metode Negosiasi Harga terhadap harga dan/atau layanan pendukung sesuai ketentuan Katalog Elektronik.'}
+                    </p>
+
+                    <div className="font-bold text-[12px] uppercase mt-4">VII. Persyaratan Kualifikasi</div>
+                    <p className="text-[11px] font-bold">Penyedia Badan Usaha / Perorangan:</p>
+                    <ul className="list-disc pl-8 space-y-1 text-[11px]">
+                      <li>Memiliki identitas / NIB dan izin usaha sesuai KBLI yang relevan.</li>
+                      <li>Memiliki status valid wajib pajak / NPWP.</li>
+                      {getPacketCategory(selectedPack.packName) === 'Modal' && <li>Memiliki Surat Dukungan Pabrikan atau Distributor Resmi.</li>}
+                      {getPacketCategory(selectedPack.packName) === 'Mamin' && <li>Memiliki Sertifikat Laik Higiene Sanitasi (SLHS) dari Dinas Kesehatan setempat.</li>}
+                      <li>Memiliki alamat usaha yang jelas dan kapasitas manajerial yang memadai.</li>
+                    </ul>
+
+                    <div className="font-bold text-[12px] uppercase mt-4">VIII. Penutup</div>
+                    <p className="text-justify text-[11px]">
+                      Demikian Dokumen Persiapan Pengadaan (DPP) E-Purchasing ini dibuat sebagai acuan pelaksanaan pemilihan penyedia barang/jasa melalui Katalog Elektronik LKPP.
+                    </p>
+
+                    {/* Lampiran Screenshot Jika Ada */}
+                    {surveyData && (
+                      <div className="mt-8 break-before-page">
+                        <div className="font-bold text-[12px] uppercase mb-4 text-center">LAMPIRAN: BUKTI TANGKAPAN LAYAR (SCREENSHOT) REFERENSI E-KATALOG LOKAL/NASIONAL</div>
+                        <div className="grid grid-cols-2 gap-4">
+                          {surveyData.products.map(p => (
+                            <div key={p.id} className="border border-slate-400 p-2 text-center text-[9px] bg-slate-50">
+                              <div className="font-bold mb-1">{p.vendor}</div>
+                              <img src={p.img} alt={p.name} className="w-full h-32 object-cover border border-slate-300 mb-1 filter grayscale contrast-125" />
+                              <div className="font-mono text-blue-800 break-all">{p.link}</div>
+                              <div className="font-bold">Harga Tayang: Rp {p.price.toLocaleString('id-ID')}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 </div>
               )}

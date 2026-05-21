@@ -39,3 +39,12 @@ backend/bin/
 dpa-parser/logs/
 dpa-parser/__pycache__/
 *.pyc
+
+# Screenshots and Scratch files
+frontend/public/screenshots/
+inaproc_search_page.html
+patch_*.js
+scratch_*.js
+take_screenshots.js
+survey_runner.js
+test_search_result.png

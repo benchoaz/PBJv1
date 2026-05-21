@@ -9,6 +9,9 @@ services:
       - "3000:3000"
     environment:
       - VITE_API_URL=http://api:8081
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - api
     restart: unless-stopped
@@ -92,6 +95,19 @@ services:
       - DB_POSTGRESDB_DATABASE=n8n_db
       - DB_POSTGRESDB_USER=postgres
       - DB_POSTGRESDB_PASSWORD=postgres
+    restart: unless-stopped
+    networks:
+      - pbj-network
+
+  survey-service:
+    build:
+      context: ./survey-service
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./frontend/public/screenshots:/screenshots
+      - ./survey-service/server.js:/app/server.js
     restart: unless-stopped
     networks:
       - pbj-network
