@@ -607,7 +607,10 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
       const response = await fetch('http://localhost:3001/api/survey/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: requestItems })
+        body: JSON.stringify({ 
+          items: requestItems,
+          locations: searchLocations.split(',').map(s => s.trim()).filter(Boolean)
+        })
       });
 
       if (!response.ok) {
@@ -700,7 +703,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
         body: JSON.stringify({ 
            items: requestItems,
            useAi: false, // Matikan pencari sinonim untuk pencarian manual ini
-           locations: [] // Kosong = Pencarian Nasional/Global
+           locations: searchLocations.split(',').map(s => s.trim()).filter(Boolean)
         })
       });
 

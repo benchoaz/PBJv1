@@ -350,8 +350,14 @@ async function searchItem(page, item, index) {
 }
 
 app.post('/api/survey/run', async (req, res) => {
+  const globalLocations = req.body.locations || [];
   const items = req.body.items || [];
   if (!items.length) return res.status(400).json({ error: 'No items provided' });
+
+  // Pasangkan wilayah pencarian ke tiap barang
+  items.forEach(item => {
+    if (!item.locations) item.locations = globalLocations;
+  });
 
   console.log(`\n========================================`);
   console.log(`🚀 Memulai survei untuk ${items.length} item`);
