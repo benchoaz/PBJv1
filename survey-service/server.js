@@ -136,6 +136,43 @@ async function searchItem(page, item, index) {
 
   try {
     const searchTarget = item.query && item.query.trim() ? item.query.trim() : item.name;
+
+    // --- BYPASS: URL Spesifik ---
+    if (item.targetUrl && item.targetUrl.startsWith('http')) {
+      console.log(`  → BYPASS: Mengunjungi URL langsung: ${item.targetUrl}`);
+      try {
+        await page.goto(item.targetUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+        await new Promise(r => setTimeout(r, 4000));
+        const detailFile = path.join(screenshotDir, safeId + '_detail.png');
+        await page.screenshot({ path: detailFile, fullPage: false });
+        
+        const detailData = await page.evaluate(() => {
+          let price = null, vendor = null;
+          const pEl = document.querySelector('.harga-produk') || document.querySelector('h2.text-primary');
+          if (pEl) {
+            const pm = pEl.innerText.match(/Rp\s*([\d.,]+)/);
+            if (pm) price = parseInt(pm[1].replace(/\./g, '').replace(/,\d+$/, ''));
+          }
+          const vEl = document.querySelector('.penyedia-name') || document.querySelector('.card-body strong');
+          if (vEl) vendor = vEl.innerText.trim();
+          return { price, vendor };
+        });
+
+        return {
+          name: item.name,
+          query: searchTarget,
+          vendor: detailData.vendor || 'PENYEDIA TARGET',
+          price: detailData.price || item.fallbackPrice,
+          link: item.targetUrl,
+          img: `/screenshots/${path.basename(detailFile)}`,
+          searchImg: `/screenshots/${path.basename(detailFile)}`,
+          success: true
+        };
+      } catch (err) {
+        console.log(`  ❌ BYPASS gagal: ${err.message}. Lanjut pencarian manual...`);
+      }
+    }
+
     const attempts = getQueryAttempts(searchTarget);
     console.log(`  → Query pencarian yang akan dicoba (Target: ${searchTarget}):`, attempts);
 
@@ -241,7 +278,14 @@ async function searchItem(page, item, index) {
     if (searchData.length > 0) {
       console.log(`  → Menghitung skor kemiripan untuk ${searchData.length} kandidat...`);
       searchData.forEach(cand => {
-        const score = getSimilarityScore(searchTarget, cand.title);
+        let score = getSimilarityScore(searchTarget, cand.title);
+        
+        // 🛡️ PENGAWAL HUKUM (LEGAL SHIELD): Boost skor jika sesuai target penyedia
+        if (item.targetVendor && cand.vendor.toLowerCase().includes(item.targetVendor.toLowerCase())) {
+          score += 10.0;
+          console.log(`    ⭐ [TARGET MATCH] Vendor ${cand.vendor} mendapat prioritas mutlak!`);
+        }
+
         cand.score = score;
         console.log(`    - [Skor: ${score.toFixed(3)}] ${cand.title} (Vendor: ${cand.vendor})`);
         if (score > highestScore) {

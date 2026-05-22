@@ -255,6 +255,8 @@ export default function ProcurementPreparation() {
   const [surveyProgressPercent, setSurveyProgressPercent] = useState(0);
   const [useAiMode, setUseAiMode] = useState(true);
   const [searchLocations, setSearchLocations] = useState('');
+  const [globalTargetVendor, setGlobalTargetVendor] = useState('');
+  const [customTargets, setCustomTargets] = useState({});
 
   const [justifications, setJustifications] = useState(() => {
     const saved = localStorage.getItem('pbj_justifications');
@@ -408,7 +410,8 @@ export default function ProcurementPreparation() {
     const requestItems = items.map(item => ({
       name: item.name,
       query: item.name,
-      fallbackPrice: item.price
+      fallbackPrice: item.price,
+      targetVendor: globalTargetVendor || ''
     }));
 
     try {
@@ -600,7 +603,9 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
     const requestItems = [{
       name: targetItem.name,
       query: customQuery,
-      fallbackPrice: targetItem.price
+      fallbackPrice: targetItem.price,
+      targetVendor: globalTargetVendor || customTargets[productIndex] || '',
+      targetUrl: (customTargets[productIndex] && customTargets[productIndex].startsWith('http')) ? customTargets[productIndex] : ''
     }];
 
     try {
@@ -681,7 +686,9 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
         requestItems.push({
           name: items[idx].name,
           query: customKeywords[idx].trim(),
-          fallbackPrice: items[idx].price || items[idx].paguDpa
+          fallbackPrice: items[idx].price || items[idx].paguDpa,
+          targetVendor: globalTargetVendor || customTargets[idx] || '',
+          targetUrl: (customTargets[idx] && customTargets[idx].startsWith('http')) ? customTargets[idx] : ''
         });
       }
     });
@@ -2928,10 +2935,17 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                         type="text"
                         value={searchLocations}
                         onChange={(e) => setSearchLocations(e.target.value)}
-                        placeholder="Contoh: Jawa Timur, Probolinggo (opsional)"
-                        className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                        placeholder="Wilayah (Contoh: Probolinggo)"
+                        className="w-full text-[11px] px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none mb-2"
                       />
-                      <p className="text-[10px] text-slate-500 mt-1">Gunakan koma untuk beberapa lokasi. Kosongkan untuk seluruh Indonesia.</p>
+                      <input 
+                        type="text"
+                        value={globalTargetVendor}
+                        onChange={(e) => setGlobalTargetVendor(e.target.value)}
+                        placeholder="Target Penyedia Massal (Opsional, misal: CV ABC)"
+                        className="w-full text-[11px] px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                        title="Jika diisi, AI akan memprioritaskan penyedia ini untuk seluruh barang"
+                      />
                     </div>
                   </div>
 
@@ -3059,8 +3073,9 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                           </div>
 
                           {isEditing && (
-                            <div className="mt-4 pt-3 border-t border-dashed border-slate-200 space-y-2">
-                              <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Kata Kunci Pencarian</label>
+                            <div className="mt-4 pt-3 border-t border-dashed border-slate-200 space-y-3">
+                              <div>
+                                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Kata Kunci Pencarian</label>
                               <div className="flex gap-1.5">
                                 <input
                                   type="text"
@@ -3078,6 +3093,18 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                                 >
                                   {isLoading ? '...' : 'Cari'}
                                 </button>
+                              </div>
+                              </div>
+                              <div>
+                                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Target Penyedia / URL e-Katalog (Opsional)</label>
+                                <input
+                                  type="text"
+                                  value={customTargets[idx] || ''}
+                                  onChange={(e) => setCustomTargets({ ...customTargets, [idx]: e.target.value })}
+                                  placeholder="Contoh: CV Maju Jaya ATAU https://katalog.inaproc.id/..."
+                                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                  disabled={isLoading}
+                                />
                               </div>
                             </div>
                           )}
@@ -3105,6 +3132,24 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                                   className={`w-full px-2.5 py-1.5 bg-slate-50 border rounded-lg text-[10px] text-slate-800 focus:outline-none focus:ring-1 min-h-[40px] resize-y transition-colors ${isEnhancingJustification[p.id] ? 'border-indigo-400 ring-1 ring-indigo-400 bg-indigo-50/30' : 'border-slate-200 focus:ring-indigo-500'}`}
                                   disabled={isEnhancingJustification[p.id]}
                                 />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const currentJustification = justifications[p.id] || '';
+                                    if (!currentJustification.trim()) {
+                                      alert('Isi justifikasi terlebih dahulu sebelum diterapkan ke semua barang!');
+                                      return;
+                                    }
+                                    const newJustifications = { ...justifications };
+                                    surveyData.products.forEach(prod => {
+                                      newJustifications[prod.id] = currentJustification;
+                                    });
+                                    setJustifications(newJustifications);
+                                  }}
+                                  className="text-[9px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded w-full mt-1.5 text-center transition-colors border border-emerald-200"
+                                >
+                                  ✨ Terapkan Alasan ini ke Seluruh Barang
+                                </button>
                               </div>
                               <div>
                                 <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">⚖️ Produk Pembanding</label>
