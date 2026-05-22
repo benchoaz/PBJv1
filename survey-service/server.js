@@ -135,8 +135,9 @@ async function searchItem(page, item, index) {
   console.log(`\n[${index + 1}] Memproses: "${item.name}"`);
 
   try {
-    const attempts = getQueryAttempts(item.name);
-    console.log(`  → Query pencarian yang akan dicoba:`, attempts);
+    const searchTarget = item.query && item.query.trim() ? item.query.trim() : item.name;
+    const attempts = getQueryAttempts(searchTarget);
+    console.log(`  → Query pencarian yang akan dicoba (Target: ${searchTarget}):`, attempts);
 
     let searchData = [];
     let successfulQuery = '';
@@ -240,7 +241,7 @@ async function searchItem(page, item, index) {
     if (searchData.length > 0) {
       console.log(`  → Menghitung skor kemiripan untuk ${searchData.length} kandidat...`);
       searchData.forEach(cand => {
-        const score = getSimilarityScore(item.name, cand.title);
+        const score = getSimilarityScore(searchTarget, cand.title);
         cand.score = score;
         console.log(`    - [Skor: ${score.toFixed(3)}] ${cand.title} (Vendor: ${cand.vendor})`);
         if (score > highestScore) {
@@ -262,7 +263,7 @@ async function searchItem(page, item, index) {
     }
 
     // ── STEP 3: Navigate to product detail (Direct clean link) ─────────
-    let detailUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(successfulQuery || item.name);
+    let detailUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(successfulQuery || searchTarget);
     if (item.locations && item.locations.length > 0) {
         let rName = '', rCode = '';
         let lLower = item.locations[0].toLowerCase();
