@@ -1,14 +1,11 @@
 FROM ghcr.io/puppeteer/puppeteer:latest
-
+USER root
 WORKDIR /app
-
-# Copy package files and install dependencies
 COPY package*.json ./
+ENV PUPPETEER_CACHE_DIR=/app/.cache
 RUN npm install
-
-# Copy application files
 COPY server.js .
-
+RUN chown -R pptruser:pptruser /app
+USER pptruser
 EXPOSE 3001
-
 CMD ["node", "server.js"]

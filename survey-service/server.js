@@ -145,7 +145,19 @@ async function searchItem(page, item, index) {
     // ── STEP 1: Multi-Stage Search Loop ───────────────────────────────
     for (let i = 0; i < attempts.length; i++) {
       const query = attempts[i];
-      const searchUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(query);
+      let searchUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(query);
+      
+      if (item.locations && item.locations.length > 0) {
+        let rName = '', rCode = '';
+        let lLower = item.locations[0].toLowerCase();
+        if (lLower.includes('kota') && lLower.includes('probolinggo')) { rName = 'Kota Probolinggo'; rCode = '35.74'; }
+        else if (lLower.includes('probolinggo')) { rName = 'Kab. Probolinggo'; rCode = '35.13'; }
+        else if (lLower.includes('surabaya')) { rName = 'Kota Surabaya'; rCode = '35.78'; }
+        
+        if (rName) searchUrl += '&regionNames=' + encodeURIComponent(rName);
+        if (rCode) searchUrl += '&regionCode=' + encodeURIComponent(rCode);
+      }
+      
       console.log(`  → [Mencari #${i + 1}] Membuka: ${searchUrl}`);
       
       try {
@@ -238,8 +250,8 @@ async function searchItem(page, item, index) {
       });
     }
 
-    // Tentukan threshold kecocokan minimum (0.2)
-    const isValidMatch = bestCandidate && highestScore >= 0.2;
+    // Tentukan threshold kecocokan minimum (0.01 agar sangat toleran)
+    const isValidMatch = bestCandidate && highestScore >= 0.01;
     if (isValidMatch) {
       console.log(`  🌟 Produk Terpilih: "${bestCandidate.title}" dengan skor ${highestScore.toFixed(3)}`);
     } else {
@@ -251,6 +263,15 @@ async function searchItem(page, item, index) {
 
     // ── STEP 3: Navigate to product detail (Direct clean link) ─────────
     let detailUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(successfulQuery || item.name);
+    if (item.locations && item.locations.length > 0) {
+        let rName = '', rCode = '';
+        let lLower = item.locations[0].toLowerCase();
+        if (lLower.includes('kota') && lLower.includes('probolinggo')) { rName = 'Kota Probolinggo'; rCode = '35.74'; }
+        else if (lLower.includes('probolinggo')) { rName = 'Kab. Probolinggo'; rCode = '35.13'; }
+        else if (lLower.includes('surabaya')) { rName = 'Kota Surabaya'; rCode = '35.78'; }
+        if (rName) detailUrl += '&regionNames=' + encodeURIComponent(rName);
+        if (rCode) detailUrl += '&regionCode=' + encodeURIComponent(rCode);
+    }
     let detailFile = searchFile; // fallback to search screenshot
     let finalVendor = 'PENYEDIA INAPROC';
     let finalPrice = item.fallbackPrice;
@@ -285,26 +306,8 @@ async function searchItem(page, item, index) {
             if (parsed >= 100) price = parsed;
           }
 
-          // Coba cari vendor UMKK
-          const allEls = document.querySelectorAll('*');
-          for (const el of allEls) {
-            if (el.textContent.includes('UMKK') && el.children.length < 5) {
-              const parent = el.closest('div, section, article');
-              if (parent) {
-                const links = parent.querySelectorAll('a, span, div, p');
-                for (const link of links) {
-                  const txt = link.textContent.trim();
-                  if (txt.length > 3 && txt.length < 50 && 
-                      txt !== 'UMKK' && !txt.includes('Kunjungi') &&
-                      !txt.includes('Rp') && !txt.includes('TKDN')) {
-                    vendor = txt;
-                    break;
-                  }
-                }
-              }
-              if (vendor) break;
-            }
-          }
+          // Coba cari vendor UMKK (Dihapus karena sering salah menangkap menu 'Produk Hukum' di Header INAPROC V6)
+          // Kita akan menggunakan vendor asli dari Slug URL yang sudah sangat akurat.
 
           return { price, vendor };
         });

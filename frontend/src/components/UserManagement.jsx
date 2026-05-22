@@ -1,108 +1,6 @@
 import { useState, useEffect } from 'react'
 
-const satkerOptions = [
-  "Badan Kepegawaian dan Pengembangan Sumber Daya Manusia (BKPSDM)",
-  "Badan Kesatuan Bangsa dan Politik (Bakesbangpol)",
-  "Badan Penanggulangan Bencana Daerah (BPBD)",
-  "Badan Pengelolaan Pendapatan, Keuangan dan Aset Daerah (BPPKAD)",
-  "Badan Perencanaan, Penelitian dan Pengembangan Daerah (Bappeda)",
-  "Bagian Administrasi Pembangunan",
-  "Bagian Administrasi Pemerintahan",
-  "Bagian Hukum",
-  "Bagian Kesejahteraan Rakyat",
-  "Bagian Organisasi",
-  "Bagian Protokol dan Komunikasi Pimpinan",
-  "Bagian Pengadaan Barang dan Jasa (BPBJ)",
-  "Bagian Umum",
-  "Dinas Pekerjaan Umum & Penataan Ruang (PUPR)",
-  "Dinas Kesehatan",
-  "Dinas Pendidikan dan Kebudayaan",
-  "Dinas Sosial, Pemberdayaan Perempuan dan Perlindungan Anak",
-  "Dinas Lingkungan Hidup (DLH)",
-  "Dinas Kependudukan dan Pencatatan Sipil (Dispendukcapil)",
-  "Dinas Pemberdayaan Masyarakat dan Desa (DPMD)",
-  "Dinas Perhubungan (Dishub)",
-  "Dinas Komunikasi, Informatika, Persandian dan Statistik (Diskominfo)",
-  "Dinas Koperasi, Usaha Mikro, Perdagangan dan Perindustrian (DKUPP)",
-  "Dinas Penanaman Modal dan Pelayanan Terpadu Satu Pintu (DPMPTSP)",
-  "Dinas Pemuda, Olahraga dan Pariwisata (Dispopar)",
-  "Dinas Perpustakaan dan Kearsipan",
-  "Dinas Perikanan",
-  "Dinas Pertanian dan Ketahanan Pangan",
-  "Dinas Tenaga Kerja (Disnaker)",
-  "Dinas Ketahanan Pangan",
-  "Dinas Perumahan, Kawasan Permukiman dan Pertanahan (DPKPP)",
-  "Satuan Polisi Pamong Praja (Satpol PP)",
-  "RSUD Waluyo Jati Kraksaan (BLU)",
-  "RSUD Tongas (BLU)",
-  "Sekretariat Dewan Perwakilan Rakyat Daerah (DPRD)",
-  "Sekretariat Daerah",
-  "Inspektorat Daerah",
-  "Kecamatan Besuk",
-  "Kecamatan Kraksaan",
-  "Kecamatan Paiton",
-  "Kecamatan Gending",
-  "Kecamatan Dringu",
-  "Kecamatan Leces",
-  "Kecamatan Sumberasih",
-  "Kecamatan Tongas",
-  "Kecamatan Banyuanyar",
-  "Kecamatan Maron",
-  "Kecamatan Krejengan",
-  "Kecamatan Pajarakan",
-  "Kecamatan Kotaanyar",
-  "Kecamatan Pakuniran",
-  "Kecamatan Gading",
-  "Kecamatan Krucil",
-  "Kecamatan Tiris",
-  "Kecamatan Kuripan",
-  "Kecamatan Sumber",
-  "Kecamatan Wonomerto",
-  "Kecamatan Bantaran",
-  "Kecamatan Tegalsiwalan",
-  "Kecamatan Lumbang",
-  "Kecamatan Sukapura",
-  "Puskesmas Bago (Kec. Besuk)",
-  "Puskesmas Besuk",
-  "Puskesmas Kraksaan",
-  "Puskesmas Paiton",
-  "Puskesmas Gending",
-  "Puskesmas Dringu",
-  "Puskesmas Leces",
-  "Puskesmas Sumberasih",
-  "Puskesmas Tongas",
-  "Puskesmas Banyuanyar",
-  "Puskesmas Maron",
-  "Puskesmas Krejengan",
-  "Puskesmas Pajarakan",
-  "Puskesmas Kotaanyar",
-  "Puskesmas Pakuniran",
-  "Puskesmas Gading",
-  "Puskesmas Krucil",
-  "Puskesmas Tiris",
-  "Puskesmas Kuripan",
-  "Puskesmas Sumber",
-  "Puskesmas Wonomerto",
-  "Puskesmas Bantaran",
-  "Puskesmas Tegalsiwalan",
-  "Puskesmas Lumbang",
-  "Puskesmas Sukapura",
-  "Puskesmas Curahtulis (Kec. Tongas)",
-  "Puskesmas Glagah (Kec. Pakuniran)",
-  "Puskesmas Jorongan (Kec. Leces)",
-  "Puskesmas Wangkal (Kec. Gading)",
-  "Puskesmas Klenang Kidul (Kec. Banyuanyar)",
-  "Puskesmas Condong (Kec. Maron)",
-  "Puskesmas Gembongan (Kec. Babat)",
-  "Puskesmas Kedungjajang",
-  "Puskesmas Sembungan",
-  "Puskesmas Ranugedang (Kec. Tiris)",
-  "Puskesmas Wangkal",
-  "Puskesmas Wonomerto",
-  "Kantor Kesatuan Bangsa dan Politik",
-  "Kantor Satuan Polisi Pamong Praja",
-  "Unit Kerja Pengadaan Barang/Jasa (UKPBJ)"
-]
+// satkerOptions has been removed as the system now relies on real user input
 
 export default function UserManagement() {
   // Load initial state from localStorage or default list
@@ -115,9 +13,9 @@ export default function UserManagement() {
     
     if (!saved || list.length === 0) {
       const defaultList = [
-        { id: 1, name: 'Handik Hariyanto, S.Kom., M.Si', role: 'PPK', nip: '197909102002121004', department: 'Kecamatan Besuk', password: 'admin' },
-        { id: 2, name: 'Beni Trisna Wijaya, S.Kom', role: 'PP', nip: '198205192010011010', department: 'Kecamatan Besuk', password: 'admin' },
-        { id: 3, name: 'Beni (Super Admin)', role: 'Admin', nip: 'admin', department: 'Unit Kerja Pengadaan Barang/Jasa (UKPBJ)', password: 'admin' }
+        { id: 1, name: 'Handik Hariyanto, S.Kom., M.Si', role: 'PPK', nip: '197909102002121004', department: 'Kecamatan Besuk', idSatker: '67081', perangkatDaerah: 'Pemerintah Daerah Kabupaten Probolinggo', password: 'admin' },
+        { id: 2, name: 'Beni Trisna Wijaya, S.Kom', role: 'PP', nip: '198205192010011010', department: 'Kecamatan Besuk', idSatker: '67081', perangkatDaerah: 'Pemerintah Daerah Kabupaten Probolinggo', password: 'admin' },
+        { id: 3, name: 'Beni (Super Admin)', role: 'Admin', nip: 'admin', department: 'Unit Kerja Pengadaan Barang/Jasa (UKPBJ)', idSatker: '308386', perangkatDaerah: 'Pemerintah Daerah Kabupaten Probolinggo', password: 'admin' }
       ]
       localStorage.setItem('pbj_users', JSON.stringify(defaultList))
       return defaultList
@@ -134,7 +32,9 @@ export default function UserManagement() {
   const [name, setName] = useState('')
   const [role, setRole] = useState('PPK')
   const [nip, setNip] = useState('')
+  const [perangkatDaerah, setPerangkatDaerah] = useState('Pemerintah Daerah Kabupaten Probolinggo')
   const [department, setDepartment] = useState('')
+  const [idSatker, setIdSatker] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
 
@@ -149,7 +49,9 @@ export default function UserManagement() {
     setName('')
     setRole('PPK')
     setNip('')
-    setDepartment('Badan Kepegawaian dan Pengembangan Sumber Daya Manusia')
+    setPerangkatDaerah('Pemerintah Daerah Kabupaten Probolinggo')
+    setDepartment('')
+    setIdSatker('')
     setPassword('')
     setShowPassword(false)
     setIsModalOpen(true)
@@ -161,7 +63,9 @@ export default function UserManagement() {
     setName(user.name)
     setRole(user.role)
     setNip(user.nip)
+    setPerangkatDaerah(user.perangkatDaerah || 'Pemerintah Daerah Kabupaten Probolinggo')
     setDepartment(user.department)
+    setIdSatker(user.idSatker || '')
     setPassword('') // Leave blank for edit by default
     setShowPassword(false)
     setIsModalOpen(true)
@@ -171,8 +75,8 @@ export default function UserManagement() {
   const handleSave = (e) => {
     e.preventDefault()
     
-    if (!name.trim() || !nip.trim() || !department.trim()) {
-      alert('Semua data wajib diisi!')
+    if (!name.trim() || !nip.trim() || !department.trim() || !idSatker.trim() || !perangkatDaerah.trim()) {
+      alert('Semua data wajib diisi, termasuk ID Satker dan Perangkat Daerah!')
       return
     }
 
@@ -190,7 +94,9 @@ export default function UserManagement() {
             name, 
             role, 
             nip, 
+            perangkatDaerah,
             department,
+            idSatker,
             password: password.trim() ? password.trim() : u.password 
           }
         }
@@ -203,7 +109,9 @@ export default function UserManagement() {
         name,
         role,
         nip,
+        perangkatDaerah,
         department,
+        idSatker,
         password: password.trim()
       }
       setUsers(prev => [...prev, newUser])
@@ -345,21 +253,44 @@ export default function UserManagement() {
               </div>
 
               <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Perangkat Daerah (K/L/PD)</label>
+                <input 
+                  type="text"
+                  className="glass-input font-semibold text-indigo-200 bg-indigo-900/20" 
+                  value={perangkatDaerah} 
+                  onChange={e => setPerangkatDaerah(e.target.value)} 
+                  placeholder="Contoh: Pemerintah Daerah Kabupaten Probolinggo"
+                  required
+                />
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Instansi / Satuan Kerja (Dinas)</label>
                 <input 
                   type="text"
-                  list="satker-datalist"
                   className="glass-input" 
                   value={department} 
                   onChange={e => setDepartment(e.target.value)} 
-                  placeholder="Ketik/cari dari 100+ Satuan Kerja..."
+                  placeholder="Ketik nama Satuan Kerja (Contoh: Unit Kerja Pengadaan Barang/Jasa)"
                   required
                 />
-                <datalist id="satker-datalist">
-                  {satkerOptions.map((opt, i) => (
-                    <option key={i} value={opt} />
-                  ))}
-                </datalist>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-amber-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <span>🎯 ID Satker SIRUP Asli</span>
+                </label>
+                <input 
+                  type="text"
+                  className="glass-input font-mono text-amber-200 bg-amber-900/20 border-amber-500/30" 
+                  value={idSatker} 
+                  onChange={e => setIdSatker(e.target.value)} 
+                  placeholder="Masukkan ID angka dari SIRUP (Contoh: 308386)"
+                  required
+                />
+                <div className="text-[10px] text-slate-400 mt-1.5 font-medium italic">
+                  *Sistem akan menggunakan ID ini untuk menarik data paket dari portal SIRUP secara langsung.
+                </div>
               </div>
 
               <div>

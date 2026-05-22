@@ -103,7 +103,9 @@ export function AuthProvider({ children }) {
       nip: matchedUser.nip,
       departments: userDepartments,
       department: activeDept,
-      activeDepartment: activeDept
+      activeDepartment: activeDept,
+      idSatker: matchedUser.idSatker || '',
+      perangkatDaerah: matchedUser.perangkatDaerah || 'Pemerintah Daerah Kabupaten Probolinggo'
     } : {
       ...data.user,
       name: 'User ' + nip,
@@ -112,7 +114,9 @@ export function AuthProvider({ children }) {
       nip: nip,
       departments: customDepartment ? [customDepartment] : ['Kecamatan Besuk'],
       department: customDepartment || 'Kecamatan Besuk',
-      activeDepartment: customDepartment || 'Kecamatan Besuk'
+      activeDepartment: customDepartment || 'Kecamatan Besuk',
+      idSatker: '',
+      perangkatDaerah: 'Pemerintah Daerah Kabupaten Probolinggo'
     }
     
     setUser(enrichedUser)

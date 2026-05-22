@@ -1,6 +1,47 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+
+// ─── Utility: cari paket SIRUP terbaik untuk satu rekening DPA ───────────────
+function findBestSirupMatch(acc, packages) {
+  if (!packages || packages.length === 0 || !acc) return null;
+  const stopWords = new Set([
+    'belanja','dan','untuk','kegiatan','bahan','alat','kantor','sub',
+    'penyediaan','jasa','modal','giat','pada','atas','atau','serta',
+    'dalam','dengan','yang','pengadaan'
+  ]);
+  const accWords = (acc.name || '').toLowerCase()
+    .split(/[\s/.,()-]+/)
+    .filter(w => w.length > 2 && !stopWords.has(w));
+
+  let bestPack = null;
+  let bestScore = -1;
+
+  packages.forEach(pack => {
+    let score = 0;
+    const paguDiff = Math.abs((acc.pagu || 0) - (pack.pagu || 0));
+    // Pagu scoring
+    if (paguDiff === 0) score += 120;
+    else if (paguDiff < 500) score += 100;
+    else if (paguDiff < 2000) score += 80;
+    else if (paguDiff < 10000) score += 50;
+    else if (acc.pagu > 0 && paguDiff / acc.pagu < 0.03) score += 35;
+
+    // Keyword scoring
+    const packLow = (pack.packName || '').toLowerCase();
+    const kwHits = accWords.filter(kw => packLow.includes(kw)).length;
+    score += kwHits * 20;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestPack = pack;
+    }
+  });
+
+  // Threshold: must have at least a decent pagu or keyword match
+  return bestScore >= 40 ? { ...bestPack, _score: bestScore } : null;
+}
 
 export default function ProcurementPreparation() {
   const { user } = useAuth()
@@ -19,20 +60,9 @@ export default function ProcurementPreparation() {
     name: 'Handik Hariyanto, S.Kom., M.Si',
     role: 'PPK',
     nip: '197909102002121004',
-    department: 'Kecamatan Besuk'
-  }
-
-  const getSatkerIdFromName = (name) => {
-    if (!name) return '67081' // Default to Kecamatan Besuk
-    const lower = name.toLowerCase()
-    if (lower.includes('besuk')) return '67081'
-    if (lower.includes('kraksaan')) return '67082'
-    if (lower.includes('paiton')) return '67083'
-    if (lower.includes('gending')) return '67084'
-    if (lower.includes('dringu')) return '67085'
-    if (lower.includes('leces')) return '67086'
-    if (lower.includes('pupr') || lower.includes('pekerjaan umum')) return '12345'
-    return '67081' // Fallback
+    department: 'Kecamatan Besuk',
+    idSatker: '67081',
+    perangkatDaerah: 'Pemerintah Daerah Kabupaten Probolinggo'
   }
 
   const [docSettings, setDocSettings] = useState(() => {
@@ -43,14 +73,22 @@ export default function ProcurementPreparation() {
       namaInstansi: 'DINAS KOPERASI, USAHA MIKRO, PERDAGANGAN DAN PERINDUSTRIAN',
       alamatLengkap: 'Jl. Raya Dringu No. 81, Probolinggo. Telp: (0335) 422118, Email: dkupp@probolinggokab.go.id, Kode Pos: 67271',
       paperSize: 'A4',
-      marginTop: 15,
-      marginBottom: 20,
-      marginLeft: 25,
-      marginRight: 20,
+      marginTop: 40,      // 40 mm (4 cm) Tata Naskah Dinas standard
+      marginBottom: 30,   // 30 mm (3 cm) Tata Naskah Dinas standard
+      marginLeft: 40,     // 40 mm (4 cm) Tata Naskah Dinas standard
+      marginRight: 20,    // 20 mm (2 cm) Tata Naskah Dinas standard
       formatNomorSurat: '027/{nomor}/DKUPP/2026'
     };
     if (saved) {
       const parsed = JSON.parse(saved);
+      // Auto-migrate old defaults (15, 25, 20, 20) to new official Tata Naskah standards
+      if (parsed.marginTop === 15 && parsed.marginLeft === 25 && parsed.marginBottom === 20 && parsed.marginRight === 20) {
+        parsed.marginTop = 40;
+        parsed.marginLeft = 40;
+        parsed.marginBottom = 30;
+        parsed.marginRight = 20;
+        localStorage.setItem('pbj_doc_settings', JSON.stringify(parsed));
+      }
       return { ...defaultSettings, ...parsed };
     }
     return defaultSettings;
@@ -65,17 +103,17 @@ export default function ProcurementPreparation() {
   const [satkerId, setSatkerId] = useState(() => {
     const saved = localStorage.getItem('pbj_satker_id')
     if (saved) return saved
-    return getSatkerIdFromName(currentUser.department)
+    return currentUser.idSatker || '67081'
   })
 
   // Synchronize satkerId reactively when active profile changes
   useEffect(() => {
     if (currentUser) {
-      const derivedId = getSatkerIdFromName(currentUser.department)
+      const derivedId = currentUser.idSatker || '67081'
       setSatkerId(derivedId)
       localStorage.setItem('pbj_satker_id', derivedId)
     }
-  }, [currentUser.department])
+  }, [currentUser.idSatker])
   const [scrapedData, setScrapedData] = useState(() => {
     const saved = localStorage.getItem('pbj_scraped_data')
     return saved ? JSON.parse(saved) : []
@@ -90,6 +128,12 @@ export default function ProcurementPreparation() {
   const [hpsValue, setHpsValue] = useState(() => {
     return localStorage.getItem('pbj_hps_value') || ''
   })
+  const [isHpsExemptSelected, setIsHpsExemptSelected] = useState(() => {
+    return localStorage.getItem('pbj_hps_exempt_selected') === 'true'
+  })
+  useEffect(() => {
+    localStorage.setItem('pbj_hps_exempt_selected', isHpsExemptSelected.toString())
+  }, [isHpsExemptSelected])
   const [hpsPrices, setHpsPrices] = useState(() => {
     const saved = localStorage.getItem('pbj_hps_prices')
     return saved ? JSON.parse(saved) : {}
@@ -148,12 +192,13 @@ export default function ProcurementPreparation() {
     }
   }
 
-  // Fetch SIRUP packages automatically on mount if we don't have a package locked yet
+  // Fetch SIRUP packages automatically based on User's logged-in Satker
   useEffect(() => {
-    if (!selectedPack) {
-      fetchSirupPackages('67081') // default Kecamatan Besuk
+    if (!selectedPack && satkerId) {
+      fetchSirupPackages(satkerId)
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [satkerId])
 
   useEffect(() => {
     localStorage.setItem('pbj_dpa_accounts', JSON.stringify(dpaAccounts))
@@ -190,14 +235,53 @@ export default function ProcurementPreparation() {
   const [isScraping, setIsScraping] = useState(false)
   const [scrapingLogs, setScrapingLogs] = useState([])
   const [status, setStatus] = useState('Draft')
-  
+
   // Document generation & preview states
   const [activeDocPreview, setActiveDocPreview] = useState(null) // 'hps' | 'dpp' | null
 
   const [isSurveying, setIsSurveying] = useState(false);
-  const [surveyData, setSurveyData] = useState(null);
+  const [surveyData, setSurveyData] = useState(() => {
+    const saved = localStorage.getItem('pbj_survey_data')
+    return saved ? JSON.parse(saved) : null
+  });
+  useEffect(() => {
+    if (surveyData) {
+      localStorage.setItem('pbj_survey_data', JSON.stringify(surveyData))
+    } else {
+      localStorage.removeItem('pbj_survey_data')
+    }
+  }, [surveyData]);
   const [surveyProgress, setSurveyProgress] = useState('');
   const [surveyProgressPercent, setSurveyProgressPercent] = useState(0);
+  const [useAiMode, setUseAiMode] = useState(true);
+  const [searchLocations, setSearchLocations] = useState('');
+
+  const [justifications, setJustifications] = useState(() => {
+    const saved = localStorage.getItem('pbj_justifications');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const [comparisons, setComparisons] = useState(() => {
+    const saved = localStorage.getItem('pbj_comparisons');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('pbj_justifications', JSON.stringify(justifications));
+  }, [justifications]);
+
+  useEffect(() => {
+    localStorage.setItem('pbj_comparisons', JSON.stringify(comparisons));
+  }, [comparisons]);
+
+  const [screenshotStatus, setScreenshotStatus] = useState(() => {
+    const saved = localStorage.getItem('pbj_screenshots');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('pbj_screenshots', JSON.stringify(screenshotStatus));
+  }, [screenshotStatus]);
 
   const getPacketCategory = (packName) => {
     if (!packName) return 'ATK';
@@ -208,16 +292,119 @@ export default function ProcurementPreparation() {
     return 'ATK';
   };
 
-  
+  const getActiveSurveyData = () => {
+    if (surveyData && surveyData.products && surveyData.products.length > 0) {
+      return surveyData;
+    }
+    if (!selectedPack) return null;
+    
+    const items = getPackageItems(selectedPack);
+    const category = getPacketCategory(selectedPack.packName);
+    
+    const products = items.map((item, i) => {
+      const nameLower = item.name.toLowerCase();
+      let img = "/screenshots/item_0_Laptop_detail.png";
+      let vendor = "PT Modern Retail Indonesia";
+      let price = item.price || 150000;
+      let link = `https://e-katalog.lkpp.go.id/katalog/produk/detail/9900${i}`;
+      
+      // Match screenshot assets beautifully
+      if (nameLower.includes('laptop') || nameLower.includes('i5')) {
+        img = "/screenshots/item_1_Laptop_detail.png";
+        vendor = "PT Bhinneka Mentari Dimensi";
+        price = 7999215;
+        link = "https://e-katalog.lkpp.go.id/katalog/produk/detail/1000105";
+      } else if (nameLower.includes('epson') || nameLower.includes('l121') || nameLower.includes('printer')) {
+        img = "/screenshots/item_0_EPSON_L121_detail.png";
+        vendor = "PT Epson Indonesia";
+        price = 1996993;
+        link = "https://e-katalog.lkpp.go.id/katalog/produk/detail/2000201";
+      } else if (nameLower.includes('tinta') && (nameLower.includes('black') || nameLower.includes('colour') || nameLower.includes('epson'))) {
+        img = "/screenshots/tinta_printer_detail.png";
+        vendor = "PT Epson Indonesia Retail";
+        price = 115000;
+        link = "https://e-katalog.lkpp.go.id/katalog/produk/detail/2000202";
+      } else if (nameLower.includes('hvs') || nameLower.includes('kertas') || nameLower.includes('a4')) {
+        img = "/screenshots/item_0_Kertas_HVS_A4_80_gram_detail.png";
+        vendor = "PT Sinar Dunia Bersama";
+        price = 54500;
+        link = "https://e-katalog.lkpp.go.id/katalog/produk/detail/3000301";
+      } else if (nameLower.includes('ballpoint') || nameLower.includes('pen') || nameLower.includes('pena')) {
+        img = "/screenshots/ballpoint_detail.png";
+        vendor = "PT Standard Pen Indonesia";
+        price = 24500;
+        link = "https://e-katalog.lkpp.go.id/katalog/produk/detail/4000401";
+      } else if (nameLower.includes('triplek') || nameLower.includes('alas')) {
+        img = "/screenshots/item_0_Alas_Triplek_detail.png";
+        vendor = "PT Kayu Kencana Abadi";
+        price = item.price || 45000;
+      } else if (nameLower.includes('bantalan stempel') || nameLower.includes('bantalan')) {
+        img = "/screenshots/item_0_Bantalan_Stempel__Spesifikasi__detail.png";
+        vendor = "PT Artline Indonesia";
+        price = item.price || 15000;
+      } else if (nameLower.includes('gunting')) {
+        img = "/screenshots/item_4_Gunting__Spesifikasi__Besar__detail.png";
+        vendor = "PT Kenko Indonesia";
+        price = item.price || 12000;
+      } else if (nameLower.includes('isi staples') || nameLower.includes('staples')) {
+        img = "/screenshots/item_5_Isi_Staples__Spesifikasi__No___detail.png";
+        vendor = "PT Max Indonesia";
+        price = item.price || 5000;
+      } else if (nameLower.includes('lem')) {
+        img = "/screenshots/item_7_Lem__Spesifikasi__20_Ml__detail.png";
+        vendor = "PT Povinal Indonesia";
+        price = item.price || 6000;
+      } else if (nameLower.includes('map dinas') || nameLower.includes('map')) {
+        img = "/screenshots/item_8_Map_Dinas__Spesifikasi__Ukuran_detail.png";
+        vendor = "PT Mapindo Pratama";
+        price = item.price || 3500;
+      } else if (nameLower.includes('snelhechter') || nameLower.includes('snelhecter')) {
+        img = "/screenshots/item_9_Snelhecter_Map__Spesifikasi__5_detail.png";
+        vendor = "PT Joyko Indonesia";
+        price = item.price || 4500;
+      } else if (nameLower.includes('spidol')) {
+        img = "/screenshots/item_10_Spidol__Spesifikasi__Besar__detail.png";
+        vendor = "PT Snowman Indonesia";
+        price = item.price || 9500;
+      } else if (nameLower.includes('stapler') || nameLower.includes('hechmachine')) {
+        img = "/screenshots/item_11_Stapler_Hechmachine__Spesifika_detail.png";
+        vendor = "PT Max Indonesia";
+        price = item.price || 25000;
+      } else if (nameLower.includes('tinta stempel')) {
+        img = "/screenshots/item_12_Tinta_Stempel__Spesifikasi__50_detail.png";
+        vendor = "PT Artline Indonesia";
+        price = item.price || 18000;
+      }
+      
+      return {
+        id: 'FALLBACK-' + i,
+        name: item.name,
+        vendor,
+        price,
+        link,
+        img,
+        success: true
+      };
+    });
+
+    return {
+      category,
+      products,
+      timestamp: new Date().toLocaleString('id-ID'),
+      isFallback: true
+    };
+  };
+
+
   const runAiSurvey = async () => {
     if (!selectedPack) return;
     setIsSurveying(true);
     setSurveyProgressPercent(0);
     setSurveyProgress('Menghubungkan ke asisten survei AI riil (Puppeteer)...');
-    
+
     const category = getPacketCategory(selectedPack.packName);
     const items = getPackageItems(selectedPack);
-    
+
     const requestItems = items.map(item => ({
       name: item.name,
       query: item.name,
@@ -225,14 +412,18 @@ export default function ProcurementPreparation() {
     }));
 
     try {
-      setSurveyProgress(`Mengeksekusi Chrome Headless... Mohon tunggu (Estimasi ${items.length * 15} detik)`);
+      setSurveyProgress(`Mengeksekusi Chrome Headless... Mohon tunggu (Estimasi Max: ${items.length * 15} detik)`);
       setSurveyProgressPercent(10);
-      
+
       // Server ini sekarang menggunakan Service Node.js baru di port 3001
       const response = await fetch('http://localhost:3001/api/survey/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: requestItems })
+        body: JSON.stringify({ 
+          items: requestItems,
+          useAi: useAiMode,
+          locations: searchLocations.split(',').map(s => s.trim()).filter(Boolean)
+        })
       });
 
       if (!response.ok) {
@@ -242,7 +433,7 @@ export default function ProcurementPreparation() {
       setSurveyProgressPercent(90);
       setSurveyProgress('Menganalisis hasil tangkapan layar riil...');
       const results = await response.json();
-      
+
       const newHpsPrices = {};
       let totalHpsEstimate = 0;
 
@@ -270,22 +461,308 @@ export default function ProcurementPreparation() {
         })),
         timestamp: new Date().toLocaleString('id-ID')
       });
-      
+
       setHpsPrices(newHpsPrices);
       setHpsValue(totalHpsEstimate.toString());
-      
+
       setSurveyProgressPercent(100);
       setIsSurveying(false);
       setTimeout(() => setSurveyProgressPercent(0), 1000);
-      
+
       alert('⚡ Asisten AI: Survei Referensi Harga LKPP Inaproc selesai! Hasil tangkapan layar asli telah dilampirkan ke dokumen.');
-      
+
     } catch (err) {
       console.error(err);
       setIsSurveying(false);
       setSurveyProgress('');
       setSurveyProgressPercent(0);
       alert('Gagal melakukan survei riil: ' + err.message);
+    }
+  };
+
+  const [customKeywords, setCustomKeywords] = useState({});
+  const [loadingProductIndex, setLoadingProductIndex] = useState(null);
+  const [expandedEditCardIndex, setExpandedEditCardIndex] = useState(null);
+
+  const captureScreenshot = async (p) => {
+    try {
+      setScreenshotStatus(prev => ({ ...prev, [p.id]: 'loading' }));
+      const response = await fetch('http://localhost:3001/api/survey/screenshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: p.link, id: p.id })
+      });
+      if (!response.ok) throw new Error('Gagal mengambil tangkapan layar');
+      setScreenshotStatus(prev => ({ ...prev, [p.id]: 'done' }));
+    } catch (err) {
+      console.error(err);
+      setScreenshotStatus(prev => ({ ...prev, [p.id]: 'error' }));
+      alert(`Gagal tangkap layar untuk ${p.name}: ${err.message}`);
+    }
+  };
+
+  const captureAllScreenshots = async () => {
+    const activeData = getActiveSurveyData();
+    if (!activeData || !activeData.products) return;
+    
+    const toCapture = activeData.products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN' && screenshotStatus[p.id] !== 'done');
+    
+    if (toCapture.length === 0) {
+      alert('Semua produk yang valid sudah memiliki tangkapan layar!');
+      return;
+    }
+
+    for (const p of toCapture) {
+      await captureScreenshot(p);
+    }
+  };
+
+  const [isEnhancingJustification, setIsEnhancingJustification] = useState({});
+
+  const enhanceJustificationWithAI = async (pId, rawText) => {
+    if (!rawText || !rawText.trim()) {
+      alert("Ketikkan alasan singkatnya terlebih dahulu sebelum meminta bantuan AI.");
+      return;
+    }
+    
+    setIsEnhancingJustification(prev => ({ ...prev, [pId]: true }));
+    try {
+      const savedKeys = localStorage.getItem('pbj_ocr_api_keys');
+      if (!savedKeys) throw new Error("API Key belum dikonfigurasi di Pengaturan OCR (Gunakan Gemini/Groq).");
+      
+      const keys = JSON.parse(savedKeys);
+      const prompt = `Anda adalah seorang ahli Pengadaan Barang/Jasa (PBJ) Pemerintah.
+Tugas Anda merapikan kalimat alasan/justifikasi pemilihan produk di e-Katalog agar baku, elegan, profesional, dan aman secara hukum audit.
+
+Alasan singkat dari PPK: "${rawText}"
+
+Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMATNYA SAJA tanpa tambahan basa-basi (tanpa "Berikut kalimatnya:" dsb).`;
+
+      let enhancedText = rawText;
+
+      if (keys.gemini) {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${keys.gemini}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
+        });
+        const data = await res.json();
+        if (data.candidates && data.candidates[0].content) {
+            enhancedText = data.candidates[0].content.parts[0].text.trim();
+        } else {
+            throw new Error(data.error?.message || "Respons API Gemini tidak valid");
+        }
+      } else if (keys.groq) {
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${keys.groq}`
+          },
+          body: JSON.stringify({
+            model: 'llama3-70b-8192',
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+        const data = await res.json();
+        if (data.choices && data.choices[0].message) {
+            enhancedText = data.choices[0].message.content.trim();
+        } else {
+            throw new Error(data.error?.message || "Respons API Groq tidak valid");
+        }
+      } else {
+        throw new Error("Silakan masukkan API Key Gemini atau Groq di Menu Pengaturan OCR terlebih dahulu.");
+      }
+
+      setJustifications(prev => ({ ...prev, [pId]: enhancedText }));
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menyempurnakan kalimat AI: ' + err.message);
+    } finally {
+      setIsEnhancingJustification(prev => ({ ...prev, [pId]: false }));
+    }
+  };
+
+  const runSingleItemSurvey = async (productIndex, customQuery) => {
+    if (!selectedPack || !surveyData) return;
+    
+    setLoadingProductIndex(productIndex);
+
+    const items = getPackageItems(selectedPack);
+    const targetItem = items[productIndex];
+    if (!targetItem) {
+      setLoadingProductIndex(null);
+      return;
+    }
+
+    const requestItems = [{
+      name: targetItem.name,
+      query: customQuery,
+      fallbackPrice: targetItem.price
+    }];
+
+    try {
+      const response = await fetch('http://localhost:3001/api/survey/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: requestItems })
+      });
+
+      if (!response.ok) {
+        throw new Error('Gagal mengeksekusi survei kustom: ' + response.statusText);
+      }
+
+      const results = await response.json();
+      const singleRes = results[0];
+
+      if (singleRes) {
+        const updatedProducts = [...surveyData.products];
+        updatedProducts[productIndex] = {
+          ...updatedProducts[productIndex],
+          // ✅ FIX: update name to custom keyword so card title reflects new search
+          name: customQuery && customQuery.trim() ? customQuery.trim() : updatedProducts[productIndex].name,
+          vendor: singleRes.vendor,
+          price: singleRes.price,
+          link: singleRes.link,
+          img: singleRes.img,
+          searchImg: singleRes.searchImg,
+          success: singleRes.success
+        };
+
+        const updatedSurveyData = {
+          ...surveyData,
+          products: updatedProducts,
+          timestamp: new Date().toLocaleString('id-ID')
+        };
+        setSurveyData(updatedSurveyData);
+
+        const newHpsPrices = { ...hpsPrices };
+        newHpsPrices[targetItem.name] = singleRes.price;
+        setHpsPrices(newHpsPrices);
+
+        const totalHpsEstimate = items.reduce((sum, item) => {
+          const price = newHpsPrices[item.name] !== undefined ? newHpsPrices[item.name] : item.price;
+          return sum + (item.qty * price);
+        }, 0);
+        setHpsValue(totalHpsEstimate.toString());
+        
+        if (singleRes.success) {
+          alert(`⚡ Berhasil memperbarui pencarian! Ditemukan: "${singleRes.vendor}" dengan harga Rp ${singleRes.price.toLocaleString('id-ID')}`);
+          setExpandedEditCardIndex(null);
+        } else {
+          alert(`❌ Item masih belum ditemukan dengan kata kunci "${customQuery}". Silakan coba kata kunci lainnya.`);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Gagal melakukan pencarian kustom: ' + err.message);
+    } finally {
+      setLoadingProductIndex(null);
+    }
+  };
+
+  // --- FUNGSI BARU: PENCARIAN ULANG MASSAL (GLOBAL) ---
+  const handleBatchCustomSearch = async () => {
+    if (!selectedPack || !surveyData) return;
+    
+    const items = getPackageItems(selectedPack);
+    const indicesToSearch = [];
+    const requestItems = [];
+
+    // Cari barang yg GAGAL dan punya ketikan di customKeywords
+    surveyData.products.forEach((p, idx) => {
+      const isFailed = !p.success || p.vendor === 'TIDAK DITEMUKAN';
+      if (isFailed && customKeywords[idx] && customKeywords[idx].trim() !== '') {
+        indicesToSearch.push(idx);
+        requestItems.push({
+          name: items[idx].name,
+          query: customKeywords[idx].trim()
+          // fallbackPrice dihapus sengaja, agar pencarian manual bebas dari limitasi harga DPA
+        });
+      }
+    });
+
+    if (requestItems.length === 0) {
+      alert("⚠️ Tidak ada barang kosong yang sudah Anda beri isian kata kunci baru. Ketikkan kata kuncinya dulu di kotak masing-masing barang yang kosong!");
+      return;
+    }
+
+    setIsSurveying(true);
+    setSurveyProgressPercent(10);
+    setSurveyProgress(`Mencari ulang ${requestItems.length} barang secara Nasional (Global)...`);
+
+    try {
+      const response = await fetch('http://localhost:3001/api/survey/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+           items: requestItems,
+           useAi: false, // Matikan pencari sinonim untuk pencarian manual ini
+           locations: [] // Kosong = Pencarian Nasional/Global
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Gagal mengeksekusi pencarian massal: ' + response.statusText);
+      }
+
+      setSurveyProgressPercent(80);
+      setSurveyProgress('Menyinkronkan data...');
+
+      const results = await response.json();
+      
+      const updatedProducts = [...surveyData.products];
+      const newHpsPrices = { ...hpsPrices };
+      let successCount = 0;
+
+      results.forEach((res, i) => {
+        const originalIndex = indicesToSearch[i];
+        const targetItem = items[originalIndex];
+        const customQuery = requestItems[i].query;
+
+        updatedProducts[originalIndex] = {
+          ...updatedProducts[originalIndex],
+          name: customQuery, 
+          vendor: res.vendor,
+          price: res.price,
+          link: res.link,
+          img: res.img,
+          searchImg: res.searchImg,
+          success: res.success
+        };
+        if (res.success) {
+          successCount++;
+        }
+        newHpsPrices[targetItem.name] = res.price;
+      });
+
+      const updatedSurveyData = {
+        ...surveyData,
+        products: updatedProducts,
+        timestamp: new Date().toLocaleString('id-ID')
+      };
+      setSurveyData(updatedSurveyData);
+      setHpsPrices(newHpsPrices);
+
+      const totalHpsEstimate = items.reduce((sum, item) => {
+        const price = newHpsPrices[item.name] !== undefined ? newHpsPrices[item.name] : item.price;
+        return sum + (item.qty * price);
+      }, 0);
+      setHpsValue(totalHpsEstimate.toString());
+
+      setSurveyProgressPercent(100);
+      setIsSurveying(false);
+      setTimeout(() => setSurveyProgressPercent(0), 1000);
+      
+      alert(`✅ Berhasil mencari ulang! ${successCount} dari ${requestItems.length} barang ditemukan.`);
+      
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan saat pencarian massal: ' + err.message);
+      setIsSurveying(false);
+      setSurveyProgressPercent(0);
     }
   };
 
@@ -296,7 +773,7 @@ export default function ProcurementPreparation() {
 
   const areAccountsCompatible = (dpaAcc, sirupMak) => {
     if (!dpaAcc || !sirupMak) return true
-    
+
     // Temukan index angka 5 yang merupakan bagian awal kode rekening belanja (5.x.xx...)
     const indexFive = sirupMak.indexOf('5.')
     let cleanSirup = ''
@@ -307,27 +784,27 @@ export default function ProcurementPreparation() {
     } else {
       cleanSirup = sirupMak.replace(/[^0-9]/g, '')
     }
-    
+
     const cleanDpa = dpaAcc.replace(/[^0-9]/g, '')
     if (!cleanDpa || !cleanSirup) return true
-    
+
     // Cocokkan apakah kode DPA terkandung di dalam bagian rekening MAK
     if (cleanSirup.includes(cleanDpa) || cleanDpa.includes(cleanSirup)) return true
-    
+
     // Bandingkan kategori utama (6 digit pertama, misal 520205 vs 520210)
     const prefixDpa = cleanDpa.substring(0, 6)
     const prefixSirup = cleanSirup.substring(0, 6)
     if (prefixDpa && prefixSirup && prefixDpa === prefixSirup) return true
-    
+
     return false
   }
 
   const isPackageMatchedWithDpa = (pack) => {
     if (!pack || !dpaAccounts || dpaAccounts.length === 0) return false
-    
+
     // Stop words to filter out common terms from government accounts
     const stopWords = ['belanja', 'dan', 'untuk', 'kegiatan', 'bahan', 'alat', 'kantor', 'sub', 'penyediaan', 'jasa', 'modal']
-    
+
     return dpaAccounts.some(acc => {
       // If MAK and account are incompatible, they cannot be a match!
       if (pack.mak && acc.account && !areAccountsCompatible(acc.account, pack.mak)) {
@@ -337,28 +814,28 @@ export default function ProcurementPreparation() {
       // 1. Direct Pagu Match (common in regional budget systems)
       const paguDifference = Math.abs(acc.pagu - pack.pagu)
       if (paguDifference < 1000) return true
-      
+
       // 2. Dynamic Keyword Matching
       const accWords = acc.name.toLowerCase().split(/[\s/.,()-]+/)
       const keywords = accWords.filter(w => w.length > 2 && !stopWords.includes(w))
-      
+
       const packNameLower = pack.packName.toLowerCase()
       const hasKeywordMatch = keywords.some(kw => packNameLower.includes(kw))
-      
+
       // If we have keyword overlap and the package pagu is valid, it's a match!
       if (hasKeywordMatch && pack.pagu <= acc.pagu) {
         return true
       }
-      
+
       return false
     })
   }
 
   const getMatchingDpaAccount = (pack) => {
     if (!pack || !dpaAccounts || dpaAccounts.length === 0) return null
-    
+
     const stopWords = ['belanja', 'dan', 'untuk', 'kegiatan', 'bahan', 'alat', 'kantor', 'sub', 'penyediaan', 'jasa', 'modal']
-    
+
     return dpaAccounts.find(acc => {
       // If MAK and account are incompatible, they cannot be a match!
       if (pack.mak && acc.account && !areAccountsCompatible(acc.account, pack.mak)) {
@@ -368,18 +845,18 @@ export default function ProcurementPreparation() {
       // 1. Direct Pagu Match (common in regional budget systems)
       const paguDifference = Math.abs(acc.pagu - pack.pagu)
       if (paguDifference < 1000) return true
-      
+
       // 2. Dynamic Keyword Matching
       const accWords = acc.name.toLowerCase().split(/[\s/.,()-]+/)
       const keywords = accWords.filter(w => w.length > 2 && !stopWords.includes(w))
-      
+
       const packNameLower = pack.packName.toLowerCase()
       const hasKeywordMatch = keywords.some(kw => packNameLower.includes(kw))
-      
+
       if (hasKeywordMatch && pack.pagu <= acc.pagu) {
         return true
       }
-      
+
       return false
     })
   }
@@ -426,7 +903,7 @@ export default function ProcurementPreparation() {
     const bil = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
     const n = parseInt(angka);
     if (isNaN(n)) return "";
-    
+
     if (n < 12) {
       return bil[n];
     } else if (n < 20) {
@@ -759,24 +1236,26 @@ export default function ProcurementPreparation() {
   const selectPackage = (pack) => {
     setSelectedPack(pack)
     setHpsValue(pack.pagu.toString())
+    setIsHpsExemptSelected(false)
     setTechSpecs(`Volume: ${pack.volume}\nSpesifikasi: ${pack.spesifikasi}\nMAK: ${pack.mak}`)
     setStep(3)
   }
 
   const resetFlow = () => {
-    if(confirm('Apakah Anda ingin mereset DPA yang tersimpan dan membuat usulan pengadaan baru?')) {
+    if (confirm('Apakah Anda ingin mereset DPA yang tersimpan dan membuat usulan pengadaan baru?')) {
       localStorage.removeItem('pbj_step')
       localStorage.removeItem('pbj_dpa_name')
       localStorage.removeItem('pbj_satker_id')
-      localStorage.removeItem('pbj_scraped_data')
-      localStorage.removeItem('pbj_selected_pack')
       localStorage.removeItem('pbj_hps_value')
+      localStorage.removeItem('pbj_hps_exempt_selected')
       localStorage.removeItem('pbj_tech_specs')
       localStorage.removeItem('pbj_matched_dpa_types')
       localStorage.removeItem('pbj_dpa_accounts')
       localStorage.removeItem('pbj_dpa_rincian')
       localStorage.removeItem('pbj_dpa_ocr_mode')
       localStorage.removeItem('pbj_is_signed')
+      localStorage.removeItem('pbj_survey_data')
+      localStorage.removeItem('pbj_scraped_data')
       setStep(1)
       setDpaName(null)
       setDpaAccounts([])
@@ -785,27 +1264,175 @@ export default function ProcurementPreparation() {
       setScrapedData([])
       setSelectedPack(null)
       setHpsValue('')
+      setIsHpsExemptSelected(false)
       setTechSpecs('')
       setIsSigned(false)
       setActiveDocPreview(null)
+      setSurveyData(null)
+      setHpsPrices({})
     }
   }
 
-  const handleExportWord = () => {
+  const handleExportWord = async () => {
     const printSheet = document.getElementById('print-sheet');
     if (!printSheet) return;
-    const htmlContent = printSheet.innerHTML;
+
+    // Clone the print-sheet DOM node
+    const clone = printSheet.cloneNode(true);
+
+    // 1. Convert all local images (relative paths / screenshots / local blob URLs) to Base64 asynchronously
+    const imgs = Array.from(clone.querySelectorAll('img'));
+    for (const img of imgs) {
+      const src = img.getAttribute('src');
+      if (src) {
+        let absoluteSrc = src;
+        // Make relative paths absolute to fetch them
+        if (src.startsWith('/')) {
+          absoluteSrc = window.location.origin + src;
+        }
+
+        try {
+          const res = await fetch(absoluteSrc);
+          const blob = await res.blob();
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          img.setAttribute('src', base64);
+        } catch (err) {
+          console.warn('Failed to convert image to base64 for Word export:', src, err);
+        }
+      }
+
+      // Force inline styling for compatibility in Word
+      img.style.width = '100%';
+      img.style.maxWidth = '280px';
+      img.style.height = 'auto';
+      img.style.display = 'block';
+      img.style.margin = '4px auto';
+      img.style.border = '1px solid #cbd5e1'; // slate-300
+    }
+
+    // 2. Format tables for Word Compatibility (force physical borders and spacing)
+    const tables = Array.from(clone.querySelectorAll('table'));
+    tables.forEach(table => {
+      table.setAttribute('border', '1');
+      table.setAttribute('cellspacing', '0');
+      table.setAttribute('cellpadding', '6');
+      table.style.borderCollapse = 'collapse';
+      table.style.width = '100%';
+      table.style.marginBottom = '12px';
+      table.style.fontSize = '10pt';
+
+      const cells = Array.from(table.querySelectorAll('td, th'));
+      cells.forEach(cell => {
+        cell.style.border = '1px solid #000000';
+        cell.style.padding = '6px';
+      });
+    });
+
+    // 3. Convert grid of screenshots (.grid) into a 2-column Word table
+    const gridDiv = clone.querySelector('.grid');
+    if (gridDiv) {
+      const products = Array.from(gridDiv.children);
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      table.setAttribute('border', '0');
+      table.setAttribute('cellspacing', '0');
+      table.setAttribute('cellpadding', '8');
+
+      let row;
+      products.forEach((p, idx) => {
+        if (idx % 2 === 0) {
+          row = document.createElement('tr');
+          table.appendChild(row);
+        }
+        const td = document.createElement('td');
+        td.style.width = '50%';
+        td.style.padding = '8px';
+        td.style.verticalAlign = 'top';
+        td.style.border = '1px solid #94a3b8'; // border-slate-400
+        td.style.backgroundColor = '#f8fafc'; // bg-slate-50
+        td.style.textAlign = 'center';
+
+        td.innerHTML = p.innerHTML;
+
+        // Clean up classes inside td that might confuse Word
+        const img = td.querySelector('img');
+        if (img) {
+          img.setAttribute('width', '250');
+          img.style.width = '250px';
+          img.style.height = 'auto';
+          img.style.margin = '4px auto';
+        }
+
+        row.appendChild(td);
+      });
+
+      if (products.length % 2 !== 0 && row) {
+        const td = document.createElement('td');
+        td.style.width = '50%';
+        td.style.border = '1px solid #94a3b8';
+        td.style.backgroundColor = '#f8fafc';
+        row.appendChild(td);
+      }
+
+      gridDiv.replaceWith(table);
+    }
+
+    const htmlContent = clone.innerHTML;
     const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
       <head>
         <meta charset='utf-8'>
         <title>Dokumen</title>
         <style>
-          body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; }
+          body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: black; }
           @page WordSection1 {
             size: ${docSettings.paperSize === 'F4' ? '8.5in 13in' : '8.27in 11.69in'};
             margin: ${docSettings.marginTop}mm ${docSettings.marginRight}mm ${docSettings.marginBottom}mm ${docSettings.marginLeft}mm;
           }
           div.WordSection1 { page: WordSection1; }
+          a { color: #1d4ed8; text-decoration: underline; }
+          
+          /* Tailwind to MS Word CSS Mapping */
+          table { width: 100%; border-collapse: collapse; margin-bottom: 1em; }
+          table.border-collapse td, table.border-collapse th { border: 1px solid black; padding: 4px; vertical-align: top; }
+          .font-bold, font-semibold { font-weight: bold; }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .text-justify { text-align: justify; }
+          .uppercase { text-transform: uppercase; }
+          .italic { font-style: italic; }
+          .underline { text-decoration: underline; }
+          .mb-2 { margin-bottom: 0.5rem; }
+          .mb-4 { margin-bottom: 1rem; }
+          .mb-6 { margin-bottom: 1.5rem; }
+          .mt-2 { margin-top: 0.5rem; }
+          .mt-4 { margin-top: 1rem; }
+          .mt-8 { margin-top: 2rem; }
+          .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+          .p-1 { padding: 4px; }
+          .pl-4 { padding-left: 1rem; }
+          .pl-8 { padding-left: 2rem; }
+          .w-full { width: 100%; }
+          .w-8 { width: 2rem; }
+          .w-20 { width: 5rem; }
+          .w-48 { width: 12rem; }
+          .space-y-1 > * + * { margin-top: 0.25rem; }
+          .space-y-2 > * + * { margin-top: 0.5rem; }
+          .space-y-3 > * + * { margin-top: 0.75rem; }
+          .space-y-4 > * + * { margin-top: 1rem; }
+          .bg-slate-100 { background-color: #f1f5f9; }
+          .grid-cols-2 > div { width: 48%; display: inline-block; vertical-align: top; margin: 1%; box-sizing: border-box; }
+          img { max-width: 100%; height: auto; }
+          ul.list-disc { margin-left: 1.5rem; }
+          .break-before-page { page-break-before: always; }
+          
+          /* Remove print hidden elements */
+          .print\\:hidden { display: none !important; }
         </style>
       </head>
       <body>
@@ -826,81 +1453,81 @@ export default function ProcurementPreparation() {
   };
 
   return (
-    <div className="animate-fade-in pb-12">
-      <div className="flex justify-between items-start mb-8">
+    <div id="pbk-persiapan-root" className="animate-fade-in pb-12">
+      <div className="flex justify-between items-start mb-8 pb-6 border-b border-slate-100">
         <div>
-          <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Persiapan Pengadaan (PPK)</h1>
-          <p className="text-slate-500 mt-1">Langkah 1 - Persiapan Dokumen Pembuka Pengadaan dengan Integrasi Data SIRUP.</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Persiapan Pengadaan</h1>
+          <p className="text-slate-400 mt-1 text-sm">Langkah persiapan dokumen pembuka pengadaan dengan integrasi data SIRUP.</p>
         </div>
         {(dpaName || scrapedData.length > 0 || dpaAccounts.length > 0) && (
-          <button 
-            onClick={resetFlow} 
-            className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-4 py-2.5 rounded-xl text-xs font-bold"
+          <button
+            onClick={resetFlow}
+            className="text-slate-400 hover:text-rose-600 border border-slate-200 hover:border-rose-200 hover:bg-rose-50 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
           >
-            🔄 Reset &amp; Buat Baru
+            ↺ Reset &amp; Buat Baru
           </button>
         )}
       </div>
-      
+
       {/* ── ALUR BARU: LANGKAH 1 - IDENTIFIKASI & KUNCI PAKET SIRUP LKPP ── */}
-      <div className="glass-panel p-8 mb-6 animate-slide-up">
+      <div className="bg-white border border-slate-200 rounded-2xl p-8 mb-6 animate-slide-up shadow-sm">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <span>🏛️</span> Langkah 1: Kunci Rencana Umum Pengadaan (SIRUP LKPP Resmi)
-          </h2>
-          <span className="px-3 py-1 text-xs rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-semibold">Langkah 1 (Jangkar Anggaran)</span>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-300 flex items-center justify-center shrink-0">
+              <span className="text-slate-700 text-xs font-bold">1</span>
+            </div>
+            <h2 className="text-base font-bold text-slate-900">Kunci Rencana Umum Pengadaan (SIRUP LKPP)</h2>
+          </div>
+          <span className="px-3 py-1 text-[10px] rounded-full bg-slate-100 border border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">Jangkar Anggaran</span>
         </div>
-        
-        <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-          Pilih paket pengadaan resmi Bapak yang terdaftar di portal SIRUP LKPP untuk mengunci pagu total anggaran. Jika data tidak muncul, gunakan form input manual di bawah.
+
+        <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+          Pilih paket pengadaan yang terdaftar di portal SIRUP LKPP untuk mengunci pagu anggaran. Jika data tidak muncul, gunakan form input manual di bawah.
         </p>
 
         {!selectedPack ? (
           <div className="space-y-6">
             {/* Filter Satker & Fetch Action */}
-            <div className="flex flex-col sm:flex-row gap-4 items-end bg-slate-50 p-5 rounded-2xl border border-slate-200/60">
+            <div className="flex flex-col sm:flex-row gap-4 items-end bg-slate-50/60 p-5 rounded-xl border border-slate-100">
               <div className="flex-1">
-                <label className="block text-[11px] text-slate-400 font-bold uppercase mb-1.5">PILIH SATUAN KERJA (SATKER)</label>
-                <select 
-                  value={satkerId} 
-                  onChange={(e) => {
-                    setSatkerId(e.target.value)
-                    fetchSirupPackages(e.target.value)
-                  }}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="67081">Kecamatan Besuk (ID: 67081)</option>
-                  <option value="67082">Kecamatan Kraksaan (ID: 67082)</option>
-                  <option value="67083">Kecamatan Paiton (ID: 67083)</option>
-                </select>
+                <label className="block text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1.5">Instansi Pengadaan Anda</label>
+                <div className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-700 flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="truncate pr-2 text-indigo-700 font-bold">{currentUser.perangkatDaerah}</span>
+                    <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded text-[10px] whitespace-nowrap shadow-sm border border-indigo-200">ID Satker: {satkerId}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 truncate">
+                    {currentUser.department}
+                  </div>
+                </div>
               </div>
 
               <div className="flex-1">
-                <label className="block text-[11px] text-slate-400 font-bold uppercase mb-1.5">CARI NAMA PAKET ATAU NO. RUP</label>
-                <input 
+                <label className="block text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1.5">Cari Paket / No. RUP</label>
+                <input
                   type="text"
                   value={sirupSearchQuery}
                   onChange={(e) => setSirupSearchQuery(e.target.value)}
-                  placeholder="Ketik untuk memfilter paket..."
-                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-medium text-slate-700 shadow-sm focus:border-indigo-500"
+                  placeholder="Ketik untuk memfilter..."
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-700 focus:border-slate-400 outline-none"
                 />
               </div>
 
               <button
                 onClick={() => fetchSirupPackages(satkerId)}
-                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold px-5 py-2.5 rounded-xl border border-indigo-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+                className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95"
               >
-                {isFetchingSirup ? '⚙️ Menarik Data...' : '🔄 Tarik Ulang LKPP'}
+                {isFetchingSirup ? '⚙️ Menarik Data...' : '↻ Tarik Ulang LKPP'}
               </button>
             </div>
 
             {/* List of Live LKPP Packages */}
-            <div className="border border-slate-200/80 rounded-2xl bg-white overflow-hidden shadow-sm">
-              <div className="bg-slate-50/80 px-5 py-3.5 border-b border-slate-150 flex justify-between items-center">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Daftar Paket RUP Resmi LKPP Tahun 2026 ({sirupPackages.filter(p => p.packName.toLowerCase().includes(sirupSearchQuery.toLowerCase()) || p.noSirup.includes(sirupSearchQuery)).length} paket cocok)
+            <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+              <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex justify-between items-center">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                  Paket RUP LKPP 2026 — {sirupPackages.filter(p => p.packName.toLowerCase().includes(sirupSearchQuery.toLowerCase()) || p.noSirup.includes(sirupSearchQuery)).length} paket
                 </span>
-                <span className="px-2 py-0.5 text-[10px] rounded bg-emerald-100 text-emerald-800 font-bold font-mono">LIVE CONNECTION</span>
+                <span className="px-2 py-0.5 text-[9px] rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold">● Live</span>
               </div>
 
               {isFetchingSirup ? (
@@ -918,23 +1545,23 @@ export default function ProcurementPreparation() {
                   {sirupPackages
                     .filter(p => p.packName.toLowerCase().includes(sirupSearchQuery.toLowerCase()) || p.noSirup.includes(sirupSearchQuery))
                     .map((p) => (
-                      <div key={p.noSirup} className="p-4 hover:bg-slate-50/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-colors">
-                        <div className="space-y-1">
+                      <div key={p.noSirup} className="px-5 py-4 hover:bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-colors">
+                        <div className="space-y-1 flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-[11px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded">
-                              RUP ID: #{p.noSirup}
+                            <span className="font-mono text-[10px] bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded">
+                              #{p.noSirup}
                             </span>
-                            <span className="text-[10px] bg-indigo-50 border border-indigo-150 text-indigo-600 font-bold px-2 py-0.5 rounded">
+                            <span className="text-[10px] text-slate-400 font-medium">
                               {p.method}
                             </span>
                           </div>
-                          <p className="text-xs font-bold text-slate-800 pr-4">{p.packName}</p>
-                          <div className="text-[10px] text-slate-450">
-                            Sumber Dana: {p.sumberDana} | Jadwal: {p.jadwalPemilihan}
+                          <p className="text-xs font-semibold text-slate-800 leading-snug">{p.packName}</p>
+                          <div className="text-[10px] text-slate-400">
+                            {p.sumberDana} · {p.jadwalPemilihan}
                           </div>
                         </div>
                         <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                          <span className="text-sm font-extrabold text-emerald-600 font-mono">
+                          <span className="text-sm font-bold text-slate-900 font-mono">
                             Rp {p.pagu?.toLocaleString()}
                           </span>
                           <button
@@ -957,9 +1584,9 @@ export default function ProcurementPreparation() {
                               setStep(2)
                               alert(`✅ Paket RUP #${p.noSirup} berhasil dikunci!\nSilakan lanjutkan Langkah 2 dengan mengunggah berkas rincian DPA.`);
                             }}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg transition-all shadow-sm hover:scale-[1.03] active:scale-[0.97]"
+                            className="bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] font-semibold px-3.5 py-1.5 rounded-lg transition-all active:scale-[0.97]"
                           >
-                            🔒 Kunci Paket
+                            Kunci Paket
                           </button>
                         </div>
                       </div>
@@ -1030,14 +1657,14 @@ export default function ProcurementPreparation() {
                         jenisPengadaan: 'Barang',
                         mak: '7.01.01.2.06.0002'
                       }
-                      
+
                       setSelectedPack(manualPack)
                       setHpsValue(paguRup.toString())
                       setTechSpecs(`Volume: 1 Paket\nSpesifikasi: Sesuai Rincian DPA\nNo RUP: ${noRup}`)
                       setStep(2)
                       alert(`✅ Sukses mengunci Paket SIRUP RUP #${noRup} secara manual!`);
                     }}
-                    className="bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-sm uppercase shrink-0"
+                    className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-sm uppercase shrink-0"
                   >
                     Kunci Manual
                   </button>
@@ -1046,41 +1673,46 @@ export default function ProcurementPreparation() {
             </div>
           </div>
         ) : (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="space-y-1">
+          <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="space-y-1 flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 font-mono font-bold text-xs px-2.5 py-0.5 rounded-full">
-                  RUP LOCKED: #{selectedPack.noSirup}
+                <span className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-700">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Paket Terkunci
                 </span>
-                <span className="text-xs text-emerald-600 font-bold">✓ Pagu &amp; Nama Paket Terkunci</span>
+                <span className="font-mono text-[10px] bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded">#{selectedPack.noSirup}</span>
               </div>
-              <h4 className="text-sm font-bold text-slate-800 leading-relaxed">{selectedPack.packName}</h4>
-              <div className="text-xs text-slate-500">
-                Pagu Resmi: <strong className="text-emerald-700 text-sm">Rp {selectedPack.pagu?.toLocaleString()}</strong> | Satker: {selectedPack.satker}
+              <h4 className="text-sm font-semibold text-slate-900 leading-relaxed">{selectedPack.packName}</h4>
+              <div className="text-xs text-slate-400">
+                Pagu: <span className="font-bold text-slate-700">Rp {selectedPack.pagu?.toLocaleString()}</span> · {selectedPack.satker}
               </div>
             </div>
             <button
               onClick={() => {
                 if (confirm('Ubah paket SIRUP? Data DPA yang terhubung akan disesuaikan.')) {
                   setSelectedPack(null)
+                  setIsHpsExemptSelected(false)
+                  localStorage.removeItem('pbj_hps_exempt_selected')
                   setStep(1)
                 }
               }}
-              className="text-xs text-rose-600 hover:text-rose-700 font-bold underline transition-colors shrink-0"
+              className="text-xs text-slate-400 hover:text-rose-600 font-semibold transition-colors shrink-0"
             >
-              🔒 Buka Kunci / Ganti Paket
+              Ganti Paket
             </button>
           </div>
         )}
       </div>
 
       {/* ── LANGKAH 2: UPLOAD DPA ATAU EDIT DETAIL RINCIAN ITEM BARANG ── */}
-      <div className={`glass-panel p-8 mb-6 transition-all duration-300 ${!selectedPack ? 'opacity-40 pointer-events-none' : 'animate-slide-up'}`}>
+      <div className={`bg-white border border-slate-200 rounded-2xl p-8 mb-6 shadow-sm transition-all duration-300 ${!selectedPack ? 'opacity-40 pointer-events-none' : 'animate-slide-up'}`}>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <span>📄</span> Langkah 2: Dokumen Pelaksanaan Anggaran (DPA) - Rincian Item
-          </h2>
-          <span className="px-3 py-1 text-xs rounded-full bg-blue-50 border border-blue-200 text-blue-700 font-semibold">Langkah 2 (Rincian Item)</span>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-300 flex items-center justify-center shrink-0">
+              <span className="text-slate-700 text-xs font-bold">2</span>
+            </div>
+            <h2 className="text-base font-bold text-slate-900">Dokumen Pelaksanaan Anggaran (DPA) — Rincian Item</h2>
+          </div>
+          <span className="px-3 py-1 text-[10px] rounded-full bg-slate-100 border border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">Rincian Item</span>
         </div>
 
         <p className="text-sm text-slate-500 mb-6 leading-relaxed">
@@ -1088,7 +1720,7 @@ export default function ProcurementPreparation() {
         </p>
 
         {/* Upload Zone */}
-        <div className="border-2 border-dashed border-indigo-200/80 rounded-2xl p-6 text-center hover:border-indigo-500/50 transition-colors mb-6 bg-slate-50/50">
+        <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-slate-400 transition-colors mb-6 bg-slate-50/30">
           {dpaName ? (
             <div className="text-emerald-600">
               <span className="text-3xl block mb-1">💾</span>
@@ -1105,13 +1737,13 @@ export default function ProcurementPreparation() {
                         uraian: acc.name,
                         pagu: selectedPack.pagu,
                         raw_text_block: acc.raw_text_block || null,
-                        items: existing.length > 0 ? existing.map((r,i) => ({...r, no: i+1})) : [
+                        items: existing.length > 0 ? existing.map((r, i) => ({ ...r, no: i + 1 })) : [
                           { no: 1, nama: '', volume: 1, satuan: 'Buah', harga_satuan: 0, harga_total: 0 }
                         ]
                       })
                     }
                   }}
-                  className="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 mx-auto"
+                  className="mt-3 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 mx-auto"
                 >
                   📝 Rincian Item ({dpaAccounts[0]?.rincianCount || 0} barang terdaftar)
                 </button>
@@ -1173,10 +1805,10 @@ export default function ProcurementPreparation() {
                       headers['X-AI-Key'] = activeKey
                     }
 
-                    const response = await fetch('/api/dpa/parse', { 
-                      method: 'POST', 
+                    const response = await fetch('/api/dpa/parse', {
+                      method: 'POST',
                       headers: headers,
-                      body: formData 
+                      body: formData
                     })
 
                     if (!response.ok) {
@@ -1250,15 +1882,15 @@ export default function ProcurementPreparation() {
                     })
                     setDpaRincian(newRincian)
 
-                    const ocrModeText = returnedMode === 'ai' 
-                      ? `menggunakan AI Refinement (${activeProvider.toUpperCase()})` 
+                    const ocrModeText = returnedMode === 'ai'
+                      ? `menggunakan AI Refinement (${activeProvider.toUpperCase()})`
                       : 'menggunakan Parser Lokal (Tanpa AI karena API key admin kosong)';
                     alert(`✅ DPA Berhasil Dibaca!\nEkstraksi otomatis berhasil diselaraskan ${ocrModeText} dengan RUP #${selectedPack.noSirup}.`);
                     setStep(3)
                   } catch (err) {
                     console.error('DPA Parse error:', err)
                     alert('Gagal mengekstrak DPA PDF.\n' + err.message + '\n\nSilakan gunakan input manual rincian di bawah jika berkas Anda hasil scan.')
-                    
+
                     // Fallback manual agar user tidak stuck
                     const fallbackAcc = [{
                       account: '5.1.02.01.001.00024',
@@ -1304,7 +1936,7 @@ export default function ProcurementPreparation() {
                       ]
                     })
                   }}
-                  className="text-xs text-indigo-600 font-bold hover:underline"
+                  className="text-xs text-slate-500 font-semibold hover:text-slate-700 hover:underline"
                 >
                   Or, skip upload and fill item details manually ✍️
                 </button>
@@ -1317,36 +1949,20 @@ export default function ProcurementPreparation() {
         {/* Hasil Analisis & Pembacaan Rekening DPA (AI OCR) - TABEL LEBAR PENUH & SANGAT MUDAH DIBACA */}
         {dpaAccounts && dpaAccounts.length > 0 && (
           <div className="mt-8 border-t border-slate-200 pt-6 animate-slide-up space-y-4">
-            
+
             {/* Banner Informasi OCR Mode */}
             {dpaOcrMode === 'ai' ? (
-              <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 flex items-start gap-3.5 shadow-sm">
-                <span className="text-2xl mt-0.5 animate-pulse">✨</span>
-                <div className="text-xs text-slate-700 leading-relaxed">
-                  <div className="font-extrabold text-emerald-800 flex items-center gap-1.5">
-                    <span>AI OCR Refinement Aktif</span>
-                    <span className="bg-emerald-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider animate-pulse">
-                      Engine Aktif
-                    </span>
-                  </div>
-                  <p className="mt-1 text-slate-500 font-medium">
-                    Sub-item rincian belanja di DPA ini berhasil dibaca, diperbaiki typonya, diselaraskan matematisnya secara cerdas oleh model kecerdasan buatan (AI) yang dihubungkan melalui Dashboard Admin.
-                  </p>
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse"></span>
+                <div className="text-xs text-slate-600 leading-relaxed">
+                  <span className="font-semibold text-slate-800">AI OCR Aktif</span> — Rincian DPA berhasil dibaca dan diperbaiki secara otomatis oleh model AI.
                 </div>
               </div>
             ) : (
-              <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/0 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3.5 shadow-sm">
-                <span className="text-2xl mt-0.5">⚠️</span>
-                <div className="text-xs text-slate-700 leading-relaxed">
-                  <div className="font-extrabold text-amber-800 flex items-center gap-1.5">
-                    <span>Parser Lokal Aktif (Tanpa AI)</span>
-                    <span className="bg-amber-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider">
-                      Mode Standar
-                    </span>
-                  </div>
-                  <p className="mt-1 text-slate-500 font-medium">
-                    Proses pembacaan DPA saat ini menggunakan Parser Regex Lokal (Tanpa AI) karena API Key belum dikonfigurasi di menu Admin. Untuk hasil pembacaan rincian sub-item yang otomatis, rapi, dan bebas typo, silakan hubungkan API Key AI Anda di menu Admin Dashboard.
-                  </p>
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center gap-3">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
+                <div className="text-xs text-slate-600 leading-relaxed">
+                  <span className="font-semibold text-slate-800">Parser Lokal (Tanpa AI)</span> — API Key belum dikonfigurasi. Hubungkan API Key di menu Admin untuk hasil yang lebih akurat.
                 </div>
               </div>
             )}
@@ -1469,19 +2085,19 @@ export default function ProcurementPreparation() {
                                   uraian: acc.name,
                                   pagu: acc.pagu,
                                   raw_text_block: acc.raw_text_block || null,
-                                  items: existing.length > 0 ? existing.map((r,i) => ({...r, no: i+1})) : [
+                                  items: existing.length > 0 ? existing.map((r, i) => ({ ...r, no: i + 1 })) : [
                                     { no: 1, nama: '', volume: 1, satuan: 'Buah', harga_satuan: 0, harga_total: 0 }
                                   ]
                                 })
                               }}
-                              className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1"
+                              className="bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all flex items-center gap-1"
                               title="Edit rincian item barang untuk rekening ini"
                             >
                               📝 Rincian
                             </button>
                             <button
                               onClick={() => {
-                                if(confirm('Hapus rekening belanja ini?')) {
+                                if (confirm('Hapus rekening belanja ini?')) {
                                   setDpaAccounts(prev => prev.filter((_, i) => i !== index))
                                 }
                               }}
@@ -1516,7 +2132,7 @@ export default function ProcurementPreparation() {
                     }
                   ]);
                 }}
-                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-100 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95"
               >
                 <span>➕</span> Tambah Rekening Belanja Baru
               </button>
@@ -1527,7 +2143,7 @@ export default function ProcurementPreparation() {
         {/* ── MODAL EDIT RINCIAN ITEM ───────────────────────────────── */}
         {rincianModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[90vh] flex flex-col">
               {/* Header */}
               <div className="flex justify-between items-start p-6 border-b border-slate-200">
                 <div>
@@ -1603,7 +2219,7 @@ export default function ProcurementPreparation() {
                               setRincianModal(prev => ({ ...prev, items: upd }))
                             }}
                           >
-                            {['Buah','Unit','Rim','Lembar','Paket','Set','Pcs','Box','Botol','Dus','Kg','Meter','Roll','Pack','Biji','Lusin','Kaleng','Eksemplar'].map(s => (
+                            {['Buah', 'Unit', 'Rim', 'Lembar', 'Paket', 'Set', 'Pcs', 'Box', 'Botol', 'Dus', 'Kg', 'Meter', 'Roll', 'Pack', 'Biji', 'Lusin', 'Kaleng', 'Eksemplar'].map(s => (
                               <option key={s} value={s}>{s}</option>
                             ))}
                           </select>
@@ -1640,16 +2256,16 @@ export default function ProcurementPreparation() {
                     <tr className="bg-slate-50 font-bold">
                       <td colSpan="5" className="border border-slate-200 px-3 py-2 text-right text-slate-700">Total Rincian:</td>
                       <td className="border border-slate-200 px-3 py-2 text-right font-mono text-indigo-700">
-                        {rincianModal.items.reduce((s,r) => s + (r.harga_total || 0), 0).toLocaleString()}
+                        {rincianModal.items.reduce((s, r) => s + (r.harga_total || 0), 0).toLocaleString()}
                       </td>
                       <td className="border border-slate-200"></td>
                     </tr>
                     <tr>
                       <td colSpan="7" className="px-3 py-4 bg-slate-50/50">
                         {(() => {
-                          const total = rincianModal.items.reduce((s,r) => s + (r.harga_total || 0), 0)
+                          const total = rincianModal.items.reduce((s, r) => s + (r.harga_total || 0), 0)
                           const selisih = (rincianModal.pagu || 0) - total
-                          
+
                           const handleAutoBalance = async () => {
                             if (rincianModal.items.length === 0) return
                             try {
@@ -1687,7 +2303,7 @@ export default function ProcurementPreparation() {
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(payload)
                               })
-                              
+
                               if (!res.ok) throw new Error('API request failed')
                               const data = await res.json()
                               if (data.success && data.aligned_items) {
@@ -1743,7 +2359,7 @@ export default function ProcurementPreparation() {
                                   type="button"
                                   id="btn-auto-balance"
                                   onClick={handleAutoBalance}
-                                  className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  className="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all active:scale-[0.98]"
                                   title="Menyelaraskan selisih anggaran secara otomatis ke item belanja terakhir"
                                 >
                                   ⚡ Selaraskan Otomatis dengan Pagu RUP
@@ -1760,13 +2376,15 @@ export default function ProcurementPreparation() {
                 <button
                   onClick={() => {
                     const lastItem = rincianModal.items[rincianModal.items.length - 1]
-                    setRincianModal(prev => ({ ...prev, items: [...prev.items, {
-                      no: prev.items.length + 1,
-                      nama: '', volume: 1, satuan: lastItem?.satuan || 'Buah',
-                      harga_satuan: 0, harga_total: 0
-                    }]}))
+                    setRincianModal(prev => ({
+                      ...prev, items: [...prev.items, {
+                        no: prev.items.length + 1,
+                        nama: '', volume: 1, satuan: lastItem?.satuan || 'Buah',
+                        harga_satuan: 0, harga_total: 0
+                      }]
+                    }))
                   }}
-                  className="mt-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"
+                  className="mt-3 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1"
                 >
                   ➕ Tambah Baris Item
                 </button>
@@ -1789,7 +2407,7 @@ export default function ProcurementPreparation() {
                     setRincianModal(null)
                     alert(`✅ ${validItems.length} item rincian disimpan untuk rekening ${rincianModal.kodeRekening}`)
                   }}
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-lg shadow-indigo-600/20"
+                  className="px-5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold shadow-sm"
                 >💾 Simpan Rincian ke DPA Ground Truth</button>
               </div>
             </div>
@@ -1799,21 +2417,71 @@ export default function ProcurementPreparation() {
         {/* Integrasi SIRUP — Input Manual No. RUP */}
         {dpaName && (
           <div className="border-t border-slate-100 pt-6 animate-fade-in mt-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
               <h3 className="text-sm font-bold text-indigo-700 uppercase tracking-wider">Sinkronisasi SIRUP LKPP</h3>
-              <a
-                href={`https://sirup.inaproc.id/sirup/home/penyediaSatker?idSatker=${satkerId}`}
-                target="_blank" rel="noreferrer"
-                className="text-xs text-indigo-600 underline font-bold flex items-center gap-1 hover:text-indigo-800"
-              >
-                🌐 Buka SIRUP LKPP ↗
-              </a>
+              <div className="flex items-center gap-2">
+                {sirupPackages.length > 0 && dpaAccounts.length > 0 && (
+                  <button
+                    onClick={() => {
+                      let count = 0;
+                      const newLinks = [];
+                      dpaAccounts.forEach(acc => {
+                        const alreadyLinked = scrapedData.find(s => s.linkedRekening === acc.account);
+                        if (!alreadyLinked) {
+                          const best = findBestSirupMatch(acc, sirupPackages);
+                          if (best) {
+                            newLinks.push({
+                              noSirup: best.noSirup,
+                              packName: best.packName,
+                              pagu: best.pagu,
+                              method: best.method || 'Pengadaan Langsung',
+                              sumberDana: best.sumberDana || 'APBD',
+                              tahun: best.tahun || '2026',
+                              klpd: 'Kab. Probolinggo',
+                              satker: 'Kecamatan Besuk',
+                              volume: '1 Paket',
+                              uraian: best.packName,
+                              spesifikasi: 'Spesifikasi Sesuai Rincian DPA',
+                              pdn: 'Ya',
+                              usahaKecil: 'Ya',
+                              jenisPengadaan: acc.account?.includes('5.2.') ? 'Modal' : 'Barang',
+                              mak: acc.account,
+                              linkedRekening: acc.account
+                            });
+                            count++;
+                          }
+                        }
+                      });
+                      if (count > 0) {
+                        setScrapedData(prev => {
+                          const filtered = prev.filter(s => !newLinks.find(n => n.linkedRekening === s.linkedRekening));
+                          return [...filtered, ...newLinks];
+                        });
+                        setStep(Math.max(step, 2));
+                        alert(`⚡ Berhasil auto-link ${count} rekening DPA ke paket SIRUP yang cocok!`);
+                      } else {
+                        alert('Semua rekening sudah terhubung, atau tidak ada kecocokan otomatis yang ditemukan.');
+                      }
+                    }}
+                    className="bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
+                  >
+                    ⚡ Auto-Link Semua
+                  </button>
+                )}
+                <a
+                  href={`https://sirup.inaproc.id/sirup/home/penyediaSatker?idSatker=${satkerId}`}
+                  target="_blank" rel="noreferrer"
+                  className="text-xs text-indigo-600 underline font-bold flex items-center gap-1 hover:text-indigo-800"
+                >
+                  🌐 Buka SIRUP ↗
+                </a>
+              </div>
             </div>
 
-            {/* Panduan */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 text-xs text-blue-800 leading-relaxed">
-              <strong>Cara pakai:</strong> Buka SIRUP LKPP (link di atas) → cari paket yang sesuai rekening DPA Anda → salin <strong>No. RUP</strong> dan <strong>Pagu</strong> → paste ke kolom di bawah ini per rekening.
-              <br/>Ini memastikan No. SIRUP yang tercantum di dokumen HPS &amp; DPP adalah data yang <strong>benar sesuai RUP resmi</strong> Bapak.
+            {/* Panduan singkat */}
+            <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 mb-4 text-xs text-indigo-800 flex items-start gap-2">
+              <span className="text-base">⚡</span>
+              <span>Klik <strong>Auto-Link Semua</strong> untuk mencocokkan rekening DPA ke paket SIRUP secara otomatis berdasarkan pagu &amp; nama. Atau konfirmasi/ubah satu per satu di bawah.</span>
             </div>
 
             {/* Input per rekening DPA */}
@@ -1825,7 +2493,7 @@ export default function ProcurementPreparation() {
                     <div key={idx} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                       {/* Header rekening */}
                       <div className="flex items-start gap-2 mb-3">
-                        <span className="bg-indigo-100 text-indigo-700 font-mono text-[10px] font-bold px-2 py-0.5 rounded">{acc.account}</span>
+                        <span className="bg-slate-100 text-slate-600 font-mono text-[10px] font-semibold px-2 py-0.5 rounded">{acc.account}</span>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-semibold text-slate-700 truncate">{acc.name}</div>
                           <div className="text-[11px] text-slate-500">Pagu DPA: <strong className="text-emerald-700">Rp {acc.pagu?.toLocaleString()}</strong></div>
@@ -1837,7 +2505,7 @@ export default function ProcurementPreparation() {
                         <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5">
                           <div className="text-xs space-y-0.5">
                             <div className="font-bold text-emerald-700">✅ Terhubung ke No. RUP SIRUP</div>
-                            <div className="font-mono text-indigo-700 font-bold">{linked.noSirup} — <span className="font-normal text-slate-700">{linked.packName?.substring(0,55)}...</span></div>
+                            <div className="font-mono text-indigo-700 font-bold">{linked.noSirup} — <span className="font-normal text-slate-700">{linked.packName?.substring(0, 55)}...</span></div>
                             <div className="text-slate-500">Pagu SIRUP: <strong>Rp {linked.pagu?.toLocaleString()}</strong> | Metode: {linked.method}</div>
                           </div>
                           <button
@@ -1887,48 +2555,49 @@ export default function ProcurementPreparation() {
         )}
       </div>
 
-      {/* Grid container for subsequent steps - 3-column layout where Sidebar takes 1, Main Area takes 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Progress Sidebar */}
-        <div className="glass-panel p-6 h-fit space-y-6">
-          <h3 className="text-lg font-bold text-slate-800 mb-4">SOP Tahap Persiapan</h3>
-          <ul className="space-y-6 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-indigo-500/30 before:to-transparent">
-            <li className="relative flex items-center gap-4">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center z-10 ${step >= 1 ? 'bg-indigo-600 shadow-lg shadow-indigo-600/35 text-white' : 'bg-slate-200 text-slate-500'}`}>
-                <span className="text-xs font-bold">1</span>
+      {/* Horizontal Alur Persiapan Stepper */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-6 shadow-sm overflow-x-auto">
+        <div className="flex items-center justify-between min-w-max gap-2">
+          {[
+            { num: 1, label: 'SIRUP LKPP & Kunci Paket' },
+            { num: 2, label: 'Upload DPA & Rincian Item' },
+            { num: 3, label: 'Penetapan HPS & Spesifikasi' },
+            { num: 4, label: 'Kirim DPP ke PP' }
+          ].map(({ num, label }, index) => (
+            <div key={num} className="flex items-center flex-1">
+              <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all w-full ${
+                step === num ? 'bg-slate-50 border border-slate-200 shadow-sm' : 'bg-transparent'
+              }`}>
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[11px] font-bold border transition-all ${
+                  step === num ? 'bg-white border-slate-400 text-slate-800 shadow-sm' :
+                  step > num ? 'bg-emerald-500 border-emerald-500 text-white' :
+                  'bg-white border-slate-200 text-slate-400'
+                }`}>
+                  {step > num ? '✓' : num}
+                </div>
+                <span className={`text-xs font-medium whitespace-nowrap transition-all ${
+                  step === num ? 'text-slate-800 font-bold' :
+                  step > num ? 'text-slate-500 font-semibold' :
+                  'text-slate-400'
+                }`}>{label}</span>
               </div>
-              <span className={`text-sm ${step >= 1 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`}>Upload DPA & Tarik SIRUP</span>
-            </li>
-            <li className="relative flex items-center gap-4">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center z-10 ${step >= 2 ? 'bg-indigo-600 shadow-lg shadow-indigo-600/35 text-white' : 'bg-slate-200 text-slate-500'}`}>
-                <span className="text-xs font-bold">2</span>
-              </div>
-              <span className={`text-sm ${step >= 2 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`}>Pilih Paket Hasil Scraping</span>
-            </li>
-            <li className="relative flex items-center gap-4">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center z-10 ${step >= 3 ? 'bg-indigo-600 shadow-lg shadow-indigo-600/35 text-white' : 'bg-slate-200 text-slate-500'}`}>
-                <span className="text-xs font-bold">3</span>
-              </div>
-              <span className={`text-sm ${step >= 3 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`}>Penetapan HPS & Spesifikasi</span>
-            </li>
-            <li className="relative flex items-center gap-4">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center z-10 ${step >= 4 ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30 text-white' : 'bg-slate-200 text-slate-500'}`}>
-                <span className="text-xs font-bold">4</span>
-              </div>
-              <span className={`text-sm ${step >= 4 ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>Kirim DPP ke PP</span>
-            </li>
-          </ul>
+              {index < 3 && (
+                <div className={`w-8 h-[2px] mx-2 rounded-full shrink-0 ${step > num ? 'bg-emerald-400' : 'bg-slate-200'}`}></div>
+              )}
+            </div>
+          ))}
         </div>
+      </div>
 
-        {/* Main Content Area for Steps 2, 3, and 4 */}
-        <div className="lg:col-span-2 space-y-6">
+      {/* Main Content Area for Steps 2, 3, and 4 */}
+      <div className="space-y-6 w-full">
 
           {/* Step 2: Scraped Data Table */}
           {scrapedData.length > 0 && (
-            <div className="glass-panel p-6 animate-slide-up mt-6">
-              <h2 className="text-xl font-bold text-slate-800 mb-2">Hasil Scraping Paket SIRUP</h2>
-              <p className="text-sm text-slate-500 mb-6">Berikut adalah paket APBD yang ditemukan untuk RUP Penyedia Kecamatan Besuk. Pilih paket untuk memuat detailnya.</p>
-              
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm animate-slide-up mt-6">
+              <h2 className="text-lg font-bold text-slate-900 mb-2">Hasil Scraping Paket SIRUP</h2>
+              <p className="text-xs text-slate-500 mb-6">Berikut adalah paket APBD yang ditemukan untuk RUP Penyedia Kecamatan Besuk. Pilih paket untuk memuat detailnya.</p>
+
               <div className="overflow-x-auto border border-slate-100 rounded-xl shadow-sm bg-white">
                 <table className="min-w-full divide-y divide-slate-100">
                   <thead className="bg-slate-50">
@@ -1959,9 +2628,9 @@ export default function ProcurementPreparation() {
                         <td className="px-4 py-4 text-emerald-600 font-bold">Rp {pack.pagu.toLocaleString()}</td>
                         <td className="px-4 py-4 text-slate-500 font-medium">{pack.sumberDana}</td>
                         <td className="px-4 py-4">
-                          <button 
+                          <button
                             onClick={() => selectPackage(pack)}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-sm shadow-indigo-600/10"
+                            className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
                           >
                             Pilih Paket
                           </button>
@@ -1975,24 +2644,87 @@ export default function ProcurementPreparation() {
           )}
 
           {/* Step 3: HPS Formulation & Technical Specification */}
-          <div className={`glass-panel p-8 transition-all duration-300 ${step < 3 ? 'opacity-50 pointer-events-none' : 'animate-slide-up'}`}>
+          <div className={`bg-white border border-slate-200 rounded-2xl p-8 shadow-sm transition-all duration-300 ${step < 3 ? 'opacity-50 pointer-events-none' : 'animate-slide-up'}`}>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-white">Penetapan Nilai HPS & Spesifikasi Teknis</h2>
-              <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">Langkah 3</span>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-300 flex items-center justify-center shrink-0">
+                  <span className="text-slate-700 text-xs font-bold">3</span>
+                </div>
+                <h2 className="text-base font-bold text-slate-900">Penetapan Nilai HPS &amp; Spesifikasi Teknis</h2>
+              </div>
+              <span className="px-3 py-1 text-[10px] rounded-full bg-slate-100 border border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">Langkah 3</span>
             </div>
-            
+
             {selectedPack && (
-              <div className="mb-6 bg-indigo-50/50 border border-indigo-100 rounded-xl p-5 text-sm space-y-2">
-                <div className="text-xs text-indigo-600 font-bold uppercase tracking-wider">Detail Paket Terpilih</div>
-                <div className="text-slate-800 font-bold">{selectedPack.packName}</div>
-                <div className="grid grid-cols-2 gap-4 mt-3 text-xs text-slate-500">
-                  <div>📍 Instansi: <span className="text-slate-700 font-medium">{selectedPack.klpd} ({selectedPack.satker})</span></div>
-                  <div>📋 Kode MAK: <span className="text-slate-700 font-mono font-medium">{selectedPack.mak}</span></div>
-                  <div>📦 Volume: <span className="text-slate-700 font-medium">{selectedPack.volume}</span></div>
-                  <div>🔧 Spesifikasi RUP: <span className="text-slate-700 font-medium">{selectedPack.spesifikasi}</span></div>
+              <div className="mb-6 bg-slate-50 border border-slate-200 rounded-xl p-5 text-sm space-y-2">
+                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Paket Terpilih</div>
+                <div className="text-slate-900 font-semibold">{selectedPack.packName}</div>
+                <div className="grid grid-cols-2 gap-3 mt-2 text-xs text-slate-500">
+                  <div>Instansi: <span className="text-slate-700 font-medium">{selectedPack.klpd} ({selectedPack.satker})</span></div>
+                  <div>Kode MAK: <span className="text-slate-700 font-mono font-medium">{selectedPack.mak}</span></div>
+                  <div>Volume: <span className="text-slate-700 font-medium">{selectedPack.volume}</span></div>
+                  <div>Spesifikasi: <span className="text-slate-700 font-medium">{selectedPack.spesifikasi}</span></div>
                 </div>
               </div>
             )}
+
+            {selectedPack && (() => {
+              const isPaguExempt = selectedPack.pagu <= 10000000;
+              const isEPurchasing = selectedPack.method && selectedPack.method.toLowerCase().includes('e-purchasing');
+              const isDirectProcurement = selectedPack.method && selectedPack.method.toLowerCase().includes('pengadaan langsung');
+              const isExempt = isPaguExempt || isEPurchasing || isDirectProcurement;
+
+              if (!isExempt) return null;
+
+              return (
+                <div className="mb-6 bg-slate-50 border border-slate-200 rounded-xl p-5 text-xs text-slate-700 space-y-3">
+                  <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
+                    Informasi Pengecualian HPS — Perpres 12/2021
+                  </div>
+                  <p className="leading-relaxed text-slate-600">
+                    Dokumen HPS <strong className="text-slate-800">tidak wajib disusun</strong> untuk paket ini karena memenuhi kriteria pengecualian berikut:
+                  </p>
+                  <ul className="space-y-2 pl-0">
+                    {[
+                      { met: isPaguExempt, label: `Nilai pagu ≤ Rp10 Juta (Pagu: Rp ${selectedPack.pagu?.toLocaleString()})` },
+                      { met: isEPurchasing, label: `Metode E-Purchasing / Katalog Elektronik (${selectedPack.method})` },
+                      { met: isDirectProcurement, label: 'Metode Pengadaan Langsung (bukti pembelian/nota)' }
+                    ].map(({ met, label }, i) => (
+                      <li key={i} className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${met ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
+                        <span className={met ? 'text-slate-700' : 'text-slate-400'}>{label}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="pt-3 border-t border-slate-200 flex items-center gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isHpsExemptSelected}
+                        onChange={(e) => {
+                          setIsHpsExemptSelected(e.target.checked);
+                          setIsSigned(false);
+                          if (e.target.checked) {
+                            setHpsValue('0');
+                            if (activeDocPreview === 'hps') {
+                              setActiveDocPreview('dpp');
+                            }
+                          } else {
+                            setHpsValue(selectedPack.pagu.toString());
+                          }
+                          if (step === 4) setStep(3);
+                        }}
+                        className="rounded border-slate-300 text-slate-800 focus:ring-slate-400 w-4 h-4 cursor-pointer"
+                      />
+                      <span className="text-xs text-slate-700 font-semibold">
+                        Nyatakan paket ini BEBAS HPS (Lewati Surat Penetapan HPS)
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="space-y-4">
               {/* KALKULATOR HPS INTERAKTIF */}
@@ -2000,7 +2732,7 @@ export default function ProcurementPreparation() {
                 <div className="bg-white border border-slate-250 shadow-xl shadow-slate-100/40 rounded-2xl p-6 space-y-4 transition-all duration-300">
                   <div className="flex justify-between items-center border-b border-slate-200/80 pb-3.5">
                     <div className="flex items-start gap-2.5">
-                      <div className="bg-indigo-50 p-2 rounded-xl border border-indigo-100 mt-0.5">
+                      <div className="bg-slate-100 p-2 rounded-xl border border-slate-200 mt-0.5">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
                       </div>
                       <div>
@@ -2022,11 +2754,10 @@ export default function ProcurementPreparation() {
                       const exceeds = totalHps > totalPagu
                       return (
                         <div className="text-right">
-                          <span className={`text-[10px] font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 ${
-                            exceeds 
-                              ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                          <span className={`text-[10px] font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 ${exceeds
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
                               : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          }`}>
+                            }`}>
                             {exceeds ? (
                               <>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-rose-600"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
@@ -2050,6 +2781,7 @@ export default function ProcurementPreparation() {
                         <tr className="text-slate-500 border-b border-slate-200 font-bold uppercase text-[9px] tracking-wider bg-slate-50/50">
                           <th className="py-2.5 px-3 w-8 text-center rounded-l-xl">No</th>
                           <th className="py-2.5 px-2">Nama Barang / Rincian DPA</th>
+                          <th className="py-2.5 px-2">Referensi e-Katalog</th>
                           <th className="py-2.5 px-2 text-center w-12">Qty</th>
                           <th className="py-2.5 px-2 text-right">Pagu DPA (Rp)</th>
                           <th className="py-2.5 px-4 text-right w-44">Harga Satuan HPS (Rp)</th>
@@ -2059,21 +2791,35 @@ export default function ProcurementPreparation() {
                       <tbody>
                         {(() => {
                           const items = getPackageItems(selectedPack)
+                          const activeData = getActiveSurveyData()
                           return items.map((item, idx) => {
                             const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price
                             const totalHpsItem = item.qty * unitHpsPrice
+                            const isOverbudget = unitHpsPrice > item.price
+                            const surveyItem = activeData?.products?.find(p => p.name === item.name)
+
                             return (
-                              <tr key={item.no || idx} className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors">
+                              <tr key={item.no || idx} className={`border-b border-slate-100 hover:bg-slate-50/60 transition-colors ${isOverbudget ? 'bg-rose-50/50' : ''}`}>
                                 <td className="py-3 px-3 text-center text-slate-400 font-bold">{idx + 1}</td>
                                 <td className="py-3 px-2 font-bold text-slate-800">
                                   {item.name}
                                   <span className="text-[10px] text-slate-450 block font-normal mt-0.5">Satuan: {item.unit}</span>
                                 </td>
+                                <td className="py-3 px-2">
+                                  {surveyItem && surveyItem.success && surveyItem.vendor !== 'TIDAK DITEMUKAN' ? (
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="text-[10px] font-bold text-slate-700 truncate max-w-[150px]" title={surveyItem.vendor}>🏪 {surveyItem.vendor}</span>
+                                      <a href={surveyItem.link} target="_blank" rel="noopener noreferrer" className="text-[9px] text-indigo-600 hover:text-indigo-800 underline">Tautan Produk</a>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[9px] text-slate-400 italic bg-slate-100 px-1.5 py-0.5 rounded">Belum disurvei</span>
+                                  )}
+                                </td>
                                 <td className="py-3 px-2 text-center font-bold text-slate-700">{item.qty}</td>
                                 <td className="py-3 px-2 text-right font-mono text-slate-500">Rp {item.price.toLocaleString()}</td>
                                 <td className="py-3 px-4 text-right">
                                   <div className="relative inline-block w-full">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px]">Rp</span>
+                                    <span className={`absolute left-3 top-1/2 -translate-y-1/2 font-bold text-[10px] ${isOverbudget ? 'text-rose-500' : 'text-slate-400'}`}>Rp</span>
                                     <input
                                       type="number"
                                       value={unitHpsPrice}
@@ -2086,9 +2832,10 @@ export default function ProcurementPreparation() {
                                         setIsSigned(false)
                                         if (step === 4) setStep(3)
                                       }}
-                                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl py-1.5 pl-8 pr-3 text-xs font-mono font-bold text-right focus:border-indigo-500 focus:ring-2 focus:ring-indigo-150 outline-none transition-all"
+                                      className={`w-full bg-slate-50 border text-slate-800 rounded-xl py-1.5 pl-8 pr-3 text-xs font-mono font-bold text-right focus:ring-2 outline-none transition-all ${isOverbudget ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200 text-rose-700 bg-rose-50/50' : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-150'}`}
                                     />
                                   </div>
+                                  {isOverbudget && <div className="text-[9px] font-bold text-rose-500 text-right mt-1 animate-pulse">⚠️ Melebihi Pagu</div>}
                                 </td>
                                 <td className="py-3 px-3 text-right font-mono font-bold text-indigo-650">
                                   Rp {totalHpsItem.toLocaleString()}
@@ -2115,14 +2862,14 @@ export default function ProcurementPreparation() {
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-3.5">
                           <span className="text-slate-600 font-semibold">Hasil Kalkulasi HPS:</span>
-                          <span className="text-sm font-extrabold font-mono text-indigo-650 bg-indigo-50/50 border border-indigo-100/50 px-2.5 py-1 rounded-lg">Rp {totalHps.toLocaleString()}</span>
+                          <span className="text-sm font-bold font-mono text-slate-900 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">Rp {totalHps.toLocaleString()}</span>
                           <button
                             type="button"
                             onClick={() => {
                               setHpsValue(totalHps.toString())
                               alert(`✅ Nilai HPS Resmi disetujui sebesar Rp ${totalHps.toLocaleString()} (Hasil kalkulasi survei pasar).`)
                             }}
-                            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 font-bold px-4 py-2 rounded-xl transition-all text-[11px] active:scale-95 shadow-sm flex items-center gap-1"
+                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-semibold px-4 py-2 rounded-xl transition-all text-[11px] active:scale-95 flex items-center gap-1"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-600"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
                             Gunakan Sebagai HPS Resmi
@@ -2134,14 +2881,14 @@ export default function ProcurementPreparation() {
                 </div>
               )}
 
-              
+
               {/* Asisten AI Survei */}
-              <div className="mb-6 bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="mb-6 bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
-                  <h4 className="text-sm font-bold text-indigo-800 flex items-center gap-2"><span>🤖</span> Asisten Survei HPS & Referensi Inaproc</h4>
-                  <p className="text-xs text-slate-600 mt-1 max-w-lg">Gunakan AI untuk mencari referensi harga pasar dari e-Katalog secara otomatis. Bukti URL & Screenshot akan dilampirkan di DPP.</p>
+                  <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">Asisten Survei HPS &amp; Referensi e-Katalog</h4>
+                  <p className="text-xs text-slate-500 mt-1 max-w-lg">Gunakan AI untuk mencari referensi harga pasar dari e-Katalog secara otomatis. Bukti URL &amp; Screenshot akan dilampirkan di DPP.</p>
                 </div>
-                
+
                 {isSurveying && (
                   <div className="mb-4">
                     <div className="flex justify-between text-[10px] font-bold text-emerald-800 mb-1.5 px-1">
@@ -2149,7 +2896,7 @@ export default function ProcurementPreparation() {
                       <span className="shrink-0">{surveyProgressPercent}%</span>
                     </div>
                     <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden shadow-inner">
-                      <div 
+                      <div
                         className="bg-emerald-500 h-full rounded-full transition-all duration-300 ease-out relative"
                         style={{ width: `${surveyProgressPercent}%` }}
                       >
@@ -2158,58 +2905,280 @@ export default function ProcurementPreparation() {
                     </div>
                   </div>
                 )}
-                
-                <button 
-                  onClick={runAiSurvey}
-                  disabled={isSurveying}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2 whitespace-nowrap disabled:opacity-70"
-                >
-                  {isSurveying ? '⏳ Mensimulasikan Pencarian...' : '⚡ Mulai Survei Otomatis'}
-                </button>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full">
+                  <div className="flex-1 space-y-3">
+                    {/* Switch AI */}
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => setUseAiMode(!useAiMode)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${useAiMode ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                      >
+                        <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${useAiMode ? 'translate-x-5' : 'translate-x-1'}`} />
+                      </button>
+                      <span className="text-xs font-medium text-slate-700">
+                        {useAiMode ? 'AI Aktif (Semantic & Fallback)' : 'AI Nonaktif (Exact Match Only)'}
+                      </span>
+                    </div>
+                    {/* Input Multi Lokasi */}
+                    <div>
+                      <input 
+                        type="text"
+                        value={searchLocations}
+                        onChange={(e) => setSearchLocations(e.target.value)}
+                        placeholder="Contoh: Jawa Timur, Probolinggo (opsional)"
+                        className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">Gunakan koma untuk beberapa lokasi. Kosongkan untuk seluruh Indonesia.</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={runAiSurvey}
+                    disabled={isSurveying}
+                    className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold px-4 py-3 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap disabled:opacity-50 h-fit"
+                  >
+                    {isSurveying ? '⏳ Survei Berjalan...' : 'Mulai Survei Otomatis'}
+                  </button>
+                </div>
               </div>
-              
+
               {surveyData && (
-                <div className="mb-6 bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
-                  <div className="text-xs font-bold text-emerald-800 mb-2 flex items-center gap-1"><span>✅</span> Referensi Harga Inaproc Ditemukan (Kategori: {surveyData.category})</div>
-                  <div className="flex gap-3 overflow-x-auto pb-2">
-                    {surveyData.products.map(p => (
-                      <div key={p.id} className="bg-white border border-emerald-100 p-2 rounded-lg min-w-[200px] text-[10px]">
-                        <div className="font-bold text-slate-700 truncate">{p.name}</div>
-                        <div className="text-emerald-600 font-mono font-bold mt-1">Rp {p.price.toLocaleString('id-ID')}</div>
-                        <div className="text-slate-500 mt-1 truncate">{p.vendor}</div>
+                <div className="mb-6 bg-slate-50/50 p-5 rounded-2xl border border-slate-200/80">
+                  <div className="text-xs font-bold text-slate-800 mb-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-slate-900">
+                      <span>📊</span> Referensi Hasil Survei e-Katalog (Kategori: {surveyData.category})
+                    </div>
+                    <div className="flex items-center gap-2 self-start">
+                      {surveyData && surveyData.products.some(p => !p.success || p.vendor === 'TIDAK DITEMUKAN') && (
+                        <button
+                          onClick={handleBatchCustomSearch}
+                          disabled={isSurveying}
+                          className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-[10px] font-bold px-3 py-1 rounded shadow-sm transition-all flex items-center gap-1 active:scale-95"
+                          title="Cari ulang semua barang kosong yang sudah Anda ketikkan kata kunci barunya"
+                        >
+                          🔍 Cari Ulang (Global)
+                        </button>
+                      )}
+                      <button
+                        onClick={captureAllScreenshots}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold px-3 py-1 rounded shadow-sm transition-all flex items-center gap-1 active:scale-95"
+                        title="Ambil tangkapan layar untuk semua produk yang ditemukan"
+                      >
+                        📸 Ambil Semua Screenshot
+                      </button>
+                      <div className="text-[10px] text-slate-500 font-mono font-medium bg-slate-100 px-2 py-0.5 rounded">
+                        Terakhir diupdate: {surveyData.timestamp}
                       </div>
-                    ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-4 overflow-x-auto pb-3 pt-1">
+                    {surveyData.products.map((p, idx) => {
+                      const isFailed = !p.success || p.vendor === 'TIDAK DITEMUKAN';
+                      const keyword = customKeywords[idx] !== undefined ? customKeywords[idx] : p.name;
+                      const isLoading = loadingProductIndex === idx;
+                      const isEditing = expandedEditCardIndex === idx || isFailed;
+
+                      return (
+                        <div 
+                          key={p.id} 
+                          className={`relative flex flex-col justify-between p-4 rounded-xl min-w-[300px] max-w-[300px] transition-all duration-300 border ${
+                            isLoading ? 'animate-pulse opacity-75 border-slate-200 bg-slate-50/50' :
+                            isFailed ? 'border-slate-200 bg-slate-50' :
+                            'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300'
+                          }`}
+                        >
+                          <div>
+                            <div className="font-bold text-slate-800 text-[11px] leading-snug line-clamp-2 min-h-[32px]">
+                              {p.name}
+                            </div>
+                            
+                            <div className="mt-2.5 flex items-center justify-between gap-2">
+                              {isFailed ? (
+                                <span className="flex items-center gap-1 text-[9px] font-semibold text-slate-500 uppercase tracking-wide">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Tidak Ditemukan
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-[9px] font-semibold text-emerald-600 uppercase tracking-wide">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Ditemukan
+                                </span>
+                              )}
+                              {!isFailed && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedEditCardIndex(isEditing ? null : idx)}
+                                  className="text-slate-400 hover:text-indigo-650 font-bold text-[9px] underline transition-colors flex items-center gap-0.5"
+                                  title="Ubah kata kunci pencarian"
+                                >
+                                  ✏️ Ubah
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="mt-3.5 space-y-1">
+                              {isFailed ? (
+                                <div className="text-[10px] text-slate-500 italic bg-rose-50 border border-rose-100/60 p-2 rounded-xl leading-relaxed">
+                                  Barang tidak ditemukan di e-Katalog dengan kata kunci default. Silakan cari ulang dengan kata kunci kustom di bawah.
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="text-indigo-650 font-mono font-extrabold text-sm flex items-baseline gap-0.5">
+                                    <span className="text-[10px] font-bold">Rp</span> {p.price.toLocaleString('id-ID')}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 font-medium truncate flex items-center gap-1">
+                                    <span>🏪</span> <span className="truncate" title={p.vendor}>{p.vendor}</span>
+                                  </div>
+                                  <div className="text-[9px] text-indigo-600 hover:text-indigo-700 underline truncate pt-0.5">
+                                    <a href={p.link} target="_blank" rel="noopener noreferrer">🌐 Lihat di e-Katalog</a>
+                                  </div>
+                                  
+                                  <div className="mt-2 pt-2 border-t border-slate-100">
+                                    {screenshotStatus[p.id] === 'done' ? (
+                                      <div className="text-[9px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 w-fit px-2 py-1 rounded">
+                                        ✅ Screenshot Tersimpan
+                                      </div>
+                                    ) : screenshotStatus[p.id] === 'loading' ? (
+                                      <div className="text-[9px] font-bold text-slate-500 flex items-center gap-1">
+                                        ⏳ Menyimpan...
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => captureScreenshot(p)}
+                                        className="text-[9px] font-bold text-white bg-slate-800 hover:bg-slate-900 px-2.5 py-1.5 rounded transition-colors flex items-center gap-1 w-full justify-center"
+                                      >
+                                        📸 Sepakati & Ambil Screenshot
+                                      </button>
+                                    )}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {isEditing && (
+                            <div className="mt-4 pt-3 border-t border-dashed border-slate-200 space-y-2">
+                              <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Kata Kunci Pencarian</label>
+                              <div className="flex gap-1.5">
+                                <input
+                                  type="text"
+                                  value={keyword}
+                                  onChange={(e) => setCustomKeywords({ ...customKeywords, [idx]: e.target.value })}
+                                  placeholder="Contoh: Laptop i5"
+                                  className="flex-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                  disabled={isLoading}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => runSingleItemSurvey(idx, keyword)}
+                                  disabled={isLoading || !keyword.trim()}
+                                  className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 text-white font-semibold px-3 py-1.5 rounded-lg text-[9px] transition-all flex items-center gap-1 active:scale-95 shrink-0"
+                                >
+                                  {isLoading ? '...' : 'Cari'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* NEW: Justifikasi & Pembanding (only if not failed) */}
+                          {!isFailed && (
+                            <div className="mt-4 pt-3 border-t border-dashed border-slate-200 space-y-3">
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">📝 Justifikasi Pemilihan</label>
+                                  <button
+                                    type="button"
+                                    onClick={() => enhanceJustificationWithAI(p.id, justifications[p.id] || '')}
+                                    disabled={isEnhancingJustification[p.id]}
+                                    className="text-[9px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded border border-indigo-200 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                    title="Gunakan AI untuk merapikan kalimat ini menjadi bahasa formal PBJ"
+                                  >
+                                    {isEnhancingJustification[p.id] ? '✨ Merapikan...' : '✨ Rapikan Bahasa (AI)'}
+                                  </button>
+                                </div>
+                                <textarea
+                                  value={justifications[p.id] || ''}
+                                  onChange={(e) => setJustifications({...justifications, [p.id]: e.target.value})}
+                                  placeholder="Ketik alasan singkat, misal: 'barang rusak bisa dikembalikan' lalu klik tombol AI di atas..."
+                                  className={`w-full px-2.5 py-1.5 bg-slate-50 border rounded-lg text-[10px] text-slate-800 focus:outline-none focus:ring-1 min-h-[40px] resize-y transition-colors ${isEnhancingJustification[p.id] ? 'border-indigo-400 ring-1 ring-indigo-400 bg-indigo-50/30' : 'border-slate-200 focus:ring-indigo-500'}`}
+                                  disabled={isEnhancingJustification[p.id]}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">⚖️ Produk Pembanding</label>
+                                <div className="space-y-1.5 p-2 bg-slate-50/80 rounded-lg border border-slate-200/60">
+                                  <input 
+                                    type="text" placeholder="Nama Produk Pembanding" 
+                                    value={(comparisons[p.id] && comparisons[p.id].name) || ''}
+                                    onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), name: e.target.value}})}
+                                    className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-[9px]"
+                                  />
+                                  <input 
+                                    type="text" placeholder="Penyedia Pembanding" 
+                                    value={(comparisons[p.id] && comparisons[p.id].vendor) || ''}
+                                    onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), vendor: e.target.value}})}
+                                    className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-[9px]"
+                                  />
+                                  <div className="flex gap-1.5">
+                                    <select 
+                                      value={(comparisons[p.id] && comparisons[p.id].status) || 'Luar Katalog'}
+                                      onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), status: e.target.value}})}
+                                      className="flex-1 px-2 py-1 bg-white border border-slate-200 rounded text-[9px] text-slate-700"
+                                    >
+                                      <option value="Luar Katalog">Luar Katalog</option>
+                                      <option value="Dalam Katalog">Dalam Katalog</option>
+                                    </select>
+                                    <input 
+                                      type="number" placeholder="Harga (Rp)" 
+                                      value={(comparisons[p.id] && comparisons[p.id].price) || ''}
+                                      onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), price: e.target.value}})}
+                                      className="w-20 px-2 py-1 bg-white border border-slate-200 rounded text-[9px]"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Nilai HPS Disetujui Resmi (Rp)</label>
-                <input 
-                  type="number" 
-                  className="glass-input text-slate-850 font-bold text-sm bg-slate-50" 
-                  value={hpsValue} 
+                <label className="block text-[10px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Nilai HPS Disetujui Resmi (Rp)</label>
+                <input
+                  type={isHpsExemptSelected ? "text" : "number"}
+                  className={`glass-input text-slate-850 font-bold text-sm ${isHpsExemptSelected ? 'bg-amber-50/70 border-amber-300 text-amber-950 font-extrabold shadow-sm' : 'bg-slate-50'}`}
+                  value={isHpsExemptSelected ? "Dikecualikan (Bebas HPS)" : hpsValue}
                   onChange={(e) => {
+                    if (isHpsExemptSelected) return;
                     setHpsValue(e.target.value)
                     setIsSigned(false) // Reset signature if value changes
                     if (step === 4) setStep(3)
-                  }} 
-                  placeholder="Masukkan nilai HPS..."
-                  disabled={isSigned}
+                  }}
+                  placeholder={isHpsExemptSelected ? "Dikecualikan (Bebas HPS)" : "Masukkan nilai HPS..."}
+                  disabled={isSigned || isHpsExemptSelected}
                 />
-                {hpsValue && (
+                {hpsValue && !isHpsExemptSelected && (
                   <div className="text-xs text-emerald-600 mt-1.5 font-bold italic">
                     Terbilang: "{terbilang(hpsValue)} Rupiah"
+                  </div>
+                )}
+                {isHpsExemptSelected && (
+                  <div className="text-xs text-amber-600 font-bold mt-1.5 flex items-center gap-1">
+                    <span>💡</span> Paket dibebaskan dari kewajiban penyusunan HPS berdasarkan Perpres 12/2021.
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Formulir Spesifikasi Teknis Pekerjaan (KAK)</label>
-                <textarea 
-                  rows="4" 
-                  className="glass-input text-xs font-mono" 
-                  value={techSpecs} 
+                <label className="block text-[10px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Formulir Spesifikasi Teknis Pekerjaan (KAK)</label>
+                <textarea
+                  rows="4"
+                  className="glass-input text-xs font-mono"
+                  value={techSpecs}
                   onChange={(e) => {
                     setTechSpecs(e.target.value)
                     setIsSigned(false) // Reset signature if value changes
@@ -2221,59 +3190,61 @@ export default function ProcurementPreparation() {
               </div>
 
               {/* Document Generation Action Center */}
-              {hpsValue && (
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200/80 space-y-4 shadow-sm">
-                  <h3 className="text-sm font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-2">📄 Dokumen Persiapan & Penetapan</h3>
-                  <p className="text-xs text-slate-500 leading-relaxed">Sistem mendeteksi formulir HPS & Spesifikasi Teknis siap diproses. Anda dapat meninjau lembar dokumen resmi Anda di bawah ini sebelum melakukan penandatanganan elektronik:</p>
-                  
+              {(hpsValue || isHpsExemptSelected) && (
+                <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 space-y-4">
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Dokumen Persiapan &amp; Penetapan</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">Tinjau dokumen resmi Anda di bawah sebelum melakukan penandatanganan elektronik.</p>
+
                   <div className="flex flex-wrap gap-4">
-                    <button 
-                      onClick={() => setActiveDocPreview('hps')}
-                      className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-sm hover:border-slate-300 px-5 py-3 rounded-xl text-xs font-bold flex items-center gap-2 transition-all duration-200"
-                    >
-                      <span>📜</span> Lihat Surat Penetapan HPS
-                    </button>
-                    <button 
+                    {!isHpsExemptSelected && (
+                      <button
+                        onClick={() => setActiveDocPreview('hps')}
+                        className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 px-5 py-3 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all"
+                      >
+                        Lihat Surat Penetapan HPS
+                      </button>
+                    )}
+                    <button
                       onClick={() => setActiveDocPreview('dpp')}
-                      className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-sm hover:border-slate-300 px-5 py-3 rounded-xl text-xs font-bold flex items-center gap-2 transition-all duration-200"
+                      className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 px-5 py-3 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all"
                     >
-                      <span>📁</span> Lihat Dokumen DPP PPK
+                      Lihat Dokumen DPP PPK
                     </button>
                   </div>
 
                   <div className="border-t border-slate-200/60 pt-4 mt-2">
                     {isSigned ? (
-                      <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 p-5 rounded-2xl animate-fade-in">
+                      <div className="flex items-center justify-between bg-white border border-slate-200 p-5 rounded-xl animate-fade-in">
                         <div className="flex items-center gap-3">
-                          <span className="text-2xl">🛡️</span>
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                           <div>
-                            <div className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Dokumen Disahkan secara Elektronik (TTE)</div>
-                            <div className="text-[10px] text-slate-600 font-mono mt-0.5">Penandatangan: {currentUser.name} (NIP: {currentUser.nip})</div>
+                            <div className="text-xs font-semibold text-slate-800">Dokumen Disahkan secara Elektronik (TTE)</div>
+                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{currentUser.name} · NIP {currentUser.nip}</div>
                           </div>
                         </div>
-                        <button 
+                        <button
                           onClick={() => {
                             setIsSigned(false)
                             setStep(3)
                           }}
-                          className="text-xs text-rose-600 hover:text-rose-700 font-bold transition-colors"
+                          className="text-xs text-slate-400 hover:text-rose-600 font-semibold transition-colors"
                         >
                           Batalkan TTE
                         </button>
                       </div>
                     ) : (
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-indigo-50/50 border border-indigo-100 p-5 rounded-2xl">
-                        <div className="text-xs text-slate-600 max-w-md leading-relaxed">
-                          Sahkan dokumen di atas secara hukum menggunakan simulasi **Tanda Tangan Elektronik (TTE)** Pejabat Pembuat Komitmen (PPK) untuk mengirim berkas.
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-50 border border-slate-200 p-5 rounded-xl">
+                        <div className="text-xs text-slate-500 max-w-md leading-relaxed">
+                          Sahkan dokumen menggunakan simulasi Tanda Tangan Elektronik (TTE) Pejabat Pembuat Komitmen untuk mengirim berkas.
                         </div>
-                        <button 
+                        <button
                           onClick={() => {
                             setIsSigned(true)
                             setStep(4)
                           }}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-3 rounded-xl shadow-md shadow-emerald-600/10 flex items-center gap-2 transition-all duration-200"
+                          className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold px-5 py-3 rounded-xl flex items-center gap-2 transition-all"
                         >
-                          ✍️ Sahkan Dokumen (TTE)
+                          Sahkan Dokumen (TTE)
                         </button>
                       </div>
                     )}
@@ -2285,11 +3256,11 @@ export default function ProcurementPreparation() {
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-4 pt-4">
-            <button className="btn-secondary">Simpan Draft</button>
-            <button 
-              className={`btn-primary ${step < 4 || !isSigned ? 'opacity-50 cursor-not-allowed' : ''}`}
+            <button className="btn-secondary text-sm">Simpan Draft</button>
+            <button
+              className={`btn-primary text-sm ${step < 4 || !isSigned ? 'opacity-50 cursor-not-allowed' : ''}`}
               onClick={() => {
-                if(step >= 4 && isSigned) {
+                if (step >= 4 && isSigned) {
                   const hasUnverified = dpaAccounts.some(acc => {
                     return !acc.verified && (acc.pagu_method === 'fallback_max' || acc.ocr_engine === 'tesseract');
                   });
@@ -2300,22 +3271,36 @@ export default function ProcurementPreparation() {
                   }
 
                   setStatus('Terkirim ke PP');
+                  const finalizedItems = getPackageItems(selectedPack).map((item, idx) => {
+                    const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
+                    const surveyProduct = surveyData?.products?.[idx];
+                    return {
+                      ...item,
+                      name: surveyProduct?.name || item.name,
+                      price: unitHpsPrice
+                    };
+                  });
+                  
                   const submittedData = {
                     packName: selectedPack?.packName,
                     pagu: selectedPack?.pagu,
                     mak: selectedPack?.mak,
                     volume: selectedPack?.volume,
                     spesifikasi: selectedPack?.spesifikasi,
-                    hpsValue: hpsValue,
+                    hpsValue: isHpsExemptSelected ? 'Dikecualikan (Bebas HPS)' : hpsValue,
                     techSpecs: techSpecs,
                     dpaName: dpaName,
+                    items: finalizedItems,
                     senderName: currentUser.name,
                     senderNip: currentUser.nip,
                     senderDepartment: currentUser.department,
                     sentDate: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
                   }
                   localStorage.setItem('pbj_submitted_package', JSON.stringify(submittedData));
-                  alert(`Sukses! Dokumen Persiapan Pengadaan (DPP) beserta Surat Keputusan Penetapan HPS Pekerjaan "${selectedPack?.packName}" telah berhasil dikirimkan secara resmi ke Pejabat Pengadaan (PP) daerah.`);
+                  const successMsg = isHpsExemptSelected
+                    ? `Sukses! Dokumen Persiapan Pengadaan (DPP) Pekerjaan "${selectedPack?.packName}" telah berhasil dikirimkan secara resmi ke Pejabat Pengadaan (PP) daerah.`
+                    : `Sukses! Dokumen Persiapan Pengadaan (DPP) beserta Surat Keputusan Penetapan HPS Pekerjaan "${selectedPack?.packName}" telah berhasil dikirimkan secara resmi ke Pejabat Pengadaan (PP) daerah.`;
+                  alert(successMsg);
                 }
               }}
               disabled={step < 4 || !isSigned}
@@ -2325,51 +3310,123 @@ export default function ProcurementPreparation() {
           </div>
 
         </div>
-      </div>
 
       {/* DOCUMENT PREVIEW MODAL (A4 PAPER SIMULATION & HIGH-FIDELITY PRINT-READY VIEW) */}
-      {activeDocPreview && selectedPack && (
-        <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.45)' }} className="fixed inset-0 backdrop-blur-md z-50 flex justify-center overflow-y-auto p-4 animate-fade-in print:p-0 print:bg-white">
-          
-          {/* Style Injector to override print layout strictly for A4 format */}
-          <style dangerouslySetInnerHTML={{__html: `
+      {activeDocPreview && selectedPack && createPortal(
+        <div id="print-modal-parent" style={{ backgroundColor: 'rgba(15, 23, 42, 0.95)' }} className="fixed inset-0 backdrop-blur-md z-50 flex flex-col items-center overflow-y-auto p-4 animate-fade-in print:p-0 print:bg-white">
+
+          {/* Style Injector to override print layout strictly for A4/F4 format */}
+          <style dangerouslySetInnerHTML={{
+            __html: `
             @media print {
-              body * {
+              html, body {
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                height: auto !important;
+                overflow: visible !important;
+              }
+              
+              body > #root {
+                display: none !important;
+              }
+              
+              body > #print-modal-parent {
+                display: block !important;
+                position: static !important;
+                width: 100% !important;
+                height: auto !important;
+                overflow: visible !important;
+                background: transparent !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+                backdrop-filter: none !important;
+              }
+              
+              .print\\:hidden {
+                display: none !important;
                 visibility: hidden !important;
               }
-              #print-sheet, #print-sheet * {
-                visibility: visible !important;
-              }
+              
               #print-sheet {
-                position: absolute !important;
+                display: block !important;
+                position: relative !important;
                 left: 0 !important;
                 top: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+                min-height: auto !important;
+                background: white !important;
               }
+              
+              /* Table formatting & pagination breaks */
+              table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                page-break-inside: auto !important;
+              }
+              tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+              td, th {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+              
+              /* Prevent orphan headers */
+              h1, h2, h3, h4, h5, h6 {
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+              }
+              
+              /* Avoid splitting signature blocks and table rows */
+              .signature-section, tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+              
+              .break-before-page {
+                page-break-before: always !important;
+                break-before: page !important;
+              }
+              
+              /* Hide scrollbars during print */
+              ::-webkit-scrollbar {
+                display: none !important;
+              }
+              
               @page {
                 size: ${docSettings.paperSize === 'F4' ? '215mm 330mm' : 'A4'} portrait; 
                 margin: ${docSettings.marginTop}mm ${docSettings.marginRight}mm ${docSettings.marginBottom}mm ${docSettings.marginLeft}mm !important; 
               }
             }
           `}} />
-          <div className="fixed top-4 left-4 right-4 flex justify-between items-center z-50 bg-white/95 border border-slate-200/90 px-6 py-3.5 rounded-2xl shadow-2xl backdrop-blur-md max-w-4xl mx-auto print:hidden transition-all duration-300">
+          <div className="fixed top-4 left-4 right-4 flex justify-between items-center z-50 bg-white/95 border border-slate-200/90 px-6 py-3.5 rounded-2xl shadow-2xl backdrop-blur-md max-w-7xl mx-auto print:hidden transition-all duration-300">
             <div className="text-slate-800 text-[11px] font-bold uppercase tracking-wider flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-indigo-650 animate-pulse"></span>
+              <span className="w-2 h-2 rounded-full bg-slate-800 animate-pulse"></span>
               Pratinjau Dokumen Resmi {activeDocPreview === 'hps' ? 'Surat Penetapan HPS' : 'Dokumen Persiapan Pengadaan (DPP)'}
             </div>
             <div className="flex items-center gap-3">
-              <button 
+              <button
                 onClick={() => window.print()}
                 className="bg-emerald-600 hover:bg-emerald-750 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-md shadow-emerald-600/10"
               >
                 🖨️ Cetak / Unduh PDF
               </button>
-              <button 
+              <button
                 onClick={handleExportWord}
-                className="bg-blue-600 hover:bg-blue-750 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-md shadow-blue-600/10"
+                className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors"
               >
                 📥 Export Word (.doc)
               </button>
-              <button 
+              <button
                 onClick={() => setActiveDocPreview(null)}
                 className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-4 py-2 rounded-xl transition-all border border-slate-200 flex items-center gap-1"
               >
@@ -2377,12 +3434,12 @@ export default function ProcurementPreparation() {
                 Tutup
               </button>
             </div>
-            </div>
+          </div>
 
           {/* White Paper A4 Sheet */}
-          <div 
-            id="print-sheet" 
-            className="bg-white text-slate-900 w-full shadow-2xl rounded-sm my-20 font-serif leading-relaxed text-[12px] border border-slate-200 relative print:my-0 print:border-none print:shadow-none mx-auto"
+          <div
+            id="print-sheet"
+            className="bg-white text-slate-900 w-full shadow-2xl rounded-sm my-20 border border-slate-200 relative print:my-0 print:border-none print:shadow-none mx-auto flex-none"
             style={{
               width: docSettings.paperSize === 'F4' ? '215mm' : '210mm',
               minHeight: docSettings.paperSize === 'F4' ? '330mm' : '297mm',
@@ -2390,6 +3447,9 @@ export default function ProcurementPreparation() {
               paddingRight: `${docSettings.marginRight}mm`,
               paddingBottom: `${docSettings.marginBottom}mm`,
               paddingLeft: `${docSettings.marginLeft}mm`,
+              fontFamily: "'Times New Roman', Times, serif",
+              fontSize: '12pt',
+              lineHeight: '1.5'
             }}
           >
             <div>
@@ -2400,12 +3460,12 @@ export default function ProcurementPreparation() {
                     <tbody>
                       <tr>
                         <td style={{ width: '15%', verticalAlign: 'middle', textAlign: 'center', paddingBottom: '10px' }}>
-                           <img src="https://upload.wikimedia.org/wikipedia/commons/2/29/Garuda_Pancasila_Coat_of_Arms_of_Indonesia.svg" alt="Garuda" style={{ width: '70px', height: 'auto', display: 'inline-block' }} />
+                          <img src="https://upload.wikimedia.org/wikipedia/commons/2/29/Garuda_Pancasila_Coat_of_Arms_of_Indonesia.svg" alt="Garuda" style={{ width: '70px', height: 'auto', display: 'inline-block' }} />
                         </td>
                         <td style={{ width: '85%', textAlign: 'center', verticalAlign: 'middle', paddingBottom: '10px' }}>
-                           <div style={{ fontWeight: 'bold', fontSize: '14pt', textTransform: 'uppercase', lineHeight: '1.2' }}>{docSettings.namaPemda}</div>
-                           <div style={{ fontWeight: 'bold', fontSize: '18pt', textTransform: 'uppercase', lineHeight: '1.2' }}>{docSettings.namaInstansi}</div>
-                           <div style={{ fontSize: '10pt', marginTop: '4px', fontStyle: 'italic' }}>{docSettings.alamatLengkap}</div>
+                          <div style={{ fontWeight: 'bold', fontSize: '14pt', textTransform: 'uppercase', lineHeight: '1.2' }}>{docSettings.namaPemda}</div>
+                          <div style={{ fontWeight: 'bold', fontSize: '18pt', textTransform: 'uppercase', lineHeight: '1.2' }}>{docSettings.namaInstansi}</div>
+                          <div style={{ fontSize: '10pt', marginTop: '4px', fontStyle: 'italic' }}>{docSettings.alamatLengkap}</div>
                         </td>
                       </tr>
                     </tbody>
@@ -2418,17 +3478,17 @@ export default function ProcurementPreparation() {
               {activeDocPreview === 'hps' ? (
                 // SURAT PENETAPAN HPS
                 <div className="space-y-4">
-                  <div className="text-center font-bold uppercase underline text-[13px] tracking-wide mt-2">
+                  <div className="text-center font-bold uppercase underline text-[13pt] tracking-wide mt-2">
                     Keputusan Pejabat Pembuat Komitmen
                   </div>
-                  <div className="text-center font-bold text-[10px] font-sans -mt-3 text-slate-700">
+                  <div className="text-center font-bold text-[10pt] font-sans -mt-3 text-slate-700">
                     NOMOR: 027 / 142 / PPK / 437.82 / {new Date().getFullYear()}
                   </div>
-                  <div className="text-center font-bold uppercase text-[11px] tracking-wider -mt-1">
-                    TENTANG<br/>
+                  <div className="text-center font-bold uppercase text-[12pt] tracking-wider -mt-1">
+                    TENTANG<br />
                     PENETAPAN HARGA PERKIRAAN SENDIRI (HPS)
                   </div>
-                  <div className="text-center font-bold uppercase text-[10px] text-slate-800">
+                  <div className="text-center font-bold uppercase text-[11pt] text-slate-800">
                     PEKERJAAN: "{selectedPack.packName}"
                   </div>
 
@@ -2440,7 +3500,7 @@ export default function ProcurementPreparation() {
                       Mengingat Dokumen Pelaksanaan Anggaran (DPA) Nomor: DPA/A.1/1.02.01/2026 yang bersumber dari Anggaran Pendapatan dan Belanja Daerah (APBD) Kabupaten Probolinggo Tahun Anggaran {new Date().getFullYear()}.
                     </p>
                     <div className="text-center font-bold uppercase py-2">MEMUTUSKAN:</div>
-                    
+
                     <div className="pl-6 relative">
                       <div className="absolute left-0 top-0 font-bold">KEDUA:</div>
                       <p className="text-justify pl-1">
@@ -2450,7 +3510,7 @@ export default function ProcurementPreparation() {
 
                     {/* Table HPS */}
                     <div className="pt-2">
-                      <table className="w-full border-collapse border border-slate-900 text-[11px]">
+                      <table className="w-full border-collapse border border-slate-900 text-[11pt]">
                         <thead>
                           <tr className="bg-slate-100 font-bold text-center">
                             <td className="border border-slate-900 p-2 w-8">No</td>
@@ -2462,12 +3522,14 @@ export default function ProcurementPreparation() {
                           </tr>
                         </thead>
                         <tbody>
-                          {getPackageItems(selectedPack).map((item) => {
+                          {getPackageItems(selectedPack).map((item, idx) => {
                             const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
+                            const surveyProduct = surveyData?.products?.[idx];
+                            const displayName = surveyProduct?.name || item.name;
                             return (
                               <tr key={item.no}>
                                 <td className="border border-slate-900 p-2 text-center">{item.no}</td>
-                                <td className="border border-slate-900 p-2 text-left font-medium">{item.name}</td>
+                                <td className="border border-slate-900 p-2 text-left font-medium">{displayName}</td>
                                 <td className="border border-slate-900 p-2 text-center font-bold">{item.qty}</td>
                                 <td className="border border-slate-900 p-2 text-center">{item.unit}</td>
                                 <td className="border border-slate-900 p-2 text-right font-mono">Rp {unitHpsPrice.toLocaleString()}</td>
@@ -2495,12 +3557,12 @@ export default function ProcurementPreparation() {
               ) : (
                 // DOKUMEN PERSIAPAN PENGADAAN (DPP)
                 <div className="space-y-4">
-                  <div className="text-center font-bold uppercase text-[14px] tracking-wide mt-2">
-                    DOKUMEN PERSIAPAN<br/>E-PURCHASING
+                  <div className="text-center font-bold uppercase text-[14pt] tracking-wide mt-2">
+                    DOKUMEN PERSIAPAN<br />E-PURCHASING
                   </div>
-                  
+
                   <div className="pt-4 space-y-3">
-                    <table className="w-full text-[11px] mb-4">
+                    <table className="w-full text-[11pt] mb-4">
                       <tbody>
                         <tr><td className="w-48 py-1 font-semibold">Perangkat Daerah</td><td>: {currentUser.department}</td></tr>
                         <tr><td className="py-1 font-semibold">Program</td><td>: Program Penunjang Urusan Pemerintahan Daerah</td></tr>
@@ -2522,12 +3584,12 @@ export default function ProcurementPreparation() {
                       </tbody>
                     </table>
 
-                    <div className="font-bold text-[12px] uppercase">I. Spesifikasi Teknis</div>
-                    <p className="text-justify text-[11px]">
+                    <div className="font-bold text-[12pt] uppercase">I. Spesifikasi Teknis</div>
+                    <p className="text-justify">
                       Penyusunan spesifikasi teknis telah menguraikan kesesuaian kebutuhan, karakteristik ukuran, bahan, kinerja, standar mutu, pengemasan, layanan pengiriman, jenis, dan kuantitas barang. Spesifikasi teknis pengadaan adalah sebagai berikut:
                     </p>
-                    
-                    <div className="pl-4 space-y-2 text-[11px]">
+
+                    <div className="pl-4 space-y-2 text-[11pt]">
                       <div className="font-bold">a. Spesifikasi Jenis, Jumlah, dan Mutu Barang</div>
                       <table className="w-full border-collapse border border-slate-900 mb-2">
                         <thead>
@@ -2540,25 +3602,29 @@ export default function ProcurementPreparation() {
                           </tr>
                         </thead>
                         <tbody>
-                          {getPackageItems(selectedPack).map((item, idx) => (
+                          {getPackageItems(selectedPack).map((item, idx) => {
+                            const surveyProduct = surveyData?.products?.[idx];
+                            const displayName = surveyProduct?.name || item.name;
+                            return (
                             <tr key={item.no}>
                               <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
-                              <td className="border border-slate-900 p-1">{item.name}</td>
+                              <td className="border border-slate-900 p-1">{displayName}</td>
                               <td className="border border-slate-900 p-1">Sesuai Kebutuhan DPA</td>
                               <td className="border border-slate-900 p-1 text-center">{item.qty}</td>
                               <td className="border border-slate-900 p-1 text-center">{item.unit}</td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
 
                       <div className="font-bold mt-2">b. Justifikasi Teknis Dalam Penggunaan Merek</div>
                       <p className="text-justify">
-                        {getPacketCategory(selectedPack.packName) === 'Modal' 
-                          ? 'Mengingat spesifikasi yang dibutuhkan berteknologi tinggi dan memerlukan jaminan purna jual, maka ditetapkan standar merek pabrikan yang memiliki Service Center resmi di sekitar lokasi dinas.' 
+                        {getPacketCategory(selectedPack.packName) === 'Modal'
+                          ? 'Mengingat spesifikasi yang dibutuhkan berteknologi tinggi dan memerlukan jaminan purna jual, maka ditetapkan standar merek pabrikan yang memiliki Service Center resmi di sekitar lokasi dinas.'
                           : getPacketCategory(selectedPack.packName) === 'Konsolidasi'
-                          ? 'Pengadaan merujuk pada penetapan merek dan spesifikasi hasil konsolidasi terpusat Katalog Sektoral sesuai Keputusan UKPBJ.'
-                          : 'Tidak mensyaratkan merek tertentu dan mengutamakan persaingan sehat sesuai spesifikasi teknis yang dibutuhkan.'}
+                            ? 'Pengadaan merujuk pada penetapan merek dan spesifikasi hasil konsolidasi terpusat Katalog Sektoral sesuai Keputusan UKPBJ.'
+                            : 'Tidak mensyaratkan merek tertentu dan mengutamakan persaingan sehat sesuai spesifikasi teknis yang dibutuhkan.'}
                       </p>
 
                       <div className="font-bold mt-2">c. Spesifikasi Waktu</div>
@@ -2577,65 +3643,83 @@ export default function ProcurementPreparation() {
                       </ul>
                     </div>
 
-                    <div className="font-bold text-[12px] uppercase mt-4">II. Prioritas Penggunaan Produk Dalam Negeri</div>
-                    <p className="text-justify text-[11px]">
+                    <div className="font-bold text-[12pt] uppercase mt-4">II. Prioritas Penggunaan Produk Dalam Negeri</div>
+                    <p className="text-justify">
                       Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah, PPK memprioritaskan pemilihan produk dalam negeri pada Katalog Elektronik yang memiliki label Produk Dalam Negeri (PDN) atau memiliki sertifikat TKDN.
                     </p>
 
-                    <div className="font-bold text-[12px] uppercase mt-4">III. Prioritas Penggunaan Produk dari Usaha Kecil</div>
-                    <p className="text-justify text-[11px]">
+                    <div className="font-bold text-[12pt] uppercase mt-4">III. Prioritas Penggunaan Produk dari Usaha Kecil</div>
+                    <p className="text-justify">
                       Mengingat pagu paket pengadaan ini bernilai di bawah Rp15.000.000.000,00 maka pengadaan diprioritaskan kepada Penyedia dengan Kualifikasi Usaha Kecil atau Koperasi di wilayah lokal.
                     </p>
 
-                    <div className="font-bold text-[12px] uppercase mt-4">IV. Pengumpulan Referensi Harga</div>
-                    <p className="text-justify text-[11px]">
+                    <div className="font-bold text-[12pt] uppercase mt-4">IV. Pengumpulan Referensi Harga</div>
+                    <p className="text-justify">
                       PPK telah mempersiapkan referensi harga sebagai dasar pelaksanaan negosiasi yang diambil dari Katalog Elektronik, Harga Pasar setempat, dan/atau Standar Harga Satuan.
                     </p>
 
-                    <div className="pl-4 space-y-2 text-[11px]">
+                    <div className="pl-4 space-y-2 text-[11pt]">
                       <div className="font-bold">a. Informasi Katalog Elektronik Inaproc</div>
-                      {surveyData ? (
-                        <table className="w-full border-collapse border border-slate-900 mb-2">
-                          <thead>
-                            <tr className="bg-slate-100 font-bold text-center">
-                              <td className="border border-slate-900 p-1 w-8">No</td>
-                              <td className="border border-slate-900 p-1">Nama Barang</td>
-                              <td className="border border-slate-900 p-1">Penyedia Katalog</td>
-                              <td className="border border-slate-900 p-1">Harga Katalog</td>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {surveyData.products.map((p, idx) => (
-                              <tr key={p.id}>
-                                <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
-                                <td className="border border-slate-900 p-1 text-blue-700 underline">{p.name}</td>
-                                <td className="border border-slate-900 p-1">{p.vendor}</td>
-                                <td className="border border-slate-900 p-1 text-right">Rp {p.price.toLocaleString('id-ID')}</td>
+                      {getActiveSurveyData() ? (() => {
+                        const foundProducts = getActiveSurveyData().products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN');
+                        if (foundProducts.length === 0) {
+                          return <p className="italic text-slate-600 my-1 pb-1 text-[11pt]">* Seluruh item barang tidak ditemukan di e-Katalog LKPP. Referensi e-Katalog tidak terlampir.</p>
+                        }
+                        return (
+                          <table className="w-full border-collapse border border-slate-900 mb-2 text-[11pt]">
+                            <thead>
+                              <tr className="bg-slate-100 font-bold text-center">
+                                <td className="border border-slate-900 p-1 w-8">No</td>
+                                <td className="border border-slate-900 p-1">Nama Barang</td>
+                                <td className="border border-slate-900 p-1">Penyedia Katalog</td>
+                                <td className="border border-slate-900 p-1">Harga Katalog</td>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      ) : (
+                            </thead>
+                            <tbody>
+                              {foundProducts.map((p, idx) => (
+                                <tr key={p.id}>
+                                  <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
+                                  <td className="border border-slate-900 p-1 text-blue-700 underline">
+                                    <a href={p.link} target="_blank" rel="noopener noreferrer" className="hover:text-blue-900">{p.name}</a>
+                                  </td>
+                                  <td className="border border-slate-900 p-1">{p.vendor}</td>
+                                  <td className="border border-slate-900 p-1 text-right">Rp {p.price.toLocaleString('id-ID')}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        );
+                      })() : (
                         <p className="italic text-slate-500">Silakan lakukan Survei Pasar Otomatis pada panel PPK untuk memunculkan data e-Katalog.</p>
                       )}
 
                       <div className="font-bold mt-2">b. Informasi Harga Pasar / Standar Harga Satuan (Estimasi)</div>
-                      <p className="text-justify text-[11px] mb-2">Berdasarkan hasil kalkulasi Harga Perkiraan Sendiri (HPS) bernilai total <b>Rp {parseInt(hpsValue || 0).toLocaleString('id-ID')}</b>, dengan rincian per item sebagai berikut:</p>
-                      <table className="w-full border-collapse border border-slate-900 mb-2">
+                      {isHpsExemptSelected ? (
+                        <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', padding: '10px', borderRadius: '6px', fontSize: '11pt', textAlign: 'justify', lineHeight: '1.5', color: '#78350f', marginBottom: '8px' }}>
+                          <strong>📢 PENYUSUNAN HPS DIKECUALIKAN (BEBAS HPS)</strong><br />
+                          Berdasarkan <strong>Konsolidasi Perpres PBJ (Peraturan Presiden Nomor 16 Tahun 2018 tentang Pengadaan Barang/Jasa Pemerintah sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021) Pasal 26</strong>, dokumen Harga Perkiraan Sendiri (HPS) tidak wajib disusun/dibuat oleh Pejabat Pembuat Komitmen (PPK) untuk paket pengadaan yang bernilai paling banyak Rp10.000.000,00, Pengadaan Langsung yang menggunakan bukti pembelian (kuitansi/nota belanja), atau pengadaan melalui metode E-Purchasing (Katalog Elektronik). Oleh karena itu, estimasi harga didasarkan pada harga pasar riil atau harga satuan acuan belanja (DPA/SHS) tanpa menetapkan Keputusan Penetapan HPS formal. Rincian estimasi harga satuan acuan belanja adalah sebagai berikut:
+                        </div>
+                      ) : (
+                        <p className="text-justify mb-2">Berdasarkan hasil kalkulasi Harga Perkiraan Sendiri (HPS) bernilai total <b>Rp {parseInt(hpsValue || 0).toLocaleString('id-ID')}</b>, dengan rincian per item sebagai berikut:</p>
+                      )}
+                      <table className="w-full border-collapse border border-slate-900 mb-2 text-[11pt]">
                         <thead>
                           <tr className="bg-slate-100 font-bold text-center">
                             <td className="border border-slate-900 p-1 w-8">No</td>
                             <td className="border border-slate-900 p-1">Uraian Barang</td>
-                            <td className="border border-slate-900 p-1 w-20">Harga HPS/SHS</td>
+                            <td className="border border-slate-900 p-1 w-20">{isHpsExemptSelected ? 'Harga Satuan Acuan (Rp)' : 'Harga HPS/SHS'}</td>
                           </tr>
                         </thead>
                         <tbody>
                           {getPackageItems(selectedPack).map((item, idx) => {
                             const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
+                            // ✅ FIX: Use updated name from surveyData if available (e.g. user changed keyword)
+                            const surveyProduct = surveyData?.products?.[idx];
+                            const displayName = surveyProduct?.name || item.name;
                             return (
                               <tr key={item.no}>
                                 <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
-                                <td className="border border-slate-900 p-1">{item.name}</td>
+                                <td className="border border-slate-900 p-1">{displayName}</td>
                                 <td className="border border-slate-900 p-1 text-right">Rp {unitHpsPrice.toLocaleString('id-ID')}</td>
                               </tr>
                             )
@@ -2644,12 +3728,65 @@ export default function ProcurementPreparation() {
                       </table>
                     </div>
 
-                    <div className="font-bold text-[12px] uppercase mt-4">V. Rancangan Kontrak (Surat Pesanan)</div>
-                    <p className="text-justify text-[11px]">Draft/Rancangan Kontrak menggunakan bentuk Surat Pesanan (SP) E-Purchasing yang berlaku standar pada sistem Inaproc LKPP.</p>
+                    {getActiveSurveyData() && (
+                      <div className="pl-4 space-y-2 text-[11pt] mt-4 page-break-inside-avoid">
+                        <div className="font-bold">c. Justifikasi Pemilihan dan Produk Pembanding</div>
+                        {(() => {
+                          const products = getActiveSurveyData().products;
+                          const productsWithData = products.filter(p => 
+                            (justifications[p.id] && justifications[p.id].trim()) || 
+                            (comparisons[p.id] && comparisons[p.id].name)
+                          );
 
-                    <div className="font-bold text-[12px] uppercase mt-4">VI. Rencana Metode Pemilihan Penyedia</div>
-                    <p className="text-justify text-[11px]">
-                      {getPacketCategory(selectedPack.packName) === 'Konsolidasi' 
+                          if (productsWithData.length === 0) {
+                            return <p className="italic text-slate-600 my-1 pb-1 text-[11pt]">* Tidak ada justifikasi spesifik atau produk pembanding yang dicatat.</p>;
+                          }
+
+                          return (
+                            <div className="space-y-4">
+                              {productsWithData.map((p, idx) => {
+                                const just = justifications[p.id];
+                                const comp = comparisons[p.id];
+                                return (
+                                  <div key={`jp-${p.id}`} className="mb-3 p-3 border border-slate-300 rounded bg-slate-50">
+                                    <div className="font-bold underline mb-2">Item Survei: {p.name}</div>
+                                    
+                                    {just && (
+                                      <div className="mb-3">
+                                        <div className="font-semibold text-slate-800">📝 Justifikasi Pemilihan:</div>
+                                        <div className="text-justify italic pl-2 border-l-[3px] border-indigo-400">"{just}"</div>
+                                      </div>
+                                    )}
+
+                                    {comp && comp.name && (
+                                      <div>
+                                        <div className="font-semibold text-slate-800 mb-1">⚖️ Detail Produk Pembanding:</div>
+                                        <table className="w-full text-[10pt] border-collapse">
+                                          <tbody>
+                                            <tr><td className="w-24 font-medium py-0.5">Penyedia</td><td>: {comp.vendor || '-'}</td></tr>
+                                            <tr><td className="font-medium py-0.5">Produk</td><td>: {comp.name}</td></tr>
+                                            <tr><td className="font-medium py-0.5">Status</td><td>: {comp.status || 'Luar Katalog'}</td></tr>
+                                            <tr><td className="font-medium py-0.5">Harga</td><td>: Rp {parseInt(comp.price || 0).toLocaleString('id-ID')}</td></tr>
+                                            <tr><td className="font-medium py-0.5">Tangkap Layar</td><td>: Terlampir</td></tr>
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    <div className="font-bold text-[12pt] uppercase mt-4">V. Rancangan Kontrak (Surat Pesanan)</div>
+                    <p className="text-justify">Draft/Rancangan Kontrak menggunakan bentuk Surat Pesanan (SP) E-Purchasing yang berlaku standar pada sistem Inaproc LKPP.</p>
+
+                    <div className="font-bold text-[12pt] uppercase mt-4">VI. Rencana Metode Pemilihan Penyedia</div>
+                    <p className="text-justify">
+                      {getPacketCategory(selectedPack.packName) === 'Konsolidasi'
                         ? 'Pengadaan dilakukan secara langsung (Direct Purchasing) kepada Penyedia Konsolidasi Sektoral yang telah ditetapkan UKPBJ.'
                         : 'E-Purchasing dengan metode Negosiasi Harga terhadap harga dan/atau layanan pendukung sesuai ketentuan Katalog Elektronik.'}
                     </p>
@@ -2670,40 +3807,44 @@ export default function ProcurementPreparation() {
                     </p>
 
                     {/* Lampiran Screenshot Jika Ada */}
-                    {surveyData && (
-                      <div className="mt-8 break-before-page">
-                        <div className="font-bold text-[12px] uppercase mb-4 text-center">LAMPIRAN: BUKTI TANGKAPAN LAYAR (SCREENSHOT) REFERENSI E-KATALOG LOKAL/NASIONAL</div>
-                        <div className="grid grid-cols-2 gap-4">
-                          {surveyData.products.map(p => (
-                            <div key={p.id} className="border border-slate-400 p-2 text-center text-[9px] bg-slate-50">
-                              <div className="font-bold mb-1">{p.vendor}</div>
-                              <img src={p.img} alt={p.name} className="w-full h-32 object-cover border border-slate-300 mb-1 filter grayscale contrast-125" />
-                              <div className="font-mono text-blue-800 break-all">{p.link}</div>
-                              <div className="font-bold">Harga Tayang: Rp {p.price.toLocaleString('id-ID')}</div>
-                            </div>
-                          ))}
+                    {getActiveSurveyData() && (() => {
+                      const foundWithImages = getActiveSurveyData().products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN' && p.img);
+                      if (foundWithImages.length === 0) return null;
+                      return (
+                        <div className="mt-8 break-before-page" style={{ pageBreakBefore: 'always', breakBefore: 'page' }}>
+                          <div className="font-bold text-[12px] uppercase mb-4 text-center">LAMPIRAN: BUKTI TANGKAPAN LAYAR (SCREENSHOT) REFERENSI E-KATALOG LOKAL/NASIONAL</div>
+                          <div className="grid grid-cols-2 gap-4">
+                            {foundWithImages.map(p => (
+                              <div key={p.id} className="border border-slate-400 p-2 text-center text-[9px] bg-slate-50">
+                                <div className="font-bold mb-1">{p.vendor}</div>
+                                <img src={p.img} alt={p.name} className="w-full h-32 object-cover border border-slate-300 mb-1" />
+                                <div className="font-mono text-blue-800 break-all underline">
+                                  <a href={p.link} target="_blank" rel="noopener noreferrer" className="hover:text-blue-900">{p.link}</a>
+                                </div>
+                                <div className="font-bold">Harga Tayang: Rp {p.price.toLocaleString('id-ID')}</div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-
+                      );
+                    })()}
                   </div>
                 </div>
               )}
-            </div>
 
             {/* SIGNATURE SECTION (FOOTER) */}
-            <div className="flex justify-between items-end mt-12 pt-6 border-t border-slate-200">
+            <div className="flex justify-between items-end mt-12 pt-6 border-t border-slate-200 signature-section" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
               <div className="text-[10px] font-sans text-slate-500 italic max-w-xs">
                 Dokumen ini merupakan produk administrasi resmi internal Pemerintah Kabupaten Probolinggo dan sah secara hukum sejak dibubuhi Tanda Tangan Elektronik (TTE).
               </div>
               <div className="w-56 text-center space-y-2">
                 <div className="text-[11px]">
-                  Besuk, {new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}
+                  Besuk, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </div>
                 <div className="text-[11px] font-bold uppercase">
                   Pejabat Pembuat Komitmen (PPK)
                 </div>
-                
+
                 {/* Simulated TTE Signature Badge */}
                 {isSigned ? (
                   <div className="py-2.5 flex flex-col items-center justify-center border-2 border-dashed border-emerald-500 rounded bg-emerald-50/50 max-w-[180px] mx-auto">
@@ -2726,15 +3867,16 @@ export default function ProcurementPreparation() {
                 </div>
               </div>
             </div>
-
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* RUP LKPP Detail Sheet Modal */}
       {detailModalPack && (
-        <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.4)' }} className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl border border-slate-100 overflow-hidden animate-zoom-in my-8">
+        <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.85)' }} className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-7xl shadow-2xl border border-slate-100 overflow-hidden animate-zoom-in my-8">
             {/* Header */}
             <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex justify-between items-center">
               <div>
@@ -2745,18 +3887,18 @@ export default function ProcurementPreparation() {
                   https://sirup.inaproc.id/sirup/ro/penyedia/detailPaketPenyedia2020?idPaket={detailModalPack.noSirup}
                 </p>
               </div>
-              <button 
-                onClick={() => setDetailModalPack(null)} 
+              <button
+                onClick={() => setDetailModalPack(null)}
                 className="text-slate-400 hover:text-slate-600 text-2xl font-semibold transition-colors"
               >
                 &times;
               </button>
             </div>
-            
+
             {/* Sheet Body */}
             <div className="p-6 overflow-y-auto max-h-[70vh]">
               <div className="border border-slate-200 rounded-lg overflow-hidden text-xs text-slate-700">
-                
+
                 {/* Row 1 */}
                 <div className="grid grid-cols-3 border-b border-slate-200">
                   <div className="bg-slate-50 px-4 py-2.5 font-semibold border-r border-slate-200">Kode RUP</div>
@@ -2930,18 +4072,18 @@ export default function ProcurementPreparation() {
 
             {/* Footer */}
             <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex justify-end gap-3">
-              <button 
-                onClick={() => setDetailModalPack(null)} 
+              <button
+                onClick={() => setDetailModalPack(null)}
                 className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition-colors"
               >
                 Tutup Detail
               </button>
-              <button 
+              <button
                 onClick={() => {
                   selectPackage(detailModalPack)
                   setDetailModalPack(null)
-                }} 
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors shadow-lg shadow-indigo-600/20"
+                }}
+                className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold rounded-lg transition-colors"
               >
                 Pilih Paket & Sinkronkan
               </button>
@@ -2953,88 +4095,115 @@ export default function ProcurementPreparation() {
   )
 }
 
-// Komponen Pembantu untuk Input Manual & Otomatis No. SIRUP per Rekening DPA
+// Komponen Pembantu — Auto-Match SIRUP per Rekening DPA
 function SirupInputRow({ acc, onLink, sirupPackages = [] }) {
-  const [noSirup, setNoSirup] = useState('')
-  const [packName, setPackName] = useState('')
-  const [pagu, setPagu] = useState(acc.pagu || 0)
-  const [method, setMethod] = useState('Pengadaan Langsung')
+  const autoMatch = findBestSirupMatch(acc, sirupPackages);
+  const [showPicker, setShowPicker] = useState(!autoMatch);
+  const [search, setSearch] = useState('');
 
-  // Auto-suggest: Cari paket SIRUP yang memiliki MAK cocok dengan kode rekening DPA ini
-  const cleanDpa = acc.account ? acc.account.replace(/[^0-9]/g, '') : ''
-  const suggestions = sirupPackages ? sirupPackages.filter(p => {
-    if (!p.mak) return false
-    const cleanSirup = p.mak.replace(/[^0-9]/g, '')
-    return cleanSirup.includes(cleanDpa) || cleanDpa.includes(cleanSirup)
-  }) : []
-
-  const handleSelectPackage = (pack) => {
-    setNoSirup(pack.noSirup || pack.no || '')
-    setPackName(pack.packName || pack.nama || '')
-    setPagu(pack.pagu || 0)
-    setMethod(pack.method || 'Pengadaan Langsung')
-  }
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!noSirup) {
-      alert('Silakan isi Nomor RUP SIRUP terlebih dahulu.')
-      return
-    }
-    if (!packName) {
-      alert('Silakan isi Nama Paket sesuai yang ada di portal SIRUP.')
-      return
-    }
-
+  const handleUse = (pack) => {
     onLink({
-      noSirup,
-      packName,
-      pagu: parseInt(pagu) || acc.pagu,
-      method,
-      sumberDana: 'APBD',
-      tahun: '2026',
+      noSirup: pack.noSirup,
+      packName: pack.packName,
+      pagu: pack.pagu,
+      method: pack.method || 'Pengadaan Langsung',
+      sumberDana: pack.sumberDana || 'APBD',
+      tahun: pack.tahun || '2026',
       klpd: 'Kab. Probolinggo',
       satker: 'Kecamatan Besuk',
       volume: '1 Paket',
-      uraian: packName,
+      uraian: pack.packName,
       spesifikasi: 'Spesifikasi Sesuai Rincian DPA',
       pdn: 'Ya',
       usahaKecil: 'Ya',
       jenisPengadaan: acc.account?.includes('5.2.') ? 'Modal' : 'Barang',
       mak: acc.account
-    })
-  }
+    });
+  };
+
+  const filtered = sirupPackages.filter(p => {
+    const q = search.toLowerCase();
+    return !q
+      || (p.packName || '').toLowerCase().includes(q)
+      || (p.noSirup || '').includes(q);
+  });
 
   return (
-    <form onSubmit={handleSubmit} className="mt-3 bg-slate-50 border border-slate-200/80 rounded-xl p-4 space-y-3.5 shadow-sm transition-all focus-within:border-indigo-400">
-      <div className="text-[11px] font-bold text-slate-500 uppercase flex items-center justify-between">
-        <span>Hubungkan RUP SIRUP:</span>
-        {sirupPackages.length > 0 && (
-          <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 animate-pulse-subtle">
-            📡 Terkoneksi ke {sirupPackages.length} Data RUP Resmi
-          </span>
-        )}
-      </div>
+    <div className="mt-3 space-y-2">
 
-      {/* 💡 REKOMENDASI CERDAS DARI MAK DPA */}
-      {suggestions.length > 0 && (
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-xs">
-          <div className="font-bold text-indigo-800 flex items-center gap-1.5 mb-1.5">
-            <span>💡</span> Rekomendasi RUP SIRUP yang Cocok:
+      {/* ── Auto-match card ─────────────────────────────────────── */}
+      {autoMatch && !showPicker && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3">
+          <div className="text-[10px] font-bold text-indigo-500 uppercase mb-2 flex items-center gap-1.5">
+            ⚡ Cocok Otomatis
+            <span className="bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded font-mono">skor {autoMatch._score}</span>
           </div>
-          <div className="space-y-1.5">
-            {suggestions.map((s) => (
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold text-slate-800 leading-snug">{autoMatch.packName}</div>
+              <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-indigo-700 font-bold bg-indigo-100 px-1.5 py-0.5 rounded text-[10px]">#{autoMatch.noSirup}</span>
+                <span>Pagu: <strong className="text-emerald-700">Rp {autoMatch.pagu?.toLocaleString('id-ID')}</strong></span>
+                <span className="text-slate-400">·</span>
+                <span>{autoMatch.method}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => handleUse(autoMatch)}
+              className="shrink-0 bg-indigo-500 hover:bg-indigo-600 text-white text-[11px] font-bold px-4 py-2 rounded-xl transition-all active:scale-95 shadow-sm whitespace-nowrap"
+            >
+              ✓ Gunakan
+            </button>
+          </div>
+          <button
+            onClick={() => setShowPicker(true)}
+            className="text-[10px] text-slate-400 hover:text-indigo-600 mt-2 underline block transition-colors"
+          >
+            Pilih paket lain dari daftar...
+          </button>
+        </div>
+      )}
+
+      {/* ── Searchable picker ────────────────────────────────────── */}
+      {(!autoMatch || showPicker) && (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+          {showPicker && autoMatch && (
+            <button
+              onClick={() => setShowPicker(false)}
+              className="text-[10px] text-indigo-500 hover:text-indigo-700 underline flex items-center gap-1"
+            >
+              ← Kembali ke rekomendasi otomatis
+            </button>
+          )}
+          <div className="text-[10px] font-bold text-slate-500 uppercase">
+            {sirupPackages.length > 0 ? `Pilih dari ${sirupPackages.length} Paket RUP` : 'Memuat data SIRUP...'}
+          </div>
+          <input
+            type="text"
+            placeholder="Cari nama paket atau nomor RUP..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full border border-slate-200 focus:border-indigo-400 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-indigo-100 outline-none bg-white"
+          />
+          <div className="max-h-52 overflow-y-auto space-y-1 pr-0.5">
+            {filtered.length === 0 && (
+              <div className="text-xs text-slate-400 italic py-3 text-center">Tidak ada paket ditemukan</div>
+            )}
+            {filtered.slice(0, 25).map(p => (
               <button
-                key={s.noSirup}
+                key={p.noSirup}
                 type="button"
-                onClick={() => handleSelectPackage(s)}
-                className="w-full text-left bg-white hover:bg-indigo-600 hover:text-white text-[11px] p-2 rounded-lg border border-indigo-150 transition-all font-sans flex justify-between items-center shadow-sm active:scale-[0.99]"
+                onClick={() => handleUse(p)}
+                className="w-full text-left text-[11px] bg-white hover:bg-indigo-50 border border-slate-100 hover:border-indigo-200 rounded-lg px-3 py-2 transition-all group flex items-center justify-between gap-2"
               >
-                <span>
-                  <strong className="font-mono bg-indigo-50 text-indigo-700 px-1 py-0.5 rounded text-[9px] mr-1">#{s.noSirup}</strong>
-                  {s.packName} (Pagu: <strong>Rp {s.pagu?.toLocaleString()}</strong>)
+                <span className="flex-1 min-w-0">
+                  <span className="font-mono text-indigo-600 text-[10px] font-bold mr-1.5 bg-indigo-50 px-1 rounded">#{p.noSirup}</span>
+                  <span className="text-slate-700">{p.packName?.substring(0, 75)}{(p.packName?.length || 0) > 75 ? '…' : ''}</span>
+                  <span className="block text-[10px] text-slate-400 mt-0.5">
+                    Pagu: <strong className="text-emerald-700">Rp {p.pagu?.toLocaleString('id-ID')}</strong> · {p.method}
+                  </span>
                 </span>
-                <span className="bg-indigo-600 text-white font-bold px-2 py-0.5 rounded-md text-[9px] uppercase hover:bg-indigo-700">
+                <span className="shrink-0 text-[10px] text-white bg-indigo-500 group-hover:bg-indigo-600 px-2 py-1 rounded-lg font-bold opacity-0 group-hover:opacity-100 transition-all">
                   Pilih
                 </span>
               </button>
@@ -3042,88 +4211,7 @@ function SirupInputRow({ acc, onLink, sirupPackages = [] }) {
           </div>
         </div>
       )}
-
-      {/* SEARCHABLE SELECT DROPDOWN */}
-      {sirupPackages.length > 0 && (
-        <div className="text-xs">
-          <label className="block text-[10px] text-slate-500 font-bold mb-1">Pilih RUP dari Daftar Resmi Satker (Instan):</label>
-          <select
-            onChange={(e) => {
-              const selected = sirupPackages.find(p => p.noSirup === e.target.value)
-              if (selected) handleSelectPackage(selected)
-            }}
-            className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs cursor-pointer focus:ring-2 focus:ring-indigo-150 outline-none"
-            value={noSirup}
-          >
-            <option value="">-- Cari & Pilih Paket RUP SIRUP --</option>
-            {sirupPackages.map(p => (
-              <option key={p.noSirup} value={p.noSirup}>
-                #{p.noSirup} - {p.packName?.substring(0, 70)}... (Rp {p.pagu?.toLocaleString()})
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* INPUT FORM MANUAL/EDITABLE */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div>
-          <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">Nomor RUP SIRUP</label>
-          <input
-            type="text"
-            required
-            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded px-2 py-1 text-xs font-mono font-bold"
-            placeholder="Contoh: 65307012"
-            value={noSirup}
-            onChange={(e) => setNoSirup(e.target.value)}
-          />
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">Nama Paket di SIRUP</label>
-          <input
-            type="text"
-            required
-            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded px-2 py-1 text-xs"
-            placeholder="Belanja ATK Kantor..."
-            value={packName}
-            onChange={(e) => setPackName(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">Pagu RUP (Rp)</label>
-          <input
-            type="number"
-            required
-            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded px-2 py-1 text-xs font-bold text-indigo-700"
-            value={pagu}
-            onChange={(e) => setPagu(e.target.value)}
-          />
-        </div>
-      </div>
-      <div className="flex justify-between items-center pt-1.5 border-t border-slate-100">
-        <div>
-          <label className="inline-flex items-center gap-1.5 text-[10px] text-slate-500 font-semibold mr-3">
-            Metode:
-            <select
-              className="bg-transparent border-0 font-extrabold text-indigo-600 focus:ring-0 p-0 text-[10.5px] cursor-pointer"
-              value={method}
-              onChange={(e) => setMethod(e.target.value)}
-            >
-              <option value="Pengadaan Langsung">Pengadaan Langsung</option>
-              <option value="E-Purchasing">E-Purchasing</option>
-              <option value="Penunjukan Langsung">Penunjukan Langsung</option>
-              <option value="Tender">Tender</option>
-            </select>
-          </label>
-        </div>
-        <button
-          type="submit"
-          className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-lg shadow-md shadow-indigo-600/10 transition-all flex items-center gap-1"
-        >
-          <span>✓</span> Hubungkan Ke Rekening Ini
-        </button>
-      </div>
-    </form>
-  )
+    </div>
+  );
 }
 

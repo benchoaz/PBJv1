@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   frontend:
     build:
@@ -24,7 +22,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     volumes:
-      - ./dpa-parser/logs:/app/logs
+      - ./dpa-parser:/app
       - paddlex-cache:/root/.paddlex
     networks:
       - pbj-network
@@ -108,6 +106,7 @@ services:
     volumes:
       - ./frontend/public/screenshots:/screenshots
       - ./survey-service/server.js:/app/server.js
+      - ./logs:/app/logs
     restart: unless-stopped
     networks:
       - pbj-network
@@ -115,6 +114,10 @@ services:
 networks:
   pbj-network:
     driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
 
 volumes:
   paddlex-cache:

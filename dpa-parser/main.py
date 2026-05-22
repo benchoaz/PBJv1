@@ -237,24 +237,47 @@ def extract_rincian_from_block(block_text: str) -> List[RincianItem]:
                 # JIKA nama kosong/pendek/hanya kata "Spesifikasi" atau diawali dengan "Spesifikasi", cari baris nama riil ke belakang (hingga 5 baris)
                 idx_line = merged_lines.index(line)
                 if (not nama_raw or len(nama_raw) < 3 or nama_raw.lower() == 'spesifikasi' or nama_raw.lower().startswith('spesifikasi')) and idx_line > 0:
+                    spec_candidates = []
+                    # Jika nama_raw adalah spesifikasi valid (bukan sekadar label kosong), masukkan sebagai kandidat spesifikasi awal
+                    if nama_raw:
+                        if re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*(.+)$', nama_raw, re.IGNORECASE):
+                            spec_candidates.append(nama_raw)
+                    
+                    name_candidate = None
                     for offset in range(1, min(6, idx_line + 1)):
                         prev_line = merged_lines[idx_line - offset].strip()
                         if not prev_line:
                             continue
                         prev_clean = re.sub(r'[^\w\s/\-\.&,()\u00C0-\u024F]', '', prev_line).strip()
                         prev_clean = re.sub(r'[\-\s\.:]+$', '', prev_clean).strip()
-                        if prev_clean.lower() == 'spesifikasi' or prev_clean.lower().startswith('spesifikasi'):
+                        
+                        # Cek label kosong spesifikasi
+                        if re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*$', prev_clean, re.IGNORECASE):
                             continue
+                        
+                        # Cek jika baris adalah spesifikasi dengan detail
+                        spec_match = re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*(.+)$', prev_clean, re.IGNORECASE)
+                        if spec_match:
+                            if prev_clean not in spec_candidates:
+                                spec_candidates.append(prev_clean)
+                            continue
+                        
                         if any(kw in prev_line.lower() for kw in ['kode rekening', 'uraian rekening', 'anggaran', 'rincian perhitungan', 'sumber pendanaan', 'sumber dana']):
                             continue
                         if re.match(r'^[0-9\s.,xX*()\-]+$', prev_clean):
                             continue
                         if len(prev_clean) >= 3:
-                            if nama_raw.lower().startswith('spesifikasi') and nama_raw != prev_clean:
-                                nama_raw = f"{prev_clean} ({nama_raw})"
-                            else:
-                                nama_raw = prev_clean
+                            name_candidate = prev_clean
                             break
+                    
+                    if name_candidate:
+                        if spec_candidates:
+                            spec_str = ", ".join(reversed(spec_candidates))
+                            nama_raw = f"{name_candidate} ({spec_str})"
+                        else:
+                            nama_raw = name_candidate
+                    elif spec_candidates:
+                        nama_raw = spec_candidates[0]
 
                 if len(nama_raw) < 3:
                     nama_raw = "Item Detail DPA"
@@ -312,24 +335,49 @@ def extract_rincian_from_block(block_text: str) -> List[RincianItem]:
         nama_raw = re.sub(r'[^\w\s/\-\.&,()\u00C0-\u024F]', '', nama_raw).strip()
         nama_raw = re.sub(r'[\-\s\.:]+$', '', nama_raw).strip()
 
-        # JIKA nama kosong/sangat pendek/hanya kata "Spesifikasi", cari baris nama riil ke belakang (hingga 5 baris)
+        # JIKA nama kosong/sangat pendek/hanya kata "Spesifikasi" atau diawali dengan "Spesifikasi", cari baris nama riil ke belakang (hingga 5 baris)
         idx_line = merged_lines.index(line)
-        if (not nama_raw or len(nama_raw) < 3 or nama_raw.lower() == 'spesifikasi') and idx_line > 0:
+        if (not nama_raw or len(nama_raw) < 3 or nama_raw.lower() == 'spesifikasi' or nama_raw.lower().startswith('spesifikasi')) and idx_line > 0:
+            spec_candidates = []
+            if nama_raw:
+                if re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*(.+)$', nama_raw, re.IGNORECASE):
+                    spec_candidates.append(nama_raw)
+            
+            name_candidate = None
             for offset in range(1, min(6, idx_line + 1)):
                 prev_line = merged_lines[idx_line - offset].strip()
                 if not prev_line:
                     continue
                 prev_clean = re.sub(r'[^\w\s/\-\.&,()\u00C0-\u024F]', '', prev_line).strip()
                 prev_clean = re.sub(r'[\-\s\.:]+$', '', prev_clean).strip()
-                if prev_clean.lower() == 'spesifikasi':
+                
+                # Cek label kosong spesifikasi
+                if re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*$', prev_clean, re.IGNORECASE):
                     continue
+                
+                # Cek jika baris adalah spesifikasi dengan detail
+                spec_match = re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*(.+)$', prev_clean, re.IGNORECASE)
+                if spec_match:
+                    if prev_clean not in spec_candidates:
+                        spec_candidates.append(prev_clean)
+                    continue
+                
                 if any(kw in prev_line.lower() for kw in ['kode rekening', 'uraian rekening', 'anggaran', 'rincian perhitungan', 'sumber pendanaan', 'sumber dana']):
                     continue
                 if re.match(r'^[0-9\s.,xX*()\-]+$', prev_clean):
                     continue
                 if len(prev_clean) >= 3:
-                    nama_raw = prev_clean
+                    name_candidate = prev_clean
                     break
+            
+            if name_candidate:
+                if spec_candidates:
+                    spec_str = ", ".join(reversed(spec_candidates))
+                    nama_raw = f"{name_candidate} ({spec_str})"
+                else:
+                    nama_raw = name_candidate
+            elif spec_candidates:
+                nama_raw = spec_candidates[0]
 
         if len(nama_raw) >= 3 and satuan and len(vals) >= 1:
             try:

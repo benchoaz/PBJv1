@@ -243,14 +243,31 @@ export default function TemplateSuratManager() {
       namaInstansi: 'DINAS KOPERASI, USAHA MIKRO, PERDAGANGAN DAN PERINDUSTRIAN',
       alamatLengkap: 'Jl. Raya Dringu No. 81, Probolinggo. Telp: (0335) 422118, Email: dkupp@probolinggokab.go.id, Kode Pos: 67271',
       paperSize: 'A4',
-      marginTop: 15,
-      marginBottom: 20,
-      marginLeft: 25,
-      marginRight: 20,
+      marginTop: 20,      // 20 mm (2 cm) Permendagri 1/2023 standard
+      marginBottom: 25,   // 25 mm (2.5 cm) Permendagri 1/2023 standard
+      marginLeft: 30,     // 30 mm (3 cm) Permendagri 1/2023 standard
+      marginRight: 20,    // 20 mm (2 cm) Permendagri 1/2023 standard
+      fontFamily: 'Arial', // Default font standard korespondensi Permendagri 1/2023
+      fontSize: '12pt',    // Default ukuran huruf isi
+      lineHeight: '1.5',   // Default tinggi baris
       formatNomorSurat: '027/{nomor}/DKUPP/2026'
     };
     if (saved) {
       const parsed = JSON.parse(saved);
+      // Auto-migrate old defaults (15, 25, 20, 20) or (40, 30, 40, 20) to new Permendagri 1/2023
+      if (
+        (parsed.marginTop === 15 && parsed.marginLeft === 25 && parsed.marginBottom === 20 && parsed.marginRight === 20) ||
+        (parsed.marginTop === 40 && parsed.marginLeft === 40 && parsed.marginBottom === 30 && parsed.marginRight === 20 && !parsed.fontFamily)
+      ) {
+        parsed.marginTop = 20;
+        parsed.marginLeft = 30;
+        parsed.marginBottom = 25;
+        parsed.marginRight = 20;
+        parsed.fontFamily = 'Arial';
+        parsed.fontSize = '12pt';
+        parsed.lineHeight = '1.5';
+        localStorage.setItem('pbj_doc_settings', JSON.stringify(parsed));
+      }
       return { ...defaultSettings, ...parsed };
     }
     return defaultSettings;
@@ -408,7 +425,11 @@ export default function TemplateSuratManager() {
         <meta charset='utf-8'>
         <title>${activeTemplateName}</title>
         <style>
-          body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; }
+          body { 
+            font-family: ${docSettings.fontFamily === 'Bookman Old Style' ? "'Bookman Old Style', Georgia, serif" : docSettings.fontFamily === 'Arial' ? "Arial, Helvetica, sans-serif" : "'Times New Roman', Times, serif"}; 
+            font-size: ${docSettings.fontSize || '12pt'}; 
+            line-height: ${docSettings.lineHeight || '1.5'};
+          }
           @page WordSection1 {
             size: ${docSettings.paperSize === 'F4' ? '8.5in 13in' : '8.27in 11.69in'};
             margin: ${docSettings.marginTop}mm ${docSettings.marginRight}mm ${docSettings.marginBottom}mm ${docSettings.marginLeft}mm;
@@ -435,7 +456,7 @@ export default function TemplateSuratManager() {
   };
 
   return (
-    <div className="animate-fade-in pb-12">
+    <div id="pbk-template-root" className="animate-fade-in pb-12">
       
       {/* Header section */}
       <div className="print:hidden">
@@ -458,7 +479,7 @@ export default function TemplateSuratManager() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 print:block print:w-full print:gap-0 print:m-0">
+      <div id="pbk-template-layout" className="flex flex-col lg:flex-row gap-6 print:block print:w-full print:gap-0 print:m-0">
         
         {/* LEFT SIDEBAR - TEMPLATE LIST */}
         <div className="w-full lg:w-1/4 flex flex-col gap-4 print:hidden">
@@ -487,9 +508,9 @@ export default function TemplateSuratManager() {
         </div>
 
         {/* RIGHT PANEL - EDITOR & PREVIEW & SETTINGS */}
-        <div className="w-full lg:w-3/4 flex flex-col print:w-full print:h-auto">
+        <div id="pbk-template-right-panel" className="w-full lg:w-3/4 flex flex-col print:w-full print:h-auto">
           {selectedTemplate ? (
-            <div className="glass-panel overflow-hidden flex flex-col h-[calc(100vh-140px)] print:h-auto print:border-none print:shadow-none print:bg-white print:overflow-visible">
+            <div id="pbk-template-glass-panel" className="glass-panel overflow-hidden flex flex-col h-[calc(100vh-140px)] print:h-auto print:border-none print:shadow-none print:bg-white print:overflow-visible">
               
               {/* Header Tab & Actions */}
               <div className="bg-slate-50 border-b border-slate-200 p-4 flex flex-wrap gap-4 items-center justify-between print:hidden">
@@ -600,7 +621,7 @@ export default function TemplateSuratManager() {
               {activeTab === 'settings' && (
                 <div className="flex-1 overflow-y-auto p-6 bg-slate-50 print:hidden flex flex-col md:flex-row gap-8">
                   
-                  {/* Left Column - Paper Settings */}
+                  {/* Left Column - Paper & Typo Settings */}
                   <div className="w-full md:w-1/3 space-y-6">
                     <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
                       <h3 className="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">📄 Pengaturan Kertas</h3>
@@ -640,6 +661,82 @@ export default function TemplateSuratManager() {
                         <p className="text-[10px] text-slate-500 mt-3 leading-relaxed">
                           Sistem menggunakan <i>native browser pagination</i>. Teks yang melebihi batas halaman bawah akan otomatis mengalir ke halaman berikutnya sesuai margin yang Anda tentukan di sini tanpa terpotong.
                         </p>
+                        
+                        <div className="mt-4 border-t border-slate-100 pt-4">
+                          <span className="block text-xs font-bold text-slate-600 mb-2">Preset Margin Resmi</span>
+                          <div className="flex flex-col gap-2">
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                handleSettingChange('marginTop', 20);
+                                handleSettingChange('marginBottom', 25);
+                                handleSettingChange('marginLeft', 30);
+                                handleSettingChange('marginRight', 20);
+                              }}
+                              className="w-full px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg border border-indigo-100 transition-colors text-left flex items-center justify-between"
+                            >
+                              <span>🏛️ Pemda (Permendagri 1/2023)</span>
+                              <span className="text-[10px] text-indigo-500 font-mono">20, 25, 30, 20 mm</span>
+                            </button>
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                handleSettingChange('marginTop', 40);
+                                handleSettingChange('marginBottom', 30);
+                                handleSettingChange('marginLeft', 40);
+                                handleSettingChange('marginRight', 20);
+                              }}
+                              className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 transition-colors text-left flex items-center justify-between"
+                            >
+                              <span>📂 Pusat (ANRI / Klasik)</span>
+                              <span className="text-[10px] text-slate-500 font-mono">40, 30, 40, 20 mm</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Typo & Spacing Settings */}
+                    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mt-6">
+                      <h3 className="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">✒️ Tipografi & Spasi</h3>
+                      
+                      <div className="mb-4">
+                        <label className="block text-xs font-bold text-slate-600 mb-1.5">Jenis Huruf (Font Family)</label>
+                        <select 
+                          className="w-full glass-input py-2 text-sm"
+                          value={docSettings.fontFamily || 'Arial'}
+                          onChange={(e) => handleSettingChange('fontFamily', e.target.value)}
+                        >
+                          <option value="Arial">Arial (Standard Korespondensi Pemda)</option>
+                          <option value="Bookman Old Style">Bookman Old Style (Standard Peraturan)</option>
+                          <option value="Times New Roman">Times New Roman (Standard Klasik)</option>
+                        </select>
+                      </div>
+
+                      <div className="mb-4">
+                        <label className="block text-xs font-bold text-slate-600 mb-1.5">Ukuran Huruf (Font Size)</label>
+                        <select 
+                          className="w-full glass-input py-2 text-sm"
+                          value={docSettings.fontSize || '12pt'}
+                          onChange={(e) => handleSettingChange('fontSize', e.target.value)}
+                        >
+                          <option value="11pt">11 pt (Kompak)</option>
+                          <option value="12pt">12 pt (Standard Resmi)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1.5">Spasi Baris (Line Height)</label>
+                        <select 
+                          className="w-full glass-input py-2 text-sm"
+                          value={docSettings.lineHeight || '1.5'}
+                          onChange={(e) => handleSettingChange('lineHeight', e.target.value)}
+                        >
+                          <option value="1.0">1.0 (Tunggal)</option>
+                          <option value="1.15">1.15 (Kompak - Permendagri 1/2023)</option>
+                          <option value="1.25">1.25 (Sedang)</option>
+                          <option value="1.5">1.5 (Standard - Permendagri / ANRI)</option>
+                        </select>
                       </div>
                     </div>
                   </div>
@@ -688,6 +785,59 @@ export default function TemplateSuratManager() {
                               onChange={(e) => handleSettingChange('alamatLengkap', e.target.value)}
                             ></textarea>
                           </div>
+
+                          <div className="border-t border-slate-100 pt-4 mt-4">
+                            <label className="block text-xs font-bold text-slate-600 mb-2">Lambang / Logo Instansi</label>
+                            <div className="flex items-center gap-4">
+                              <div className="w-16 h-16 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                                {docSettings.customLogo ? (
+                                  <img src={docSettings.customLogo} alt="Logo Instansi" className="max-w-full max-h-full object-contain" />
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center text-slate-300">
+                                    <span className="text-xl">🏛️</span>
+                                    <span className="text-[8px] font-bold mt-0.5">GARUDA</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 space-y-1.5">
+                                <div className="flex gap-2">
+                                  <label className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg border border-indigo-100 transition-colors cursor-pointer flex items-center gap-1.5">
+                                    <span>📤 Pilih Gambar</span>
+                                    <input 
+                                      type="file" 
+                                      accept="image/*" 
+                                      className="hidden" 
+                                      onChange={(e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                          if (file.size > 2 * 1024 * 1024) {
+                                            alert("Ukuran file terlalu besar. Maksimal 2MB agar penyimpanan lokal lancar.");
+                                            return;
+                                          }
+                                          const reader = new FileReader();
+                                          reader.onload = (event) => {
+                                            handleSettingChange('customLogo', event.target.result);
+                                          };
+                                          reader.readAsDataURL(file);
+                                        }
+                                      }}
+                                    />
+                                  </label>
+                                  {docSettings.customLogo && (
+                                    <button 
+                                      type="button" 
+                                      onClick={() => handleSettingChange('customLogo', null)}
+                                      className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-lg border border-rose-100 transition-colors"
+                                    >
+                                      ❌ Hapus Logo
+                                    </button>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-slate-500">Mendukung file PNG, JPG, JPEG, atau SVG (Maks. 2MB). Jika tidak ada logo yang diunggah, kop surat akan secara otomatis menggunakan Lambang Garuda default.</p>
+                              </div>
+                            </div>
+                          </div>
+
                         </div>
                       </div>
                     </div>
@@ -714,7 +864,7 @@ export default function TemplateSuratManager() {
 
               {/* PREVIEW TAB */}
               {activeTab === 'preview' && (
-                <div className="flex-1 flex overflow-hidden print:overflow-visible bg-slate-100">
+                <div id="pbk-template-inner-body" className="flex-1 flex overflow-hidden print:overflow-visible bg-slate-100">
                   {/* Left Side: Data Input for Preview (Hidden when printing) */}
                   <div className="w-[300px] border-r border-slate-200 bg-white p-4 overflow-y-auto print:hidden hidden lg:block shrink-0 shadow-[4px_0_15px_-3px_rgba(0,0,0,0.05)] z-10">
                      <h3 className="font-bold text-slate-800 text-sm mb-4">🔧 Dummy Data Pratinjau</h3>
@@ -735,11 +885,11 @@ export default function TemplateSuratManager() {
                   </div>
                   
                   {/* Right Side: Render Physical Page (This is the only thing printed!) */}
-                  <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center print:w-full print:bg-white print:p-0 print:overflow-visible print:block">
+                  <div id="print-sheet-surat-parent" className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center print:w-full print:bg-white print:p-0 print:overflow-visible print:block">
                      
                      <div 
                         ref={printRef}
-                        className="print-container bg-white shadow-xl print:shadow-none text-black relative"
+                        className="print-container bg-white shadow-xl print:shadow-none text-black relative animate-fade-in"
                         style={{
                           width: docSettings.paperSize === 'F4' ? '215mm' : '210mm',
                           minHeight: docSettings.paperSize === 'F4' ? '330mm' : '297mm',
@@ -747,53 +897,149 @@ export default function TemplateSuratManager() {
                           paddingRight: `${docSettings.marginRight}mm`,
                           paddingBottom: `${docSettings.marginBottom}mm`,
                           paddingLeft: `${docSettings.marginLeft}mm`,
-                          fontFamily: "'Times New Roman', Times, serif",
-                          fontSize: '12pt',
-                          lineHeight: '1.5'
+                          fontFamily: docSettings.fontFamily === 'Bookman Old Style' 
+                            ? "'Bookman Old Style', Georgia, serif" 
+                            : docSettings.fontFamily === 'Arial' 
+                              ? "Arial, Helvetica, sans-serif" 
+                              : "'Times New Roman', Times, serif",
+                          fontSize: docSettings.fontSize || '12pt',
+                          lineHeight: docSettings.lineHeight || '1.5'
                         }}
                      >
                        <style>
                          {`
                            @media print {
-                             /* Inject dynamic page size and margins for native pagination */
-                             @page { 
-                               size: ${docSettings.paperSize === 'F4' ? '215mm 330mm' : 'A4'} portrait; 
-                               margin: ${docSettings.marginTop}mm ${docSettings.marginRight}mm ${docSettings.marginBottom}mm ${docSettings.marginLeft}mm !important; 
-                             }
-                             body { 
-                               -webkit-print-color-adjust: exact; 
-                               print-color-adjust: exact; 
-                               background-color: white !important; 
-                             }
-                             .print\\:hidden { display: none !important; }
-                             .print\\:block { display: block !important; }
-                             
-                             /* Reset the container in print so the browser's @page rules take over */
-                             .print-container {
-                               width: 100% !important;
-                               max-width: none !important;
+                             html, body {
+                               background: white !important;
                                margin: 0 !important;
                                padding: 0 !important;
-                               box-shadow: none !important;
-                               min-height: auto !important;
+                               height: auto !important;
+                               overflow: visible !important;
                              }
-                           }
+                             
+                             body * {
+                               visibility: hidden !important;
+                              }
+                              
+                              #root,
+                              main,
+                              #pbk-template-root,
+                              #pbk-template-layout,
+                              #pbk-template-right-panel,
+                              #pbk-template-glass-panel,
+                              #pbk-template-inner-body,
+                              #print-sheet-surat-parent,
+                              .print-container, 
+                              .print-container * {
+                                visibility: visible !important;
+                                position: static !important;
+                                overflow: visible !important;
+                                height: auto !important;
+                                width: auto !important;
+                                min-height: auto !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                box-shadow: none !important;
+                                border: none !important;
+                                display: block !important;
+                                background: none !important;
+                              }
+                              
+                              .print\\:hidden { 
+                                display: none !important; 
+                              }
+                              
+                              /* Re-apply basic visual rules to print-container in block flow */
+                              .print-container {
+                                visibility: visible !important;
+                                position: relative !important;
+                                left: 0 !important;
+                                top: 0 !important;
+                                width: 100% !important;
+                                max-width: 100% !important;
+                                display: block !important;
+                                padding: ${docSettings.marginTop}mm ${docSettings.marginRight}mm ${docSettings.marginBottom}mm ${docSettings.marginLeft}mm !important;
+                                margin: 0 !important;
+                                background: white !important;
+                                font-family: ${docSettings.fontFamily === 'Bookman Old Style' ? "'Bookman Old Style', Georgia, serif" : docSettings.fontFamily === 'Arial' ? "Arial, Helvetica, sans-serif" : "'Times New Roman', Times, serif"} !important;
+                                font-size: ${docSettings.fontSize || '12pt'} !important;
+                                line-height: ${docSettings.lineHeight || '1.5'} !important;
+                              }
+                              
+                              /* Table and list rules */
+                              table {
+                                width: 100% !important;
+                                border-collapse: collapse !important;
+                                page-break-inside: auto !important;
+                              }
+                              tr {
+                                page-break-inside: avoid !important;
+                                break-inside: avoid !important;
+                              }
+                              td, th {
+                                page-break-inside: avoid !important;
+                                break-inside: avoid !important;
+                              }
+                              
+                              /* Prevent orphan headers */
+                              h1, h2, h3, h4, h5, h6 {
+                                page-break-after: avoid !important;
+                                break-after: avoid !important;
+                              }
+                              
+                              /* Avoid splitting signature blocks */
+                              .signature-section {
+                                page-break-inside: avoid !important;
+                                break-inside: avoid !important;
+                              }
+                              
+                              /* Hide scrollbars during print */
+                              ::-webkit-scrollbar {
+                                display: none !important;
+                              }
+
+                              /* Inject dynamic page size and margins for native pagination */
+                              @page { 
+                                size: ${docSettings.paperSize === 'F4' ? '215mm 330mm' : 'A4'} portrait; 
+                                margin: 0 !important; 
+                              }
+                            }
                          `}
                        </style>
 
                        {/* TATA NASKAH DINAS KOP SURAT */}
                        {docSettings.showKop && (
-                         <div className="w-full mb-6" style={{ pageBreakInside: 'avoid', fontFamily: '"Times New Roman", Times, serif' }}>
+                         <div className="w-full mb-6" style={{ 
+                            pageBreakInside: 'avoid', 
+                            fontFamily: docSettings.fontFamily === 'Bookman Old Style' 
+                              ? "'Bookman Old Style', Georgia, serif" 
+                              : docSettings.fontFamily === 'Arial' 
+                                ? "Arial, Helvetica, sans-serif" 
+                                : "'Times New Roman', Times, serif"
+                         }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', borderBottom: '3px solid black', marginBottom: '2px' }}>
                               <tbody>
                                 <tr>
-                                  <td style={{ width: '15%', verticalAlign: 'middle', textAlign: 'center', paddingBottom: '10px' }}>
-                                     <LogoGarudaPlaceholder />
+                                  <td style={{ width: '18%', verticalAlign: 'middle', textAlign: 'center', paddingBottom: '10px', paddingRight: '15px' }}>
+                                     {docSettings.customLogo ? (
+                                       <img 
+                                         src={docSettings.customLogo} 
+                                         alt="Logo Instansi" 
+                                         style={{ 
+                                           maxHeight: '80px', 
+                                           maxWidth: '95px', 
+                                           objectFit: 'contain',
+                                           display: 'inline-block' 
+                                         }} 
+                                       />
+                                     ) : (
+                                       <LogoGarudaPlaceholder />
+                                     )}
                                   </td>
-                                  <td style={{ width: '85%', textAlign: 'center', verticalAlign: 'middle', paddingBottom: '10px' }}>
-                                     <div style={{ fontWeight: 'bold', fontSize: '14pt', textTransform: 'uppercase', lineHeight: '1.2' }}>{docSettings.namaPemda}</div>
-                                     <div style={{ fontWeight: 'bold', fontSize: '18pt', textTransform: 'uppercase', lineHeight: '1.2' }}>{docSettings.namaInstansi}</div>
-                                     <div style={{ fontSize: '10pt', marginTop: '4px', fontStyle: 'italic' }}>{docSettings.alamatLengkap}</div>
+                                  <td style={{ width: '82%', textAlign: 'center', verticalAlign: 'middle', paddingBottom: '10px' }}>
+                                     <div style={{ fontWeight: 'bold', fontSize: '13pt', textTransform: 'uppercase', lineHeight: '1.2' }}>{docSettings.namaPemda}</div>
+                                     <div style={{ fontWeight: 'bold', fontSize: '16pt', textTransform: 'uppercase', lineHeight: '1.2', marginTop: '2px' }}>{docSettings.namaInstansi}</div>
+                                     <div style={{ fontSize: '9pt', marginTop: '6px', lineHeight: '1.3' }}>{docSettings.alamatLengkap}</div>
                                   </td>
                                 </tr>
                               </tbody>
@@ -803,13 +1049,31 @@ export default function TemplateSuratManager() {
                        )}
 
                        {/* DYNAMIC DOCUMENT CONTENT */}
-                       <div className="text-justify document-content" style={{ lineHeight: '1.5', textWrap: 'balance' }}>
-                         {renderPreview(activeTemplateContent).split('\n').map((line, i) => (
-                           <React.Fragment key={i}>
-                             {line}
-                             <br />
-                           </React.Fragment>
-                         ))}
+                       <div className="document-content">
+                          {renderPreview(activeTemplateContent).split(/\n\s*\n/).map((para, i) => {
+                            if (!para.trim()) return null;
+                            return (
+                              <div 
+                                key={i} 
+                                className="document-paragraph text-justify" 
+                                style={{ 
+                                  lineHeight: docSettings.lineHeight || '1.5',
+                                  fontFamily: docSettings.fontFamily === 'Bookman Old Style' 
+                                    ? "'Bookman Old Style', Georgia, serif" 
+                                    : docSettings.fontFamily === 'Arial' 
+                                      ? "Arial, Helvetica, sans-serif" 
+                                      : "'Times New Roman', Times, serif",
+                                  fontSize: docSettings.fontSize || '12pt',
+                                  whiteSpace: 'pre-wrap',
+                                  textAlign: 'justify',
+                                  textJustify: 'inter-word',
+                                  marginBottom: '1.25em'
+                                }}
+                              >
+                                {para}
+                              </div>
+                            );
+                          })}
                        </div>
                        
                      </div>

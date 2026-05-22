@@ -353,8 +353,11 @@ export default function ProcurementPanel() {
     }
   }, [submittedPack])
 
-  const getPackageItems = (pack) => {
+  function getPackageItems(pack) {
     if (!pack) return []
+    
+    // ✅ Sync Fix: Use the finalized items injected by PPK if available
+    if (pack.items && pack.items.length > 0) return pack.items;
     
     const savedItems = localStorage.getItem(`dpa_items_${pack.noSirup}`)
     if (savedItems) return JSON.parse(savedItems)
@@ -583,19 +586,20 @@ export default function ProcurementPanel() {
       <div className="flex gap-4 mb-8 border-b border-slate-200 pb-4">
         <button 
           onClick={() => setActiveTab('incoming')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${activeTab === 'incoming' ? 'bg-indigo-50 border border-indigo-200 text-indigo-600' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
+          className={`px-4 py-2 rounded-lg text-[11px] font-semibold transition-all duration-200 flex items-center gap-2 ${activeTab === 'incoming' ? 'bg-slate-100 text-slate-800 border border-slate-200 shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-200'}`}
         >
-          📬 Usulan DPP Masuk {submittedPack && <span className="ml-1 px-1.5 py-0.5 text-[9px] rounded-full bg-indigo-600 text-white font-black">1</span>}
+          <span>📬 Usulan DPP Masuk</span>
+          {submittedPack && <span className={`px-1.5 py-0.5 text-[9px] rounded-full font-black ${activeTab === 'incoming' ? 'bg-slate-300 text-slate-800' : 'bg-slate-100 border border-slate-200 text-slate-500'}`}>1</span>}
         </button>
         <button 
           onClick={() => setActiveTab('search')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${activeTab === 'search' ? 'bg-indigo-50 border border-indigo-200 text-indigo-600' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
+          className={`px-4 py-2 rounded-lg text-[11px] font-semibold transition-all duration-200 ${activeTab === 'search' ? 'bg-slate-100 text-slate-800 border border-slate-200 shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-200'}`}
         >
           🔍 Cari & Bandingkan e-Katalog Inaproc
         </button>
         <button 
           onClick={() => setActiveTab('docs')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${activeTab === 'docs' ? 'bg-indigo-50 border border-indigo-200 text-indigo-600' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
+          className={`px-4 py-2 rounded-lg text-[11px] font-semibold transition-all duration-200 ${activeTab === 'docs' ? 'bg-slate-100 text-slate-800 border border-slate-200 shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-200'}`}
         >
           📂 Arsip Dokumen Hasil Pemilihan (BAHP)
         </button>
@@ -603,17 +607,19 @@ export default function ProcurementPanel() {
 
       {/* Content */}
       {activeTab === 'incoming' && (
-        <div className="glass-panel p-8 animate-slide-up bg-white border border-slate-200 rounded-2xl shadow-sm">
-          <h2 className="text-xl font-bold text-slate-800 mb-6">Surat Dinas Usulan & DPP Masuk</h2>
+        <div className="animate-slide-up">
           
           {submittedPack ? (
-            <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-6 flex flex-col justify-between gap-6">
+            <div className="bg-white border border-slate-200 rounded-xl p-8 flex flex-col justify-between gap-6 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-slate-200"></div>
               <div>
-                <div className="flex flex-wrap items-center gap-3 mb-2">
-                  <span className="px-2.5 py-1 text-[10px] rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-widest font-extrabold shadow-sm">
-                    Aktif & Sah (TTE)
+                <div className="flex flex-wrap items-center gap-3 mb-4">
+                  <span className="px-2.5 py-1 text-[9px] rounded-md bg-slate-100 border border-slate-200 text-slate-700 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Aktif & Sah (TTE)
                   </span>
-                  <span className="text-xs text-indigo-600 font-bold uppercase tracking-wide">📦 Paket Terkirim dari PPK</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wide flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">📦</span> Paket Terkirim dari PPK
+                  </span>
                 </div>
                 <h3 className="text-xl font-bold text-slate-800">{submittedPack.packName}</h3>
                 <p className="text-xs text-slate-500 mt-1">
@@ -621,36 +627,36 @@ export default function ProcurementPanel() {
                 </p>
                 
                 {/* DPA Detailed Rincian Table */}
-                <div className="mt-4 bg-white border border-slate-200/80 rounded-xl p-4 shadow-sm max-w-2xl">
-                  <div className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider mb-2">📋 Rincian Barang Sesuai DPA (Centang barang yang akan diproses):</div>
+                <div className="mt-6 bg-slate-50/50 border border-slate-200 rounded-xl p-5 w-full">
+                  <div className="text-[10px] text-slate-600 font-bold uppercase tracking-wider mb-3">📋 Rincian Barang Tersinkronisasi (Centang barang yang akan diproses):</div>
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-100 font-bold text-slate-500 text-[10px]">
-                        <th className="pb-1 w-10 text-center">Pilih</th>
-                        <th className="pb-1 w-6">No</th>
-                        <th className="pb-1">Nama Barang</th>
-                        <th className="pb-1 text-center w-12">Jumlah</th>
-                        <th className="pb-1 text-center w-16">Satuan</th>
-                        <th className="pb-1 text-right">Harga Satuan DPA</th>
-                        <th className="pb-1 text-right">Total Pagu</th>
+                      <tr className="border-b border-slate-200 font-bold text-slate-500 text-[10px] uppercase">
+                        <th className="pb-2 w-10 text-center">Pilih</th>
+                        <th className="pb-2 w-6 text-center">No</th>
+                        <th className="pb-2">Uraian Barang (Hasil Survei HPS)</th>
+                        <th className="pb-2 text-center w-12">Jumlah</th>
+                        <th className="pb-2 text-center w-16">Satuan</th>
+                        <th className="pb-2 text-right">Harga HPS</th>
+                        <th className="pb-2 text-right">Total Pagu</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50 text-slate-700">
-                      {getPackageItems(submittedPack).map((item) => (
-                        <tr key={item.no} className={`hover:bg-slate-50/50 ${!checkedItems[item.no] ? 'opacity-40 bg-slate-50/20' : ''}`}>
-                          <td className="py-2 text-center">
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {getPackageItems(submittedPack).map((item, idx) => (
+                        <tr key={item.no} className={`hover:bg-white transition-colors ${!checkedItems[item.no] ? 'opacity-40 grayscale' : ''}`}>
+                          <td className="py-3 text-center">
                             <input 
                               type="checkbox" 
                               checked={!!checkedItems[item.no]} 
                               onChange={() => handleCheckboxChange(item.no)}
-                              className="w-4 h-4 rounded border-slate-350 text-indigo-600 focus:ring-indigo-550 cursor-pointer"
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-slate-800 focus:ring-slate-800 cursor-pointer"
                             />
                           </td>
-                          <td className="py-2 text-slate-400">{item.no}</td>
-                          <td className="py-2 font-medium">
+                          <td className="py-3 text-slate-400 text-center">{idx + 1}</td>
+                          <td className="py-3 font-medium">
                             {item.name?.includes('[Konsolidasi]') ? (
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="px-2 py-0.5 rounded-full bg-violet-100 text-violet-750 font-black text-[9px] uppercase tracking-wider border border-violet-200 shadow-xs animate-pulse">
+                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[9px] uppercase tracking-wider border border-slate-200">
                                   🔒 Konsolidasi
                                 </span>
                                 <span className="text-slate-800">{item.name.replace('[Konsolidasi]', '').trim()}</span>
@@ -659,10 +665,10 @@ export default function ProcurementPanel() {
                               item.name
                             )}
                           </td>
-                          <td className="py-2 text-center font-bold">{item.qty}</td>
-                          <td className="py-2 text-center text-slate-500">{item.unit}</td>
-                          <td className="py-2 text-right font-mono text-slate-600">Rp {item.price.toLocaleString('id-ID')}</td>
-                          <td className="py-2 text-right font-mono font-bold text-slate-800">Rp {(item.qty * item.price).toLocaleString('id-ID')}</td>
+                          <td className="py-3 text-center font-bold text-slate-800">{item.qty}</td>
+                          <td className="py-3 text-center text-slate-500">{item.unit}</td>
+                          <td className="py-3 text-right font-mono text-slate-600">Rp {item.price.toLocaleString('id-ID')}</td>
+                          <td className="py-3 text-right font-mono font-bold text-slate-800">Rp {(item.qty * item.price).toLocaleString('id-ID')}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -670,49 +676,51 @@ export default function ProcurementPanel() {
                 </div>
                 
                 {/* Documents Section */}
-                <div className="mt-4 flex flex-wrap gap-3">
+                <div className="mt-5 flex flex-wrap gap-2">
                   <button 
                     onClick={() => alert(`Membuka Dokumen DPA: ${submittedPack.dpaName}`)}
-                    className="text-xs text-slate-600 bg-white hover:bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 transition-all font-medium"
+                    className="text-[11px] text-slate-600 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 transition-all font-medium flex items-center gap-1.5"
                   >
-                    <span>📄</span> DPA: {submittedPack.dpaName}
+                    <span>📄</span> DPA Asli
                   </button>
-                  <button 
-                    onClick={() => alert(`Membuka Surat Penetapan HPS dengan Nilai Rp ${parseFloat(submittedPack.hpsValue).toLocaleString('id-ID')} yang telah ditandatangani secara elektronik (TTE) oleh ${submittedPack.senderName}.`)}
-                    className="text-xs text-indigo-700 bg-white hover:bg-slate-50 px-3.5 py-2 rounded-xl border border-indigo-200 shadow-sm flex items-center gap-2 transition-all font-bold"
-                  >
-                    <span>📜</span> Surat Penetapan HPS (Sah TTE)
-                  </button>
+                  {submittedPack.hpsValue !== 'Dikecualikan (Bebas HPS)' && parseFloat(submittedPack.hpsValue) !== 0 && submittedPack.hpsValue !== '0' && (
+                    <button 
+                      onClick={() => alert(`Membuka Surat Penetapan HPS dengan Nilai Rp ${parseFloat(submittedPack.hpsValue).toLocaleString('id-ID')} yang telah ditandatangani secara elektronik (TTE) oleh ${submittedPack.senderName}.`)}
+                      className="text-[11px] text-slate-700 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-300 transition-all font-bold flex items-center gap-1.5"
+                    >
+                      <span>📜</span> Surat Penetapan HPS (TTE)
+                    </button>
+                  )}
                   <button 
                     onClick={() => alert(`Membuka Dokumen Persiapan Pengadaan (DPP) Lengkap.`)}
-                    className="text-xs text-indigo-700 bg-white hover:bg-slate-50 px-3.5 py-2 rounded-xl border border-indigo-200 shadow-sm flex items-center gap-2 transition-all font-bold"
+                    className="text-[11px] text-slate-700 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-300 transition-all font-bold flex items-center gap-1.5"
                   >
                     <span>📁</span> Dokumen DPP PPK
                   </button>
                 </div>
               </div>
               
-              <div className="flex flex-col items-end gap-3 w-full md:w-auto border-t border-slate-200/50 pt-4 mt-2">
-                <div className="flex justify-between w-full md:w-72 items-center">
-                  <span className="text-xs text-slate-500 font-bold">TOTAL PAGU DPA (DIPROSES):</span>
-                  <span className="text-lg font-black text-slate-800">Rp {getDynamicTotalPagu().toLocaleString('id-ID')}</span>
+              <div className="flex flex-col items-end gap-3 w-full border-t border-slate-100 pt-5 mt-2">
+                <div className="flex justify-between w-full md:w-80 items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <span className="text-xs text-slate-500 font-bold">Total HPS Diproses:</span>
+                  <span className="text-lg font-black text-slate-800 font-mono">Rp {getDynamicTotalPagu().toLocaleString('id-ID')}</span>
                 </div>
                 <button 
                   onClick={() => {
-                    if (!checkedItems[1] && !checkedItems[2]) {
+                    if (Object.values(checkedItems).every(v => !v)) {
                       alert('Silakan centang minimal satu barang yang ingin Anda proses terlebih dahulu!')
                       return
                     }
                     setActiveTab('search')
                   }} 
-                  className="btn-primary w-full md:w-auto text-xs py-3 px-6 flex items-center justify-center gap-2"
+                  className="bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 shadow-sm w-full md:w-80 text-[11px] py-2.5 px-6 rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
                 >
-                  🚀 Buka Pencarian & Komparasi e-Katalog Inaproc
+                  🚀 Buka Pencarian & Komparasi Inaproc
                 </button>
               </div>
             </div>
           ) : (
-            <div className="bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-10 text-center max-w-2xl mx-auto">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center max-w-2xl mx-auto mt-4">
               <span className="text-4xl block mb-3">📬</span>
               <h3 className="text-lg font-bold text-slate-800 mb-1">Belum Ada Paket Usulan Real</h3>
               <p className="text-xs text-slate-500 leading-relaxed mb-4">Sistem mendeteksi belum ada paket aktif yang dikirimkan oleh PPK melalui dashboard Persiapan Pengadaan saat ini.</p>

@@ -18,7 +18,7 @@ function App() {
 
   return (
     <AuthProvider>
-      <div className={`min-h-screen flex bg-slate-50/30 relative ${isLoginPage ? 'bg-white' : ''}`}>
+      <div className={`min-h-screen flex bg-white relative ${isLoginPage ? 'bg-white' : ''}`}>
         {!isLoginPage && <Header />}
         <main className={`flex-1 min-w-0 ${isLoginPage ? 'p-0 h-screen overflow-hidden' : 'p-8 lg:p-12 overflow-y-auto'}`}>
           <Routes>
