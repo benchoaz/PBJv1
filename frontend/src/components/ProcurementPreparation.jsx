@@ -674,27 +674,26 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
     const indicesToSearch = [];
     const requestItems = [];
 
-    // Cari barang yg GAGAL dan punya ketikan di customKeywords
+    // Cari barang yang punya ketikan baru di customKeywords (baik sukses maupun gagal)
     surveyData.products.forEach((p, idx) => {
-      const isFailed = !p.success || p.vendor === 'TIDAK DITEMUKAN';
-      if (isFailed && customKeywords[idx] && customKeywords[idx].trim() !== '') {
+      if (customKeywords[idx] && customKeywords[idx].trim() !== '') {
         indicesToSearch.push(idx);
         requestItems.push({
           name: items[idx].name,
-          query: customKeywords[idx].trim()
-          // fallbackPrice dihapus sengaja, agar pencarian manual bebas dari limitasi harga DPA
+          query: customKeywords[idx].trim(),
+          fallbackPrice: items[idx].price || items[idx].paguDpa
         });
       }
     });
 
     if (requestItems.length === 0) {
-      alert("⚠️ Tidak ada barang kosong yang sudah Anda beri isian kata kunci baru. Ketikkan kata kuncinya dulu di kotak masing-masing barang yang kosong!");
+      alert("⚠️ Tidak ada barang yang diberi kata kunci baru. Ketikkan kata kuncinya dulu di kotak pencarian masing-masing barang!");
       return;
     }
 
     setIsSurveying(true);
     setSurveyProgressPercent(10);
-    setSurveyProgress(`Mencari ulang ${requestItems.length} barang secara Nasional (Global)...`);
+    setSurveyProgress(`Mencari ulang ${requestItems.length} barang (Sesuai Filter Wilayah)...`);
 
     try {
       const response = await fetch('http://localhost:3001/api/survey/run', {
@@ -2958,9 +2957,9 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                           onClick={handleBatchCustomSearch}
                           disabled={isSurveying}
                           className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-[10px] font-bold px-3 py-1 rounded shadow-sm transition-all flex items-center gap-1 active:scale-95"
-                          title="Cari ulang semua barang kosong yang sudah Anda ketikkan kata kunci barunya"
+                          title="Cari ulang semua barang yang sudah Anda ketikkan kata kunci barunya sekaligus (Sesuai Filter Wilayah)"
                         >
-                          🔍 Cari Ulang (Global)
+                          🔍 Cari Ulang (Massal)
                         </button>
                       )}
                       <button
