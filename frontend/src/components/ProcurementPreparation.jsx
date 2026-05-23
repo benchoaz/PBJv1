@@ -435,7 +435,32 @@ export default function ProcurementPreparation() {
 
       setSurveyProgressPercent(90);
       setSurveyProgress('Menganalisis hasil tangkapan layar riil...');
-      const results = await response.json();
+      const runRes = await response.json();
+      if (!runRes.jobId) throw new Error('Tidak mendapatkan Job ID dari server');
+
+      setSurveyProgress(`Mengantre di Worker (Job ID: ${runRes.jobId})...`);
+
+      let results = null;
+      while (true) {
+        await new Promise(r => setTimeout(r, 2500)); // poll every 2.5s
+        
+        const statusRes = await fetch(`http://localhost:3001/api/survey/status/${runRes.jobId}`);
+        if (!statusRes.ok) throw new Error('Gagal mengecek status job');
+        const statusData = await statusRes.json();
+
+        if (statusData.status === 'completed') {
+          results = statusData.results;
+          break;
+        } else if (statusData.status === 'failed') {
+          throw new Error('Proses worker gagal: ' + statusData.error);
+        } else {
+          setSurveyProgressPercent(statusData.progress || 10);
+          setSurveyProgress(`Memproses survei massal di latar belakang (${statusData.progress || 0}% selesai)...`);
+        }
+      }
+
+      setSurveyProgressPercent(90);
+      setSurveyProgress('Menganalisis hasil dari Redis Worker...');
 
       const newHpsPrices = {};
       let totalHpsEstimate = 0;
@@ -634,7 +659,24 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
         throw new Error('Gagal mengeksekusi survei kustom: ' + response.statusText);
       }
 
-      const results = await response.json();
+      const runRes = await response.json();
+      if (!runRes.jobId) throw new Error('Tidak mendapatkan Job ID dari server');
+
+      let results = null;
+      while (true) {
+        await new Promise(r => setTimeout(r, 1500)); // poll faster for single item
+        
+        const statusRes = await fetch(`http://localhost:3001/api/survey/status/${runRes.jobId}`);
+        if (!statusRes.ok) throw new Error('Gagal mengecek status job');
+        const statusData = await statusRes.json();
+
+        if (statusData.status === 'completed') {
+          results = statusData.results;
+          break;
+        } else if (statusData.status === 'failed') {
+          throw new Error('Proses worker gagal: ' + statusData.error);
+        }
+      }
       const singleRes = results[0];
 
       if (singleRes) {
@@ -746,7 +788,29 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
       setSurveyProgressPercent(80);
       setSurveyProgress('Menyinkronkan data...');
 
-      const results = await response.json();
+      const runRes = await response.json();
+      if (!runRes.jobId) throw new Error('Tidak mendapatkan Job ID dari server');
+
+      setSurveyProgress(`Mengantre di Worker (Job ID: ${runRes.jobId})...`);
+
+      let results = null;
+      while (true) {
+        await new Promise(r => setTimeout(r, 2000));
+        
+        const statusRes = await fetch(`http://localhost:3001/api/survey/status/${runRes.jobId}`);
+        if (!statusRes.ok) throw new Error('Gagal mengecek status job');
+        const statusData = await statusRes.json();
+
+        if (statusData.status === 'completed') {
+          results = statusData.results;
+          break;
+        } else if (statusData.status === 'failed') {
+          throw new Error('Proses worker gagal: ' + statusData.error);
+        } else {
+          setSurveyProgressPercent(statusData.progress || 10);
+          setSurveyProgress(`Mencari ulang di latar belakang (${statusData.progress || 0}% selesai)...`);
+        }
+      }
       
       const updatedProducts = [...surveyData.products];
       const newHpsPrices = { ...hpsPrices };

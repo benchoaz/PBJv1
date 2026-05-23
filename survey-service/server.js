@@ -3,6 +3,17 @@ const cors = require('cors');
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
+const { Queue, Worker } = require('bullmq');
+const IORedis = require('ioredis');
+
+const connection = new IORedis({
+  host: process.env.REDIS_HOST || 'localhost',
+  port: process.env.REDIS_PORT || 6379,
+  maxRetriesPerRequest: null
+});
+
+const surveyQueue = new Queue('survey-jobs', { connection });
+
 
 const app = express();
 app.use(cors());
@@ -420,8 +431,33 @@ app.post('/api/survey/run', async (req, res) => {
     if (!item.locations) item.locations = globalLocations;
   });
 
+  // Tambahkan job ke antrean Redis
+  const job = await surveyQueue.add('survey', { items });
+  console.log(`[Queue] Diterima Job ID: ${job.id} untuk ${items.length} item.`);
+  
+  res.json({ jobId: job.id });
+});
+
+app.get('/api/survey/status/:id', async (req, res) => {
+  const job = await surveyQueue.getJob(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  
+  const state = await job.getState();
+  const progress = job.progress || 0;
+  
+  res.json({ 
+    status: state, 
+    progress: progress, 
+    results: job.returnvalue || null,
+    error: job.failedReason || null
+  });
+});
+
+// ── REDIS WORKER (BACKGROUND PROCESS) ──────────────────────────────────────────
+const worker = new Worker('survey-jobs', async job => {
+  const items = job.data.items;
   console.log(`\n========================================`);
-  console.log(`🚀 Memulai survei untuk ${items.length} item`);
+  console.log(`🚀 [Worker] Memulai job ${job.id} untuk ${items.length} item`);
   console.log(`========================================`);
 
   let browser;
@@ -449,21 +485,31 @@ app.post('/api/survey/run', async (req, res) => {
     for (let i = 0; i < items.length; i++) {
       const result = await searchItem(page, items[i], i);
       results.push(result);
-      // Small pause between items to avoid rate limiting
+      
+      // Laporkan progress ke antrean (1-100%)
+      const percentage = Math.floor(((i + 1) / items.length) * 100);
+      await job.updateProgress(percentage);
+      
+      // Jeda kecil antar item untuk menghindari pemblokiran server LKPP
       if (i < items.length - 1) {
         await new Promise(r => setTimeout(r, 2000));
       }
     }
 
-    console.log(`\n✅ Survei selesai! ${results.filter(r => r.success).length}/${results.length} berhasil.`);
-    res.json(results);
+    console.log(`\n✅ [Worker] Job ${job.id} selesai! ${results.filter(r => r.success).length}/${results.length} berhasil.`);
+    return results;
   } catch (err) {
-    console.error('Fatal error:', err);
-    res.status(500).json({ error: err.message });
+    console.error(`[Worker] Fatal error on job ${job.id}:`, err);
+    throw err;
   } finally {
     if (browser) await browser.close();
   }
+}, { connection, concurrency: 1 }); // concurrency 1: hanya buka 1 browser sekaligus agar RAM hemat
+
+worker.on('failed', (job, err) => {
+  console.error(`[Worker] Job ${job.id} gagal:`, err);
 });
+
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'pbj-survey-service' }));
 
