@@ -3789,32 +3789,71 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                             return <p className="italic text-slate-600 my-1 pb-1 text-[11pt]">* Tidak ada justifikasi spesifik atau produk pembanding yang dicatat.</p>;
                           }
 
+                          // Group by justification text
+                          const groups = {};
+                          productsWithData.forEach(p => {
+                            const justText = (justifications[p.id] || '').trim();
+                            if (!groups[justText]) {
+                              groups[justText] = { items: [], comparisons: [] };
+                            }
+                            groups[justText].items.push(p.name);
+                            if (comparisons[p.id] && comparisons[p.id].name) {
+                              groups[justText].comparisons.push({ pName: p.name, comp: comparisons[p.id] });
+                            }
+                          });
+
                           return (
-                            <div className="space-y-4">
-                              {productsWithData.map((p, idx) => {
-                                const just = justifications[p.id];
-                                const comp = comparisons[p.id];
+                            <div className="space-y-6 mt-2">
+                              {Object.keys(groups).map((justText, idx) => {
+                                const group = groups[justText];
+                                const isGlobal = group.items.length > 3 || group.items.length === products.length;
+                                
                                 return (
-                                  <div key={`jp-${p.id}`} className="mb-3 p-3 border border-slate-300 rounded bg-slate-50">
-                                    <div className="font-bold underline mb-2">Item Survei: {p.name}</div>
+                                  <div key={`group-${idx}`} className="mb-4 p-4 border border-slate-300 rounded-lg bg-slate-50 shadow-sm page-break-inside-avoid">
+                                    <div className="flex items-center gap-2 mb-3 border-b border-slate-200 pb-2">
+                                      <span className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                                        {isGlobal ? 'Klausul Tingkat Paket' : 'Klausul Spesifik'}
+                                      </span>
+                                      <span className="text-[10pt] font-semibold text-slate-700">
+                                        Berlaku untuk {group.items.length} item barang
+                                      </span>
+                                    </div>
                                     
-                                    {just && (
-                                      <div className="mb-3">
-                                        <div className="font-semibold text-slate-800">📝 Justifikasi Pemilihan:</div>
-                                        <div className="text-justify italic pl-2 border-l-[3px] border-indigo-400">"{just}"</div>
+                                    <div className="mb-3 text-[10pt] text-slate-600 italic leading-relaxed">
+                                      {group.items.join(', ')}
+                                    </div>
+
+                                    {justText && (
+                                      <div className="mb-4">
+                                        <div className="font-bold text-slate-800 text-[11pt] mb-1">Pertimbangan Pemilihan Penyedia:</div>
+                                        <div className="text-justify text-[11pt] pl-3 border-l-4 border-indigo-400 mt-2">
+                                          Berdasarkan hasil survei pasar e-Katalog, Pejabat Pembuat Komitmen (PPK) menetapkan pemilihan penyedia dengan pertimbangan spesifikasi kinerja, waktu, dan/atau layanan pendukung sebagai berikut:<br/>
+                                          <div className="mt-2 font-medium italic text-slate-800">"{justText}"</div>
+                                        </div>
                                       </div>
                                     )}
 
-                                    {comp && comp.name && (
-                                      <div>
-                                        <div className="font-semibold text-slate-800 mb-1">⚖️ Detail Produk Pembanding:</div>
-                                        <table className="w-full text-[10pt] border-collapse">
+                                    {group.comparisons.length > 0 && (
+                                      <div className="mt-4">
+                                        <div className="font-bold text-slate-800 text-[11pt] mb-2">Referensi Produk Pembanding:</div>
+                                        <table className="w-full text-[10pt] border-collapse border border-slate-300">
+                                          <thead>
+                                            <tr className="bg-slate-200 text-slate-800">
+                                              <th className="border border-slate-300 p-1.5 text-left font-bold">Item Utama</th>
+                                              <th className="border border-slate-300 p-1.5 text-left font-bold">Penyedia Pembanding</th>
+                                              <th className="border border-slate-300 p-1.5 text-left font-bold">Produk Pembanding</th>
+                                              <th className="border border-slate-300 p-1.5 text-right font-bold">Harga (Rp)</th>
+                                            </tr>
+                                          </thead>
                                           <tbody>
-                                            <tr><td className="w-24 font-medium py-0.5">Penyedia</td><td>: {comp.vendor || '-'}</td></tr>
-                                            <tr><td className="font-medium py-0.5">Produk</td><td>: {comp.name}</td></tr>
-                                            <tr><td className="font-medium py-0.5">Status</td><td>: {comp.status || 'Luar Katalog'}</td></tr>
-                                            <tr><td className="font-medium py-0.5">Harga</td><td>: Rp {parseInt(comp.price || 0).toLocaleString('id-ID')}</td></tr>
-                                            <tr><td className="font-medium py-0.5">Tangkap Layar</td><td>: Terlampir</td></tr>
+                                            {group.comparisons.map((c, i) => (
+                                              <tr key={i}>
+                                                <td className="border border-slate-300 p-1.5">{c.pName}</td>
+                                                <td className="border border-slate-300 p-1.5">{c.comp.vendor || '-'}</td>
+                                                <td className="border border-slate-300 p-1.5">{c.comp.name}</td>
+                                                <td className="border border-slate-300 p-1.5 text-right">{parseInt(c.comp.price || 0).toLocaleString('id-ID')}</td>
+                                              </tr>
+                                            ))}
                                           </tbody>
                                         </table>
                                       </div>
