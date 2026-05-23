@@ -1564,6 +1564,8 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
     URL.revokeObjectURL(url);
   };
 
+  const isOverBudget = !isHpsExemptSelected && selectedPack?.pagu > 0 && parseInt(hpsValue || 0) > selectedPack.pagu;
+
   return (
     <div id="pbk-persiapan-root" className="animate-fade-in pb-12">
       <div className="flex justify-between items-start mb-8 pb-6 border-b border-slate-100">
@@ -3332,6 +3334,18 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                     <span>💡</span> Paket dibebaskan dari kewajiban penyusunan HPS berdasarkan Perpres 12/2021.
                   </div>
                 )}
+                {isOverBudget && (
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                    <span className="text-red-500 text-lg">⚠️</span>
+                    <div>
+                      <div className="text-red-700 font-bold text-xs uppercase tracking-wider mb-0.5">Peringatan: Over Budget (Melebihi Pagu DPA)</div>
+                      <div className="text-red-600 text-[10px]">
+                        Total estimasi HPS (Rp {parseInt(hpsValue || 0).toLocaleString('id-ID')}) melebihi batas Pagu DPA/SiRUP (Rp {selectedPack.pagu.toLocaleString('id-ID')}).<br/>
+                        <b>Dokumen tidak dapat disahkan.</b> Silakan revisi harga, hapus barang, atau cari barang dengan harga lebih murah.
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -3403,7 +3417,8 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                             setIsSigned(true)
                             setStep(4)
                           }}
-                          className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold px-5 py-3 rounded-xl flex items-center gap-2 transition-all"
+                          disabled={isOverBudget}
+                          className={`text-white text-xs font-semibold px-5 py-3 rounded-xl flex items-center gap-2 transition-all ${isOverBudget ? 'bg-slate-400 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-600'}`}
                         >
                           Sahkan Dokumen (TTE)
                         </button>
