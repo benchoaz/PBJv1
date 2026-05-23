@@ -295,10 +295,25 @@ async function searchItem(page, item, index) {
       });
     }
 
-    // Tentukan threshold kecocokan minimum (0.01 agar sangat toleran)
+    let autoComparator = null;
     const isValidMatch = bestCandidate && highestScore >= 0.01;
     if (isValidMatch) {
       console.log(`  🌟 Produk Terpilih: "${bestCandidate.title}" dengan skor ${highestScore.toFixed(3)}`);
+      
+      // AUTO-COMPARATOR LOGIC
+      const otherCandidates = searchData.filter(c => c !== bestCandidate && c.price && c.price > bestCandidate.price);
+      if (otherCandidates.length > 0) {
+        otherCandidates.sort((a, b) => a.price - b.price);
+        let diffVendor = otherCandidates.find(c => c.vendor !== bestCandidate.vendor);
+        let chosenComp = diffVendor || otherCandidates[0];
+        autoComparator = {
+          name: chosenComp.title,
+          vendor: chosenComp.vendor,
+          price: chosenComp.price,
+          status: 'Dalam Katalog'
+        };
+        console.log(`  ⚖️ Auto-Comparator Ditemukan: ${autoComparator.vendor} - Rp ${autoComparator.price}`);
+      }
     } else {
       if (bestCandidate) {
         console.log(`  ⚠️ Produk terdekat "${bestCandidate.title}" memiliki skor terlalu rendah (${highestScore.toFixed(3)}).`);
@@ -376,7 +391,8 @@ async function searchItem(page, item, index) {
         ? `/screenshots/${safeId}_detail.png` 
         : `/screenshots/${safeId}_search.png`,
       searchImg: `/screenshots/${safeId}_search.png`,
-      success: true
+      success: true,
+      comparator: autoComparator
     };
 
   } catch (err) {

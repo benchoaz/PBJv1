@@ -439,13 +439,25 @@ export default function ProcurementPreparation() {
 
       const newHpsPrices = {};
       let totalHpsEstimate = 0;
+      const newComparisons = { ...comparisons };
 
       // Integrate real results
       results.forEach((res, index) => {
         const qty = items[index].qty || 1;
         newHpsPrices[res.name] = res.price;
         totalHpsEstimate += (res.price * qty);
+        
+        // Auto-Comparator Capture
+        if (res.comparator) {
+          newComparisons['ITEM-' + index] = {
+            vendor: res.comparator.vendor,
+            name: res.comparator.name,
+            price: res.comparator.price,
+            status: res.comparator.status
+          };
+        }
       });
+      setComparisons(newComparisons);
 
       setSurveyProgressPercent(95);
       await new Promise(r => setTimeout(r, 500));
@@ -639,6 +651,20 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
           success: singleRes.success
         };
 
+        // Auto-Comparator Capture
+        if (singleRes.comparator) {
+          setComparisons(prev => ({
+            ...prev,
+            ['ITEM-' + productIndex]: {
+              vendor: singleRes.comparator.vendor,
+              name: singleRes.comparator.name,
+              price: singleRes.comparator.price,
+              status: singleRes.comparator.status
+            }
+          }));
+        }
+
+
         const updatedSurveyData = {
           ...surveyData,
           products: updatedProducts,
@@ -745,6 +771,19 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
           successCount++;
         }
         newHpsPrices[targetItem.name] = res.price;
+
+        // Auto-Comparator Capture
+        if (res.comparator) {
+          setComparisons(prev => ({
+            ...prev,
+            ['ITEM-' + originalIndex]: {
+              vendor: res.comparator.vendor,
+              name: res.comparator.name,
+              price: res.comparator.price,
+              status: res.comparator.status
+            }
+          }));
+        }
       });
 
       const updatedSurveyData = {
@@ -3132,24 +3171,35 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                                   className={`w-full px-2.5 py-1.5 bg-slate-50 border rounded-lg text-[10px] text-slate-800 focus:outline-none focus:ring-1 min-h-[40px] resize-y transition-colors ${isEnhancingJustification[p.id] ? 'border-indigo-400 ring-1 ring-indigo-400 bg-indigo-50/30' : 'border-slate-200 focus:ring-indigo-500'}`}
                                   disabled={isEnhancingJustification[p.id]}
                                 />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const currentJustification = justifications[p.id] || '';
-                                    if (!currentJustification.trim()) {
-                                      alert('Isi justifikasi terlebih dahulu sebelum diterapkan ke semua barang!');
-                                      return;
-                                    }
-                                    const newJustifications = { ...justifications };
-                                    surveyData.products.forEach(prod => {
-                                      newJustifications[prod.id] = currentJustification;
-                                    });
-                                    setJustifications(newJustifications);
-                                  }}
-                                  className="text-[9px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded w-full mt-1.5 text-center transition-colors border border-emerald-200"
-                                >
-                                  ✨ Terapkan Alasan ini ke Seluruh Barang
-                                </button>
+                                <div className="flex flex-col gap-1.5 mt-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setJustifications({ ...justifications, [p.id]: "Penyedia ini dipilih karena mampu menyediakan mayoritas (>80%) dari total item barang yang dibutuhkan, sehingga sangat mengefisienkan biaya pengiriman, mempermudah administrasi kontrak, dan memastikan seluruh barang tiba dalam satu waktu." });
+                                    }}
+                                    className="text-[9px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded w-full text-center transition-colors border border-blue-200"
+                                  >
+                                    💡 Template Alasan: Satu Pintu (&gt;80%)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const currentJustification = justifications[p.id] || '';
+                                      if (!currentJustification.trim()) {
+                                        alert('Isi justifikasi terlebih dahulu sebelum diterapkan ke semua barang!');
+                                        return;
+                                      }
+                                      const newJustifications = { ...justifications };
+                                      surveyData.products.forEach(prod => {
+                                        newJustifications[prod.id] = currentJustification;
+                                      });
+                                      setJustifications(newJustifications);
+                                    }}
+                                    className="text-[9px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded w-full text-center transition-colors border border-emerald-200"
+                                  >
+                                    ✨ Terapkan Alasan ini ke Seluruh Barang
+                                  </button>
+                                </div>
                               </div>
                               <div>
                                 <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">⚖️ Produk Pembanding</label>
