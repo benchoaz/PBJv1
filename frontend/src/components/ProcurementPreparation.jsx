@@ -4023,22 +4023,26 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
 
                     {/* Lampiran Screenshot Jika Ada */}
                     {getActiveSurveyData() && (() => {
-                      const foundWithImages = getActiveSurveyData().products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN' && p.img);
+                      const foundWithImages = getActiveSurveyData().products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN' && (p.searchImg || p.img));
                       if (foundWithImages.length === 0) return null;
                       return (
                         <div className="mt-8 break-before-page" style={{ pageBreakBefore: 'always', breakBefore: 'page' }}>
-                          <div className="font-bold text-[12px] uppercase mb-4 text-center">LAMPIRAN: BUKTI TANGKAPAN LAYAR (SCREENSHOT) REFERENSI E-KATALOG LOKAL/NASIONAL</div>
-                          <div className="grid grid-cols-2 gap-4">
-                            {foundWithImages.map(p => (
-                              <div key={p.id} className="border border-slate-400 p-2 text-center text-[9px] bg-slate-50">
-                                <div className="font-bold mb-1">{p.vendor}</div>
-                                <img src={p.img} alt={p.name} className="w-full h-32 object-cover border border-slate-300 mb-1" />
-                                <div className="font-mono text-blue-800 break-all underline">
-                                  <a href={p.link} target="_blank" rel="noopener noreferrer" className="hover:text-blue-900">{p.link}</a>
+                          <div className="font-bold text-[12px] uppercase mb-6 text-center border-b-2 border-slate-900 pb-2">LAMPIRAN: BUKTI TANGKAPAN LAYAR (SCREENSHOT) REFERENSI E-KATALOG LOKAL/NASIONAL</div>
+                          <div className="flex flex-col gap-8">
+                            {foundWithImages.map((p, index) => {
+                              // Gunakan searchImg (ber-watermark) jika ada, jika tidak fallback ke img thumbnail biasa
+                              const imgSrc = p.searchImg ? `http://localhost:3001${p.searchImg}` : p.img;
+                              return (
+                                <div key={p.id} className="border border-slate-400 p-4 text-[10px] bg-slate-50" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                                  <div className="font-bold mb-2 text-[12px]">Gambar {index + 1}: {p.name} - {p.vendor}</div>
+                                  <img src={imgSrc} alt={p.name} className="w-full h-auto object-contain border-2 border-slate-300 shadow-sm mb-2" style={{ maxHeight: '800px' }} />
+                                  <div className="font-mono text-blue-800 break-all underline mt-2">
+                                    <a href={p.link} target="_blank" rel="noopener noreferrer" className="hover:text-blue-900">{p.link}</a>
+                                  </div>
+                                  <div className="font-bold mt-1 text-slate-800">Harga Tayang: Rp {p.price.toLocaleString('id-ID')}</div>
                                 </div>
-                                <div className="font-bold">Harga Tayang: Rp {p.price.toLocaleString('id-ID')}</div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       );
