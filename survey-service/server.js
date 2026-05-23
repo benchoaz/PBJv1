@@ -141,6 +141,41 @@ function getSimilarityScore(target, candidate) {
   return baseScore * lengthPenalty * positionBonus;
 }
 
+async function injectWatermark(page) {
+  try {
+    await page.evaluate(() => {
+      // Hapus watermark lama jika ada
+      const oldWm = document.getElementById('pbj-watermark');
+      if (oldWm) oldWm.remove();
+
+      const wm = document.createElement('div');
+      wm.id = 'pbj-watermark';
+      wm.style.position = 'fixed';
+      wm.style.bottom = '15px';
+      wm.style.right = '15px';
+      wm.style.backgroundColor = 'rgba(220, 38, 38, 0.85)';
+      wm.style.color = 'white';
+      wm.style.padding = '8px 16px';
+      wm.style.fontSize = '13px';
+      wm.style.fontWeight = 'bold';
+      wm.style.fontFamily = 'monospace';
+      wm.style.zIndex = '9999999';
+      wm.style.borderRadius = '6px';
+      wm.style.pointerEvents = 'none';
+      wm.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.3)';
+      wm.style.border = '2px solid rgba(255,255,255,0.2)';
+      
+      const now = new Date();
+      wm.innerText = '🔒 BUKTI SURVEI E-KATALOG\\n' + now.toLocaleString('id-ID');
+      
+      document.body.appendChild(wm);
+    });
+  } catch (err) {
+    console.error('Gagal menyuntikkan watermark:', err);
+  }
+}
+
+
 async function searchItem(page, item, index) {
   const safeId = 'item_' + index + '_' + item.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
   console.log(`\n[${index + 1}] Memproses: "${item.name}"`);
@@ -155,6 +190,7 @@ async function searchItem(page, item, index) {
         await page.goto(item.targetUrl, { waitUntil: 'networkidle2', timeout: 45000 });
         await new Promise(r => setTimeout(r, 4000));
         const detailFile = path.join(screenshotDir, safeId + '_detail.png');
+        await injectWatermark(page);
         await page.screenshot({ path: detailFile, fullPage: false });
         
         const detailData = await page.evaluate(() => {
@@ -271,6 +307,7 @@ async function searchItem(page, item, index) {
           searchData = candidates;
           successfulQuery = query;
           // Simpan screenshot pencarian yang sukses
+          await injectWatermark(page);
           await page.screenshot({ path: searchFile, fullPage: false });
           console.log(`    ✅ Berhasil menemukan ${candidates.length} produk dengan query: "${query}"`);
           break;
