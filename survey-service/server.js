@@ -19,10 +19,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const screenshotDir = '/screenshots';
+const screenshotDir = path.join(__dirname, 'screenshots');
 if (!fs.existsSync(screenshotDir)) {
   fs.mkdirSync(screenshotDir, { recursive: true });
 }
+
+// BUKA AKSES: Izinkan peramban mengakses folder screenshot secara publik
+app.use('/screenshots', express.static(screenshotDir));
 
 /**
  * Membersihkan nama barang dari spesifikasi kurung, stopwords pengadaan, dan satuan kemasan.
@@ -86,7 +89,7 @@ function getQueryAttempts(originalName) {
   const uniqueAttempts = [];
   attempts.forEach(q => {
     const trimmed = q.trim();
-    if (trimmed.length >= 3 && !uniqueAttempts.includes(trimmed)) {
+    if (trimmed.length >= 2 && !uniqueAttempts.includes(trimmed)) {
       uniqueAttempts.push(trimmed);
     }
   });
@@ -233,14 +236,24 @@ async function searchItem(page, item, index) {
       let searchUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(query);
       
       if (item.locations && item.locations.length > 0) {
-        let rName = '', rCode = '';
-        let lLower = item.locations[0].toLowerCase();
-        if (lLower.includes('kota') && lLower.includes('probolinggo')) { rName = 'Kota Probolinggo'; rCode = '35.74'; }
-        else if (lLower.includes('probolinggo')) { rName = 'Kab. Probolinggo'; rCode = '35.13'; }
-        else if (lLower.includes('surabaya')) { rName = 'Kota Surabaya'; rCode = '35.78'; }
+        let rNames = [];
+        let rCodes = [];
         
-        if (rName) searchUrl += '&regionNames=' + encodeURIComponent(rName);
-        if (rCode) searchUrl += '&regionCode=' + encodeURIComponent(rCode);
+        item.locations.forEach(loc => {
+          let lLower = loc.toLowerCase();
+          if (lLower.includes('kota') && lLower.includes('probolinggo')) { 
+            if (!rNames.includes('Kota Probolinggo')) { rNames.push('Kota Probolinggo'); rCodes.push('35.74'); }
+          }
+          else if (lLower.includes('probolinggo')) { 
+            if (!rNames.includes('Kab. Probolinggo')) { rNames.push('Kab. Probolinggo'); rCodes.push('35.13'); }
+          }
+          else if (lLower.includes('surabaya')) { 
+            if (!rNames.includes('Kota Surabaya')) { rNames.push('Kota Surabaya'); rCodes.push('35.78'); }
+          }
+        });
+        
+        if (rNames.length > 0) searchUrl += '&regionNames=' + encodeURIComponent(rNames.join(','));
+        if (rCodes.length > 0) searchUrl += '&regionCode=' + encodeURIComponent(rCodes.join(','));
       }
       
       console.log(`  → [Mencari #${i + 1}] Membuka: ${searchUrl}`);
@@ -326,19 +339,34 @@ async function searchItem(page, item, index) {
     if (searchData.length > 0) {
       console.log(`  → Menghitung skor kemiripan untuk ${searchData.length} kandidat...`);
       searchData.forEach(cand => {
+        // [BARU] HUKUM BATAS PAGU (PRICE CEILING)
+        // Pengecualian: Jika kandidat cocok dengan target penyedia yang diarahkan (targetVendor), jangan ditolak agar bisa masuk tahap negosiasi
+        const isTargetMatch = item.targetVendor && cand.vendor.toLowerCase().includes(item.targetVendor.toLowerCase());
+        if (!isTargetMatch && item.fallbackPrice && cand.price && cand.price > item.fallbackPrice) {
+          console.log(`    🚫 [TOLAK] Harga Rp ${cand.price} melampaui PAGU DPA (Rp ${item.fallbackPrice}): ${cand.title}`);
+          return; // Lompati kandidat ini, jangan dinilai
+        }
+
         let score = getSimilarityScore(searchTarget, cand.title);
         
         // 🛡️ PENGAWAL HUKUM (LEGAL SHIELD): Boost skor jika sesuai target penyedia
-        if (item.targetVendor && cand.vendor.toLowerCase().includes(item.targetVendor.toLowerCase())) {
+        if (isTargetMatch) {
           score += 10.0;
           console.log(`    ⭐ [TARGET MATCH] Vendor ${cand.vendor} mendapat prioritas mutlak!`);
         }
 
         cand.score = score;
-        console.log(`    - [Skor: ${score.toFixed(3)}] ${cand.title} (Vendor: ${cand.vendor})`);
+        console.log(`    - [Skor: ${score.toFixed(3)}] ${cand.title} (Vendor: ${cand.vendor}, Rp ${cand.price})`);
         if (score > highestScore) {
           highestScore = score;
           bestCandidate = cand;
+        } else if (Math.abs(score - highestScore) < 0.001 && bestCandidate) {
+          // TIE-BREAKER: Prioritaskan harga yang lebih murah!
+          if (cand.price && bestCandidate.price && cand.price < bestCandidate.price) {
+            console.log(`    ⚖️ [TIE-BREAKER] Memilih harga lebih murah: Rp ${cand.price} vs Rp ${bestCandidate.price}`);
+            highestScore = score;
+            bestCandidate = cand;
+          }
         }
       });
     }
@@ -372,13 +400,22 @@ async function searchItem(page, item, index) {
     // ── STEP 3: Navigate to product detail (Direct clean link) ─────────
     let detailUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(successfulQuery || searchTarget);
     if (item.locations && item.locations.length > 0) {
-        let rName = '', rCode = '';
-        let lLower = item.locations[0].toLowerCase();
-        if (lLower.includes('kota') && lLower.includes('probolinggo')) { rName = 'Kota Probolinggo'; rCode = '35.74'; }
-        else if (lLower.includes('probolinggo')) { rName = 'Kab. Probolinggo'; rCode = '35.13'; }
-        else if (lLower.includes('surabaya')) { rName = 'Kota Surabaya'; rCode = '35.78'; }
-        if (rName) detailUrl += '&regionNames=' + encodeURIComponent(rName);
-        if (rCode) detailUrl += '&regionCode=' + encodeURIComponent(rCode);
+        let rNames = [];
+        let rCodes = [];
+        item.locations.forEach(loc => {
+          let lLower = loc.toLowerCase();
+          if (lLower.includes('kota') && lLower.includes('probolinggo')) { 
+            if (!rNames.includes('Kota Probolinggo')) { rNames.push('Kota Probolinggo'); rCodes.push('35.74'); }
+          }
+          else if (lLower.includes('probolinggo')) { 
+            if (!rNames.includes('Kab. Probolinggo')) { rNames.push('Kab. Probolinggo'); rCodes.push('35.13'); }
+          }
+          else if (lLower.includes('surabaya')) { 
+            if (!rNames.includes('Kota Surabaya')) { rNames.push('Kota Surabaya'); rCodes.push('35.78'); }
+          }
+        });
+        if (rNames.length > 0) detailUrl += '&regionNames=' + encodeURIComponent(rNames.join(','));
+        if (rCodes.length > 0) detailUrl += '&regionCode=' + encodeURIComponent(rCodes.join(','));
     }
     let detailFile = searchFile; // fallback to search screenshot
     let finalVendor = 'PENYEDIA INAPROC';
@@ -481,13 +518,21 @@ app.get('/api/survey/status/:id', async (req, res) => {
   
   const state = await job.getState();
   const progress = job.progress || 0;
+  const isCanceled = await connection.get(`cancel_job_${req.params.id}`);
   
   res.json({ 
     status: state, 
     progress: progress, 
     results: job.returnvalue || null,
-    error: job.failedReason || null
+    error: job.failedReason || null,
+    isCanceled: !!isCanceled
   });
+});
+
+app.post('/api/survey/cancel/:id', async (req, res) => {
+  const jobId = req.params.id;
+  await connection.setex(`cancel_job_${jobId}`, 3600, '1'); // set flag to expire in 1 hour
+  res.json({ success: true, message: `Job ${jobId} cancellation requested` });
 });
 
 // ── REDIS WORKER (BACKGROUND PROCESS) ──────────────────────────────────────────
@@ -501,6 +546,7 @@ const worker = new Worker('survey-jobs', async job => {
   try {
     browser = await puppeteer.launch({
       headless: 'new',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -520,6 +566,12 @@ const worker = new Worker('survey-jobs', async job => {
 
     const results = [];
     for (let i = 0; i < items.length; i++) {
+      const isCanceled = await connection.get(`cancel_job_${job.id}`);
+      if (isCanceled) {
+        console.log(`\n🛑 [Worker] Job ${job.id} dibatalkan oleh pengguna pada item ke-${i+1}`);
+        break; // Stop immediately, return what we have so far
+      }
+
       const result = await searchItem(page, items[i], i);
       results.push(result);
       

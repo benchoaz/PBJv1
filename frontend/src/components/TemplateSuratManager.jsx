@@ -1,5 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { 
+  FileText, 
+  Settings, 
+  Printer, 
+  Download, 
+  Copy, 
+  Trash2, 
+  RefreshCw, 
+  Sparkles,
+  Info,
+  Layers,
+  ChevronRight,
+  ChevronDown,
+  Search,
+  CheckCircle,
+  Edit3,
+  BookOpen,
+  Image as ImageIcon,
+  Lock as LockIcon,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 
 const DEFAULT_TEMPLATES = [
   {
@@ -146,24 +168,183 @@ Penyedia,
     isDefault: true
   },
   {
-    id: 'TPL-006',
+    id: 'TPL-006A',
     category: 'Tahap Persiapan',
-    name: 'Dokumen Persiapan Pengadaan (DPP)',
+    name: 'Dokumen Persiapan Pengadaan (ATK / Barang Umum)',
     content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
 Nomor: {{nomor_dpp}}
 Tanggal: {{tanggal_dpp}}
 
 Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah beserta perubahannya, Pejabat Pembuat Komitmen (PPK) telah menyusun Dokumen Persiapan Pengadaan (DPP) untuk paket pekerjaan berikut:
 
-Nama Pekerjaan  : {{nama_pekerjaan}}
-Lokasi Pekerjaan: {{tempat_penetapan}}
-Nilai Pagu      : {{nilai_pagu}}
-Sumber Dana     : {{sumber_dana}}
+Perangkat Daerah       : {{nama_satker}}
+Program                : {{program}}
+Kegiatan               : {{kegiatan}}
+Sub Kegiatan           : {{sub_kegiatan}}
+Pengadaan/Pekerjaan    : {{nama_pekerjaan}}
+Lokasi Pekerjaan       : {{lokasi_pekerjaan}}
+Volume Pekerjaan       : {{volume_pekerjaan}}
+Uraian Pekerjaan       : {{uraian_pekerjaan}}
+Produk Dalam Negeri    : {{pdn}}
+Usaha Kecil            : {{usaha_kecil}}
+Pra DIPA/DPA           : {{pra_dipa}}
+Sumber Dana            : {{sumber_dana}}
+Mata Anggaran Kegiatan : {{mak}}
+Pagu Anggaran          : {{nilai_pagu}}
 
-Dokumen Persiapan Pengadaan ini terdiri dari:
-1. Spesifikasi Teknis / Kerangka Acuan Kerja (KAK)
-2. Harga Perkiraan Sendiri (HPS)
-3. Rancangan Kontrak (Surat Pesanan)
+{{komponen_dinamis_dpp}}
+
+Demikian Dokumen Persiapan Pengadaan ini ditetapkan untuk dipergunakan sebagai dasar pelaksanaan proses pengadaan melalui metode E-Purchasing.
+
+Ditetapkan di: {{tempat_penetapan}}
+
+Pejabat Pembuat Komitmen,
+
+
+{{nama_ppk}}
+NIP. {{nip_ppk}}`,
+    isDefault: true
+  },
+  {
+    id: 'TPL-006B',
+    category: 'Tahap Persiapan',
+    name: 'Dokumen Persiapan Pengadaan (Makanan dan Minuman)',
+    content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
+Nomor: {{nomor_dpp}}
+Tanggal: {{tanggal_dpp}}
+
+Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah beserta perubahannya, Pejabat Pembuat Komitmen (PPK) telah menyusun Dokumen Persiapan Pengadaan (DPP) untuk paket pekerjaan berikut:
+
+Perangkat Daerah       : {{nama_satker}}
+Program                : {{program}}
+Kegiatan               : {{kegiatan}}
+Sub Kegiatan           : {{sub_kegiatan}}
+Pengadaan/Pekerjaan    : {{nama_pekerjaan}}
+Lokasi Pekerjaan       : {{lokasi_pekerjaan}}
+Volume Pekerjaan       : {{volume_pekerjaan}}
+Uraian Pekerjaan       : {{uraian_pekerjaan}}
+Produk Dalam Negeri    : {{pdn}}
+Usaha Kecil            : {{usaha_kecil}}
+Pra DIPA/DPA           : {{pra_dipa}}
+Sumber Dana            : {{sumber_dana}}
+Mata Anggaran Kegiatan : {{mak}}
+Pagu Anggaran          : {{nilai_pagu}}
+
+{{komponen_dinamis_dpp}}
+
+Demikian Dokumen Persiapan Pengadaan ini ditetapkan untuk dipergunakan sebagai dasar pelaksanaan proses pengadaan melalui metode E-Purchasing.
+
+Ditetapkan di: {{tempat_penetapan}}
+
+Pejabat Pembuat Komitmen,
+
+
+{{nama_ppk}}
+NIP. {{nip_ppk}}`,
+    isDefault: true
+  },
+  {
+    id: 'TPL-006C',
+    category: 'Tahap Persiapan',
+    name: 'Dokumen Persiapan Pengadaan (Peralatan Modal / Teknologi)',
+    content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
+Nomor: {{nomor_dpp}}
+Tanggal: {{tanggal_dpp}}
+
+Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah beserta perubahannya, Pejabat Pembuat Komitmen (PPK) telah menyusun Dokumen Persiapan Pengadaan (DPP) untuk paket pekerjaan berikut:
+
+Perangkat Daerah       : {{nama_satker}}
+Program                : {{program}}
+Kegiatan               : {{kegiatan}}
+Sub Kegiatan           : {{sub_kegiatan}}
+Pengadaan/Pekerjaan    : {{nama_pekerjaan}}
+Lokasi Pekerjaan       : {{lokasi_pekerjaan}}
+Volume Pekerjaan       : {{volume_pekerjaan}}
+Uraian Pekerjaan       : {{uraian_pekerjaan}}
+Produk Dalam Negeri    : {{pdn}}
+Usaha Kecil            : {{usaha_kecil}}
+Pra DIPA/DPA           : {{pra_dipa}}
+Sumber Dana            : {{sumber_dana}}
+Mata Anggaran Kegiatan : {{mak}}
+Pagu Anggaran          : {{nilai_pagu}}
+
+{{komponen_dinamis_dpp}}
+
+Demikian Dokumen Persiapan Pengadaan ini ditetapkan untuk dipergunakan sebagai dasar pelaksanaan proses pengadaan melalui metode E-Purchasing.
+
+Ditetapkan di: {{tempat_penetapan}}
+
+Pejabat Pembuat Komitmen,
+
+
+{{nama_ppk}}
+NIP. {{nip_ppk}}`,
+    isDefault: true
+  },
+  {
+    id: 'TPL-006D',
+    category: 'Tahap Persiapan',
+    name: 'Dokumen Persiapan Pengadaan (Jasa Lainnya / Konstruksi)',
+    content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
+Nomor: {{nomor_dpp}}
+Tanggal: {{tanggal_dpp}}
+
+Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah beserta perubahannya, Pejabat Pembuat Komitmen (PPK) telah menyusun Dokumen Persiapan Pengadaan (DPP) untuk paket pekerjaan berikut:
+
+Perangkat Daerah       : {{nama_satker}}
+Program                : {{program}}
+Kegiatan               : {{kegiatan}}
+Sub Kegiatan           : {{sub_kegiatan}}
+Pengadaan/Pekerjaan    : {{nama_pekerjaan}}
+Lokasi Pekerjaan       : {{lokasi_pekerjaan}}
+Volume Pekerjaan       : {{volume_pekerjaan}}
+Uraian Pekerjaan       : {{uraian_pekerjaan}}
+Produk Dalam Negeri    : {{pdn}}
+Usaha Kecil            : {{usaha_kecil}}
+Pra DIPA/DPA           : {{pra_dipa}}
+Sumber Dana            : {{sumber_dana}}
+Mata Anggaran Kegiatan : {{mak}}
+Pagu Anggaran          : {{nilai_pagu}}
+
+{{komponen_dinamis_dpp}}
+
+Demikian Dokumen Persiapan Pengadaan ini ditetapkan untuk dipergunakan sebagai dasar pelaksanaan proses pengadaan melalui metode E-Purchasing.
+
+Ditetapkan di: {{tempat_penetapan}}
+
+Pejabat Pembuat Komitmen,
+
+
+{{nama_ppk}}
+NIP. {{nip_ppk}}`,
+    isDefault: true
+  },
+  {
+    id: 'TPL-006E',
+    category: 'Tahap Persiapan',
+    name: 'Dokumen Persiapan Pengadaan (Konsolidasi Sektoral)',
+    content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
+Nomor: {{nomor_dpp}}
+Tanggal: {{tanggal_dpp}}
+
+Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah beserta perubahannya, Pejabat Pembuat Komitmen (PPK) telah menyusun Dokumen Persiapan Pengadaan (DPP) untuk paket pekerjaan berikut:
+
+Perangkat Daerah       : {{nama_satker}}
+Program                : {{program}}
+Kegiatan               : {{kegiatan}}
+Sub Kegiatan           : {{sub_kegiatan}}
+Pengadaan/Pekerjaan    : {{nama_pekerjaan}}
+Lokasi Pekerjaan       : {{lokasi_pekerjaan}}
+Volume Pekerjaan       : {{volume_pekerjaan}}
+Uraian Pekerjaan       : {{uraian_pekerjaan}}
+Produk Dalam Negeri    : {{pdn}}
+Usaha Kecil            : {{usaha_kecil}}
+Pra DIPA/DPA           : {{pra_dipa}}
+Sumber Dana            : {{sumber_dana}}
+Mata Anggaran Kegiatan : {{mak}}
+Pagu Anggaran          : {{nilai_pagu}}
+
+{{komponen_dinamis_dpp}}
 
 Demikian Dokumen Persiapan Pengadaan ini ditetapkan untuk dipergunakan sebagai dasar pelaksanaan proses pengadaan melalui metode E-Purchasing.
 
@@ -206,14 +387,25 @@ NIP. {{nip_ppk}}`,
   }
 ];
 
+// High-fidelity SVG of the Indonesian Garuda Emblem
 const LogoGarudaPlaceholder = () => (
-  <svg width="70" height="70" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M50 5 L90 25 L90 60 C90 85 50 100 50 100 C50 100 10 85 10 60 L10 25 Z" stroke="#1e293b" strokeWidth="3" fill="transparent"/>
-    <circle cx="50" cy="45" r="15" fill="#1e293b"/>
-    <path d="M50 60 L50 80" stroke="#1e293b" strokeWidth="3"/>
-    <path d="M35 45 L20 45" stroke="#1e293b" strokeWidth="3"/>
-    <path d="M65 45 L80 45" stroke="#1e293b" strokeWidth="3"/>
-    <path d="M40 25 L60 25" stroke="#1e293b" strokeWidth="3"/>
+  <svg width="65" height="65" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-sm select-none">
+    <path d="M50 8 C58 20 85 24 90 28 C90 45 82 72 50 94 C18 72 10 45 10 28 C15 24 42 20 50 8 Z" fill="#D97706" opacity="0.1" />
+    <path d="M50 8 C58 20 85 24 90 28 C90 45 82 72 50 94 C18 72 10 45 10 28 C15 24 42 20 50 8 Z" stroke="#8F5C12" strokeWidth="2.5" strokeLinejoin="round" />
+    
+    <path d="M50 35 C35 32 18 36 12 44 C16 52 24 58 35 56 C33 62 25 68 20 72 C30 72 38 68 42 60" stroke="#8F5C12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M50 35 C65 32 82 36 88 44 C84 52 76 58 65 56 C67 62 75 68 80 72 C70 72 62 68 58 60" stroke="#8F5C12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    
+    <path d="M43 62 L43 78 C43 82 50 84 50 84 C50 84 57 82 57 78 L57 62 Z" fill="#8F5C12" opacity="0.2"/>
+    <path d="M46 62 V76 M50 62 V80 M54 62 V76" stroke="#8F5C12" strokeWidth="1.8" strokeLinecap="round"/>
+    
+    <rect x="42" y="38" width="16" height="20" rx="3" fill="#B91C1C" stroke="#8F5C12" strokeWidth="2" />
+    <path d="M42 48 H58" stroke="#8F5C12" strokeWidth="1.5" />
+    <path d="M50 38 V58" stroke="#8F5C12" strokeWidth="1.5" />
+    <circle cx="50" cy="48" r="3" fill="#D97706" />
+    
+    <path d="M50 18 C52 14 55 12 58 14 C58 17 56 20 53 22 Z" fill="#8F5C12" stroke="#8F5C12" strokeWidth="1" />
+    <circle cx="53" cy="17" r="1" fill="#FFFFFF" />
   </svg>
 );
 
@@ -223,14 +415,17 @@ export default function TemplateSuratManager() {
   const [templates, setTemplates] = useState(() => {
     const saved = localStorage.getItem('pbj_templates');
     if (saved) {
-      const parsed = JSON.parse(saved);
-      const newTemplates = [...parsed];
-      DEFAULT_TEMPLATES.forEach(defTpl => {
-        if (!parsed.find(t => t.id === defTpl.id)) {
-          newTemplates.push(defTpl);
+      try { 
+        let parsed = JSON.parse(saved);
+        // Migration: If the old templates don't have the new split DPP templates, merge them
+        const hasNewTemplate = parsed.some(t => t.id === 'TPL-006A');
+        if (!hasNewTemplate) {
+          const newDefaults = DEFAULT_TEMPLATES.filter(dt => !parsed.some(pt => pt.id === dt.id));
+          parsed = [...parsed, ...newDefaults];
+          localStorage.setItem('pbj_templates', JSON.stringify(parsed));
         }
-      });
-      return newTemplates;
+        return parsed; 
+      } catch (e) { return DEFAULT_TEMPLATES; }
     }
     return DEFAULT_TEMPLATES;
   });
@@ -239,87 +434,103 @@ export default function TemplateSuratManager() {
     const saved = localStorage.getItem('pbj_doc_settings');
     const defaultSettings = {
       showKop: true,
+      logoType: 'pemda', // 'pemda' (Probolinggo), 'garuda' (Nasional), 'custom' (Unggah)
       namaPemda: 'PEMERINTAH KABUPATEN PROBOLINGGO',
       namaInstansi: 'DINAS KOPERASI, USAHA MIKRO, PERDAGANGAN DAN PERINDUSTRIAN',
-      alamatLengkap: 'Jl. Raya Dringu No. 81, Probolinggo. Telp: (0335) 422118, Email: dkupp@probolinggokab.go.id, Kode Pos: 67271',
+      alamatLengkap: 'Jl. Jenderal Ahmad Yani No. 23 Probolinggo – Probolinggo - 67219. Laman: https://probolinggokab.go.id, Pos-el: dkuppkabprobolinggo@gmail.com',
       paperSize: 'A4',
-      marginTop: 20,      // 20 mm (2 cm) Permendagri 1/2023 standard
-      marginBottom: 25,   // 25 mm (2.5 cm) Permendagri 1/2023 standard
-      marginLeft: 30,     // 30 mm (3 cm) Permendagri 1/2023 standard
-      marginRight: 20,    // 20 mm (2 cm) Permendagri 1/2023 standard
-      fontFamily: 'Arial', // Default font standard korespondensi Permendagri 1/2023
-      fontSize: '12pt',    // Default ukuran huruf isi
-      lineHeight: '1.5',   // Default tinggi baris
-      formatNomorSurat: '027/{nomor}/DKUPP/2026'
+      marginTop: 20,      // 20 mm (2 cm) Permendagri 1/2023
+      marginBottom: 25,   // 25 mm (2.5 cm) Permendagri 1/2023
+      marginLeft: 30,     // 30 mm (3 cm) Permendagri 1/2023
+      marginRight: 20,    // 20 mm (2 cm) Permendagri 1/2023
+      fontFamily: 'Arial', // Arial (Permendagri 1/2023)
+      fontSize: '12pt',    
+      lineHeight: '1.15',  // 1.15 (Permendagri 1/2023)
+      formatNomorSurat: '027/{nomor}/DKUPP/2026',
+      customLogo: null
     };
     if (saved) {
       const parsed = JSON.parse(saved);
-      // Auto-migrate old defaults (15, 25, 20, 20) or (40, 30, 40, 20) to new Permendagri 1/2023
-      if (
-        (parsed.marginTop === 15 && parsed.marginLeft === 25 && parsed.marginBottom === 20 && parsed.marginRight === 20) ||
-        (parsed.marginTop === 40 && parsed.marginLeft === 40 && parsed.marginBottom === 30 && parsed.marginRight === 20 && !parsed.fontFamily)
-      ) {
-        parsed.marginTop = 20;
-        parsed.marginLeft = 30;
-        parsed.marginBottom = 25;
-        parsed.marginRight = 20;
-        parsed.fontFamily = 'Arial';
-        parsed.fontSize = '12pt';
-        parsed.lineHeight = '1.5';
-        localStorage.setItem('pbj_doc_settings', JSON.stringify(parsed));
-      }
+      parsed.showKop = true; // FORCE SHOW KOP SURAT
       return { ...defaultSettings, ...parsed };
     }
     return defaultSettings;
   });
 
-  const [activeTab, setActiveTab] = useState('edit'); // 'edit', 'preview', 'settings'
   const [selectedTemplateId, setSelectedTemplateId] = useState(templates[0]?.id || null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showMargins, setShowMargins] = useState(true);
+  const [controlTab, setControlTab] = useState('variables'); // 'variables', 'settings', 'editor'
   
   const [editMode, setEditMode] = useState(false);
   const [activeTemplateContent, setActiveTemplateContent] = useState('');
   const [activeTemplateName, setActiveTemplateName] = useState('');
+  const [activeCategory, setActiveCategory] = useState('Tahap Persiapan');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [notification, setNotification] = useState('');
+
+  // Active projects list for dynamic dropdown connection (Out of the Box feature!)
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
   
-  // Simulated form variables for preview
+  // Accordion state for categories
+  const [expandedCategories, setExpandedCategories] = useState({
+    'Tahap Persiapan': true,
+    'Tahap Pemilihan': true,
+    'Tahap Kontrak': true
+  });
+
+  // Simulated variable fields for real-time document filling
   const [previewVars, setPreviewVars] = useState({
-    nama_satker: user?.department || 'Dinas Contoh Pemerintah Daerah',
-    nama_satker_kapital: (user?.department || 'Dinas Contoh Pemerintah Daerah').toUpperCase(),
-    alamat_satker: 'Jl. Pemuda No. 1, Pusat Pemerintahan',
-    nama_pekerjaan: 'Pengadaan Laptop Perkantoran',
-    nilai_pagu: 'Rp 150.000.000',
-    sumber_dana: 'APBD 2026',
+    nama_satker: user?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
+    nama_satker_kapital: (user?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
+    alamat_satker: 'Gedung Sekretariat Daerah Lt. 2, Jl. Raya Dringu No. 81, Probolinggo',
+    nama_pekerjaan: 'Pengadaan Laptop Core i7 Dinas Kesehatan',
+    nilai_pagu: 'Rp 148.500.000',
+    sumber_dana: 'APBD Kabupaten Probolinggo TA 2026',
     nama_ppk: 'Handik Hariyanto, S.Kom., M.Si',
     nip_ppk: '197909102002121004',
-    nomor_surat: (docSettings?.formatNomorSurat || '027/{nomor}/DKUPP/2026').replace('{nomor}', '123'),
-    nama_penyedia: 'PT. Teknologi Maju Bersama',
-    hari_tanggal_acara: 'Senin, 25 Mei 2026',
-    waktu_acara: '09:00 WIB',
-    tempat_acara: 'Ruang Rapat UKPBJ',
+    nomor_surat: (docSettings?.formatNomorSurat || '027/{nomor}/BPBJ/2026').replace('{nomor}', '045.2'),
+    nama_penyedia: 'PT. Mandiri Solusindo Tekno',
+    hari_tanggal_acara: 'Kamis, 28 Mei 2026',
+    waktu_acara: '10:00 WIB',
+    tempat_acara: 'Ruang Rapat Utama UKPBJ',
     nama_pejabat_pengadaan: 'Beni Trisna Wijaya, S.Kom',
     nip_pejabat_pengadaan: '198205192010011010',
-    nomor_ba: (docSettings?.formatNomorSurat || '027/{nomor}/DKUPP/2026').replace('{nomor}', '124'),
-    hari_ba: 'Selasa',
-    tanggal_ba: '26 Mei 2026',
-    harga_penawaran: 'Rp 148.000.000',
-    harga_negosiasi: 'Rp 145.000.000',
-    nomor_bahp: (docSettings?.formatNomorSurat || '027/{nomor}/DKUPP/2026').replace('{nomor}', '125'),
-    nilai_hps: 'Rp 149.500.000',
-    nama_penyedia_terpilih: 'PT. Teknologi Maju Bersama',
-    harga_final: 'Rp 145.000.000',
-    tempat_penetapan: 'Kabupaten Probolinggo',
-    nomor_sp: (docSettings?.formatNomorSurat || '027/{nomor}/DKUPP/2026').replace('{nomor}', '126'),
-    alamat_penyedia: 'Gedung Cyber, Lt 3. Jakarta',
-    nilai_kontrak: 'Rp 145.000.000',
-    waktu_penyelesaian: '30 (tiga puluh) hari kalender',
-    nomor_dpp: (docSettings?.formatNomorSurat || '027/{nomor}/DKUPP/2026').replace('{nomor}', '120'),
-    tanggal_dpp: '20 Mei 2026',
-    nomor_hps: (docSettings?.formatNomorSurat || '027/{nomor}/DKUPP/2026').replace('{nomor}', '121'),
-    tanggal_hps: '21 Mei 2026',
-    lokasi_pekerjaan: 'Dinas Koperasi UKM, Kota Probolinggo',
+    nomor_ba: (docSettings?.formatNomorSurat || '027/{nomor}/BPBJ/2026').replace('{nomor}', '108/BAKN'),
+    hari_ba: 'Kamis',
+    tanggal_ba: '28 Mei 2026',
+    harga_penawaran: 'Rp 147.200.000',
+    harga_negosiasi: 'Rp 144.500.000',
+    nomor_bahp: (docSettings?.formatNomorSurat || '027/{nomor}/BPBJ/2026').replace('{nomor}', '112/BAHP'),
+    nilai_hps: 'Rp 148.000.000',
+    nama_penyedia_terpilih: 'PT. Mandiri Solusindo Tekno',
+    harga_final: 'Rp 144.500.000',
+    tempat_penetapan: 'Kecamatan Kraksaan',
+    nomor_sp: (docSettings?.formatNomorSurat || '027/{nomor}/BPBJ/2026').replace('{nomor}', '115/SP'),
+    alamat_penyedia: 'Ruko Surya Harmoni Kav. 12, Probolinggo',
+    nilai_kontrak: 'Rp 144.500.000',
+    waktu_penyelesaian: '14 (empat belas) hari kalender',
+    nomor_dpp: (docSettings?.formatNomorSurat || '027/{nomor}/BPBJ/2026').replace('{nomor}', '012/DPP'),
+    tanggal_dpp: '25 Mei 2026',
+    nomor_hps: (docSettings?.formatNomorSurat || '027/{nomor}/BPBJ/2026').replace('{nomor}', '014/HPS'),
+    tanggal_hps: '26 Mei 2026',
+    lokasi_pekerjaan: 'Komp. Perkantoran Pemerintah Daerah',
+    program: 'Program Penunjang Urusan Pemerintahan Daerah',
+    kegiatan: 'Penyelenggaraan Pemerintahan dan Pelayanan Publik',
+    sub_kegiatan: 'Penyediaan Barang dan Jasa Perkantoran',
+    volume_pekerjaan: '1 Paket',
+    uraian_pekerjaan: 'Pengadaan Belanja Alat/Bahan untuk Kegiatan Kantor-Alat Tulis Kantor pada Sub Giat Penyediaan Peralatan dan Perlengkapan Kantor untuk operasional',
+    pdn: 'Ya',
+    usaha_kecil: 'Ya',
+    pra_dipa: 'Tidak',
+    mak: '5.1.02.01.001.00024',
   });
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
   const printRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem('pbj_templates', JSON.stringify(templates));
@@ -333,29 +544,188 @@ export default function TemplateSuratManager() {
     if (selectedTemplate) {
       setActiveTemplateContent(selectedTemplate.content);
       setActiveTemplateName(selectedTemplate.name);
+      setActiveCategory(selectedTemplate.category);
       setEditMode(false);
     }
-  }, [selectedTemplateId, selectedTemplate]);
+  }, [selectedTemplateId]);
+
+  // Load actual procurement projects list from DB on mount
+  useEffect(() => {
+    fetch('/api/projects')
+      .then(res => res.json())
+      .then(data => {
+        setProjects(Array.isArray(data) ? data : (data?.data || []));
+      })
+      .catch(err => console.error('Failed to load active packages:', err));
+  }, []);
+
+  // Database Nomenklatur & Alamat Resmi Satker Kabupaten Probolinggo
+  const SATKER_DATABASE = {
+    "Dinas Koperasi, Usaha Mikro, Perdagangan dan Perindustrian": {
+      singkatan: "DKUPP",
+      alamat: "Jl. Jenderal Ahmad Yani No. 23 Probolinggo – Probolinggo - 67219. Laman: https://probolinggokab.go.id, Pos-el: dkuppkabprobolinggo@gmail.com"
+    },
+    "Bagian Pengadaan Barang dan Jasa (BPBJ)": {
+      singkatan: "BPBJ",
+      alamat: "Gedung Sekretariat Daerah Lt. 2, Jl. Raya Dringu No. 81, Probolinggo. Telp: (0335) 422118, Email: bpbj@probolinggokab.go.id, Kode Pos: 67271"
+    },
+    "Dinas Kesehatan": {
+      singkatan: "DINKES",
+      alamat: "Jl. Raya Dringu No. 90, Dringu, Probolinggo. Telp: (0335) 421234, Email: dinkes@probolinggokab.go.id, Kode Pos: 67271"
+    },
+    "Dinas Pekerjaan Umum & Penataan Ruang (PUPR)": {
+      singkatan: "DPUPR",
+      alamat: "Jl. Raya Dringu No. 85, Dringu, Probolinggo. Telp: (0335) 425678, Email: dpupr@probolinggokab.go.id, Kode Pos: 67271"
+    },
+    "Dinas Pendidikan dan Kebudayaan": {
+      singkatan: "DISPENDIKBUD",
+      alamat: "Jl. Raya Dringu No. 88, Dringu, Probolinggo. Telp: (0335) 423344, Email: dispendik@probolinggokab.go.id, Kode Pos: 67271"
+    },
+    "Dinas Lingkungan Hidup (DLH)": {
+      singkatan: "DLH",
+      alamat: "Jl. Raya Dringu No. 102, Dringu, Probolinggo. Telp: (0335) 424455, Email: dlh@probolinggokab.go.id, Kode Pos: 67271"
+    },
+    "RSUD Waluyo Jati Kraksaan (BLU)": {
+      singkatan: "RSUD-WJ",
+      alamat: "Jl. Dr. Soetomo No. 1, Kraksaan, Probolinggo. Telp: (0335) 841118, Email: rsudwaluyojati@probolinggokab.go.id, Kode Pos: 67282"
+    },
+    "Kecamatan Besuk": {
+      singkatan: "KEC-BESUK",
+      alamat: "Jl. Raya Besuk No. 1, Besuk, Probolinggo. Telp: (0335) 511001, Email: kec.besuk@probolinggokab.go.id, Kode Pos: 67281"
+    },
+    "Kecamatan Kraksaan": {
+      singkatan: "KEC-KRAKSAAN",
+      alamat: "Jl. Raya Panglima Sudirman No. 12, Kraksaan, Probolinggo. Telp: (0335) 841234, Email: kec.kraksaan@probolinggokab.go.id, Kode Pos: 67282"
+    }
+  };
+
+  // Re-populate Kop settings and variables dynamically when active user changes
+  useEffect(() => {
+    if (user && user.department) {
+      const deptName = user.department;
+      const matched = SATKER_DATABASE[deptName] || {
+        singkatan: deptName.replace(/[^A-Z]/g, '') || 'PBJ',
+        alamat: "Jl. Raya Probolinggo No. 81, Probolinggo. Telp: (0335) 422118, Email: info@probolinggokab.go.id, Kode Pos: 67271"
+      };
+
+      // 1. Auto-Adapt Kop Surat & Nomenklatur Nomor Surat
+      setDocSettings(prev => ({
+        ...prev,
+        namaPemda: user.perangkatDaerah || 'PEMERINTAH KABUPATEN PROBOLINGGO',
+        namaInstansi: deptName.toUpperCase(),
+        alamatLengkap: matched.alamat,
+        formatNomorSurat: `027/{nomor}/${matched.singkatan}/2026`
+      }));
+
+      // 2. Auto-Adapt Preview Variables (Isi Variabel)
+      setPreviewVars(prev => {
+        const updated = {
+          ...prev,
+          nama_satker: deptName,
+          nama_satker_kapital: deptName.toUpperCase(),
+          alamat_satker: matched.alamat.split('. ')[0] // Ambil bagian alamat saja
+        };
+
+        // Jika user yang login adalah PPK, otomatis isi variabel PPK
+        if (user.role === 'PPK') {
+          updated.nama_ppk = user.name;
+          updated.nip_ppk = user.nip;
+        }
+
+        // Jika user yang login adalah PP, otomatis isi variabel PP
+        if (user.role === 'PP') {
+          updated.nama_pejabat_pengadaan = user.name;
+          updated.nip_pejabat_pengadaan = user.nip;
+        }
+
+        // Sinkronisasi otomatis nomor-nomor dinas dengan singkatan satker baru
+        const currentFormat = `027/{nomor}/${matched.singkatan}/2026`;
+        updated.nomor_surat = currentFormat.replace('{nomor}', '045.2');
+        updated.nomor_ba = currentFormat.replace('{nomor}', '108/BAKN');
+        updated.nomor_bahp = currentFormat.replace('{nomor}', '112/BAHP');
+        updated.nomor_sp = currentFormat.replace('{nomor}', '115/SP');
+        updated.nomor_dpp = currentFormat.replace('{nomor}', '012/DPP');
+        updated.nomor_hps = currentFormat.replace('{nomor}', '014/HPS');
+
+        return updated;
+      });
+      
+      setNotification(`Tata naskah dinas & variabel disesuaikan otomatis untuk Satker: ${deptName}!`);
+      setTimeout(() => setNotification(''), 4000);
+    }
+  }, [user]);
+
+  const handleConnectProject = (projectId) => {
+    setSelectedProjectId(projectId);
+    if (!projectId) return;
+
+    const project = projects.find(p => p.id === parseInt(projectId) || p.id === projectId);
+    if (project) {
+      let parsed = {};
+      try {
+        parsed = JSON.parse(project.description || '{}');
+      } catch (e) {}
+
+      const budgetVal = project.budget || 0;
+      const hpsVal = parsed.totalHps || 0;
+      const negoVal = parsed.hargaNegosiasi || parsed.negotiatedPrice || hpsVal * 0.98; // fallback to 2% discount if not negotiated
+      const vendorName = parsed.vendorName || parsed.supplierName || 'CV. Karya Probolinggo Mandiri';
+
+      setPreviewVars(prev => ({
+        ...prev,
+        nama_pekerjaan: project.name || prev.nama_pekerjaan,
+        nilai_pagu: `Rp ${budgetVal.toLocaleString('id-ID')}`,
+        nilai_hps: `Rp ${hpsVal.toLocaleString('id-ID')}`,
+        harga_penawaran: `Rp ${(hpsVal * 1.01).toLocaleString('id-ID')}`,
+        harga_negosiasi: `Rp ${negoVal.toLocaleString('id-ID')}`,
+        harga_final: `Rp ${negoVal.toLocaleString('id-ID')}`,
+        nilai_kontrak: `Rp ${negoVal.toLocaleString('id-ID')}`,
+        nama_penyedia: vendorName,
+        nama_penyedia_terpilih: vendorName,
+        tempat_penetapan: project.location || 'Kabupaten Probolinggo',
+        sumber_dana: 'APBD Kabupaten Probolinggo TA 2026'
+      }));
+
+      setNotification(`✓ Data Paket "${project.name}" berhasil dihubungkan ke variabel surat dinas!`);
+      setTimeout(() => setNotification(''), 4000);
+    }
+  };
+
+  const toggleCategory = (cat) => {
+    setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
+  };
 
   const handleSaveTemplate = () => {
     setTemplates(prev => prev.map(t => {
       if (t.id === selectedTemplateId) {
-        return { ...t, content: activeTemplateContent, name: activeTemplateName, isDefault: false };
+        return { 
+          ...t, 
+          content: activeTemplateContent, 
+          name: activeTemplateName, 
+          category: activeCategory,
+          isDefault: false 
+        };
       }
       return t;
     }));
     setEditMode(false);
-    alert('Template berhasil disimpan.');
+    
+    setNotification('Template surat berhasil disimpan ke database lokal!');
+    setTimeout(() => setNotification(''), 3000);
   };
 
   const handleResetTemplate = () => {
-    if(window.confirm('Apakah Anda yakin ingin mengembalikan template ini ke default bawaan sistem?')) {
+    if(window.confirm('Kembalikan template ini ke tata naskah dinas bawaan sistem?')) {
       const defaultTpl = DEFAULT_TEMPLATES.find(t => t.id === selectedTemplateId);
       if(defaultTpl) {
         setTemplates(prev => prev.map(t => t.id === selectedTemplateId ? defaultTpl : t));
         setActiveTemplateContent(defaultTpl.content);
         setActiveTemplateName(defaultTpl.name);
+        setActiveCategory(defaultTpl.category);
         setEditMode(false);
+        
+        setNotification('Template berhasil di-reset ke standard resmi!');
+        setTimeout(() => setNotification(''), 3000);
       }
     }
   };
@@ -365,17 +735,26 @@ export default function TemplateSuratManager() {
     const newTpl = {
       ...selectedTemplate,
       id: newId,
-      name: selectedTemplate.name + ' (Copy)',
+      name: selectedTemplate.name + ' (Kustom)',
       isDefault: false
     };
     setTemplates(prev => [...prev, newTpl]);
     setSelectedTemplateId(newId);
+    setControlTab('editor');
+    setEditMode(true);
+    
+    setNotification('Template berhasil digandakan!');
+    setTimeout(() => setNotification(''), 3000);
   };
 
   const handleDelete = () => {
-    if(window.confirm('Hapus template ini secara permanen?')) {
+    if(window.confirm('Hapus template surat dinas ini secara permanen dari sistem?')) {
       setTemplates(prev => prev.filter(t => t.id !== selectedTemplateId));
-      setSelectedTemplateId(templates[0]?.id);
+      const remaining = templates.filter(t => t.id !== selectedTemplateId);
+      setSelectedTemplateId(remaining[0]?.id || null);
+      
+      setNotification('Template berhasil dihapus!');
+      setTimeout(() => setNotification(''), 3000);
     }
   };
 
@@ -387,18 +766,37 @@ export default function TemplateSuratManager() {
     setDocSettings(prev => ({ ...prev, [key]: value }));
   };
 
-  const renderPreview = (content) => {
+  const formatAlamatKop = (alamat) => {
+    if (!alamat) return '';
+    let formatted = alamat;
+    
+    // Replace URL
+    const urlRegex = /(https?:\/\/[^\s,]+)/g;
+    formatted = formatted.replace(urlRegex, '<a href="$1" target="_blank" class="text-blue-600 underline hover:text-blue-800 transition-colors" style="color: #2563eb; text-decoration: underline;">$1</a>');
+    
+    // Replace Email
+    const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/g;
+    formatted = formatted.replace(emailRegex, '<a href="mailto:$1" class="text-blue-600 underline hover:text-blue-800 transition-colors" style="color: #2563eb; text-decoration: underline;">$1</a>');
+    
+    return formatted;
+  };
+
+  const renderPreviewHTML = (content) => {
     let result = content;
-    // Replace all placeholders {{key}} with values from previewVars
     const regex = /{{(.*?)}}/g;
+    
     result = result.replace(regex, (match, p1) => {
       const key = p1.trim();
-      return previewVars[key] || match;
+      const val = previewVars[key];
+      if (val !== undefined && val.trim() !== '') {
+        return `<span class="bg-amber-50/80 text-amber-900 border-b border-amber-300 font-semibold px-1 rounded hover:bg-amber-100 transition-colors select-all cursor-help" title="Variabel: ${key}">${val}</span>`;
+      }
+      return `<span class="bg-rose-100 text-rose-800 border border-rose-300 font-bold px-1.5 py-0.5 rounded text-[10px] select-all cursor-help tracking-wide" title="Wajib Diisi: ${key}">[ ${key.toUpperCase()} BELUM DIISI ]</span>`;
     });
+    
     return result;
   };
 
-  // Find all placeholders in current template
   const getPlaceholders = (content) => {
     const regex = /{{(.*?)}}/g;
     let matches;
@@ -419,6 +817,7 @@ export default function TemplateSuratManager() {
     if (!printRef.current) return;
     
     const htmlContent = printRef.current.innerHTML;
+    const cleanHtml = htmlContent.replace(/<span class="bg-amber-50.*?>/g, '').replace(/<\/span>/g, '');
     
     const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
       <head>
@@ -428,7 +827,7 @@ export default function TemplateSuratManager() {
           body { 
             font-family: ${docSettings.fontFamily === 'Bookman Old Style' ? "'Bookman Old Style', Georgia, serif" : docSettings.fontFamily === 'Arial' ? "Arial, Helvetica, sans-serif" : "'Times New Roman', Times, serif"}; 
             font-size: ${docSettings.fontSize || '12pt'}; 
-            line-height: ${docSettings.lineHeight || '1.5'};
+            line-height: ${docSettings.lineHeight || '1.15'};
           }
           @page WordSection1 {
             size: ${docSettings.paperSize === 'F4' ? '8.5in 13in' : '8.27in 11.69in'};
@@ -439,7 +838,7 @@ export default function TemplateSuratManager() {
       </head>
       <body>
         <div class="WordSection1">
-          ${htmlContent}
+          ${cleanHtml}
         </div>
       </body>
     </html>`;
@@ -448,646 +847,862 @@ export default function TemplateSuratManager() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${activeTemplateName.replace(/\s+/g, '_')}_${docSettings.formatNomorSurat ? 'Surat' : 'Doc'}.doc`;
+    link.download = `${activeTemplateName.replace(/\s+/g, '_')}_PBJ_SAE.doc`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
+  const filteredTemplates = templates.filter(tpl => 
+    tpl.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    tpl.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const categories = ['Tahap Persiapan', 'Tahap Pemilihan', 'Tahap Kontrak'];
+
+  const isPermendagriCompliant = 
+    docSettings.fontFamily === 'Arial' && 
+    docSettings.marginTop === 20 && 
+    docSettings.marginBottom === 25 && 
+    docSettings.marginLeft === 30 && 
+    docSettings.marginRight === 20 &&
+    docSettings.lineHeight === '1.15';
+
   return (
-    <div id="pbk-template-root" className="animate-fade-in pb-12">
+    <div id="pbk-template-root" className="animate-fade-in pb-16 font-sans relative">
       
-      {/* Header section */}
-      <div className="print:hidden">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Manajemen Template Surat</h1>
-            <p className="text-slate-400 mt-1">Kelola dan sesuaikan tata naskah dokumen E-Purchasing (BAKN, BAHP, SP).</p>
-          </div>
-          {user?.role === 'Admin' && (
-            <button onClick={() => {
-              const newId = 'TPL-NEW-' + Date.now();
-              setTemplates(prev => [...prev, { id: newId, category: 'Lainnya', name: 'Template Baru', content: '', isDefault: false }]);
-              setSelectedTemplateId(newId);
-              setActiveTab('edit');
-              setEditMode(true);
-            }} className="btn-primary text-sm flex items-center gap-2">
-              <span>➕</span> Buat Template Baru
-            </button>
-          )}
+      {/* Top Banner / Breadcrumb */}
+      <div className="print:hidden mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block mb-1">Government Document Builder</span>
+          <h1 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+            <span>🏛️</span>
+            <span>TATA NASKAH & TEMPLATE SURAT PBJ SAE</span>
+          </h1>
+          <p className="text-slate-500 text-xs mt-0.5">Generator dan Editor Surat Dinas Standardisasi Administrasi Pengadaan Barang/Jasa.</p>
         </div>
+
+        {/* Global Action Notifications */}
+        {notification && (
+          <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm animate-fade-in">
+            <CheckCircle size={14} className="text-emerald-600" />
+            {notification}
+          </div>
+        )}
       </div>
 
-      <div id="pbk-template-layout" className="flex flex-col lg:flex-row gap-6 print:block print:w-full print:gap-0 print:m-0">
+      {/* TOP-BAR DASHBOARD & BOTTOM FULL-WIDTH PREVIEW WORKSPACE */}
+      <div id="pbk-template-layout" className="flex flex-col gap-6 w-full print:block print:w-full print:gap-0 print:m-0">
         
-        {/* LEFT SIDEBAR - TEMPLATE LIST */}
-        <div className="w-full lg:w-1/4 flex flex-col gap-4 print:hidden">
-          <div className="glass-panel p-4 h-[calc(100vh-140px)] flex flex-col">
-            <h3 className="font-semibold text-slate-800 mb-4 px-2">Daftar Template</h3>
-            <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-              {templates.map(tpl => (
-                <button
-                  key={tpl.id}
-                  onClick={() => setSelectedTemplateId(tpl.id)}
-                  className={`w-full text-left p-3 rounded-xl transition-all duration-200 border ${selectedTemplateId === tpl.id ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-slate-100 hover:border-indigo-100 hover:bg-slate-50'}`}
+        {/* ================= TOP COLUMN: CONSOLIDATED CONTROL DASHBOARD (100% Width) ================= */}
+        <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden print:hidden animate-fade-in flex flex-col">
+          
+          {/* Permanent Toolbar Row */}
+          <div className="bg-slate-50 border-b border-slate-200 p-4 flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4">
+            
+            {/* Left side: Naskah Dinas & Connected Project selectors */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+              {/* Naskah Dinas Select */}
+              <div className="flex-1 max-w-sm relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                  <Layers size={14} className="text-indigo-600" />
+                </span>
+                <select
+                  value={selectedTemplateId || ''}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  className="w-full pl-9 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-[#0f2942] focus:outline-none focus:border-indigo-500 shadow-sm appearance-none cursor-pointer hover:border-slate-300 transition-colors"
                 >
-                  <div className="text-xs text-indigo-500 font-semibold mb-1">{tpl.category}</div>
-                  <div className="font-medium text-slate-800 text-sm leading-tight">{tpl.name}</div>
-                  <div className="mt-2 flex gap-2">
-                    {tpl.isDefault ? (
-                      <span className="px-2 py-0.5 text-[9px] uppercase tracking-wider font-bold rounded bg-slate-100 text-slate-500">Default Sistem</span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-[9px] uppercase tracking-wider font-bold rounded bg-emerald-50 text-emerald-600 border border-emerald-100">Kustomisasi</span>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT PANEL - EDITOR & PREVIEW & SETTINGS */}
-        <div id="pbk-template-right-panel" className="w-full lg:w-3/4 flex flex-col print:w-full print:h-auto">
-          {selectedTemplate ? (
-            <div id="pbk-template-glass-panel" className="glass-panel overflow-hidden flex flex-col h-[calc(100vh-140px)] print:h-auto print:border-none print:shadow-none print:bg-white print:overflow-visible">
-              
-              {/* Header Tab & Actions */}
-              <div className="bg-slate-50 border-b border-slate-200 p-4 flex flex-wrap gap-4 items-center justify-between print:hidden">
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => setActiveTab('edit')}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'edit' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}
-                  >
-                    📝 Editor Konten
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('settings')}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'settings' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}
-                  >
-                    ⚙️ Pengaturan Dokumen
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('preview')}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'preview' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}
-                  >
-                    👁️ Pratinjau (Preview)
-                  </button>
+                  {categories.map(cat => {
+                    const catTemplates = templates.filter(t => t.category === cat);
+                    if (catTemplates.length === 0) return null;
+                    return (
+                      <optgroup key={cat} label={cat.toUpperCase()} className="font-extrabold text-[10px] text-indigo-900 bg-slate-50 py-1">
+                        {catTemplates.map(t => (
+                          <option key={t.id} value={t.id} className="font-semibold text-xs text-slate-800 bg-white py-1">
+                            🏛️ {t.name} {t.isDefault ? '(Bawaan)' : '(Kustom)'}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+                  <ChevronDown size={14} />
                 </div>
-                
-                {user?.role === 'Admin' && (
-                  <div className="flex gap-2">
-                    {activeTab === 'edit' && editMode && (
-                      <button onClick={handleSaveTemplate} className="btn-primary py-1.5 px-4 text-xs">💾 Simpan Perubahan</button>
-                    )}
-                    {activeTab === 'edit' && !editMode && (
-                      <button onClick={() => setEditMode(true)} className="btn-secondary py-1.5 px-4 text-xs">✏️ Edit Mode</button>
-                    )}
-                    {activeTab === 'preview' && (
-                      <>
-                        <button onClick={handlePrint} className="bg-emerald-600 text-white hover:bg-emerald-500 px-4 py-1.5 rounded-lg text-xs font-semibold shadow-md transition-all">🖨️ Cetak PDF</button>
-                        <button onClick={handleExportWord} className="bg-blue-600 text-white hover:bg-blue-500 px-4 py-1.5 rounded-lg text-xs font-semibold shadow-md transition-all">📥 Export Word (.doc)</button>
-                      </>
-                    )}
-                    {(activeTab === 'edit' || activeTab === 'settings') && (
-                      <button onClick={handleDuplicate} className="btn-secondary py-1.5 px-3 text-xs" title="Duplikat Template">📋 Copy</button>
-                    )}
-                    {!selectedTemplate.isDefault && (
-                      <button onClick={handleDelete} className="bg-rose-100 text-rose-600 hover:bg-rose-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">🗑️ Hapus</button>
-                    )}
-                    {selectedTemplate.isDefault && !editMode && selectedTemplate.content !== DEFAULT_TEMPLATES.find(t=>t.id === selectedTemplate.id)?.content && (
-                       <button onClick={handleResetTemplate} className="text-amber-500 hover:text-amber-600 px-3 py-1.5 text-xs font-bold transition-colors">🔄 Reset Default</button>
-                    )}
-                  </div>
-                )}
               </div>
 
-              {/* EDITOR TAB */}
-              {activeTab === 'edit' && (
-                <div className="flex-1 overflow-y-auto p-6 bg-slate-100/50 print:hidden flex flex-col md:flex-row gap-6">
-                  <div className="w-full md:w-3/4 flex flex-col gap-4">
-                    {editMode ? (
-                      <input 
-                        className="glass-input text-xl font-bold"
-                        value={activeTemplateName}
-                        onChange={e => setActiveTemplateName(e.target.value)}
-                        placeholder="Nama Template Surat"
-                      />
-                    ) : (
-                      <h2 className="text-xl font-bold text-slate-800 px-2">{activeTemplateName}</h2>
-                    )}
-                    
-                    {docSettings.showKop && (
-                      <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 text-xs text-indigo-700 flex items-center gap-2">
-                        <span>ℹ️</span> <span>Kop Surat Elektronik otomatis disisipkan saat mencetak. Anda tidak perlu menyertakan teks KOP SURAT di editor ini.</span>
-                      </div>
-                    )}
-                    
-                    <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-inner relative overflow-hidden flex flex-col">
-                      <div className="bg-slate-800 text-slate-300 text-xs px-4 py-2 font-mono border-b border-slate-700 flex justify-between">
-                        <span>Markdown / Text Editor</span>
-                        <span>Variabel: {'{{nama_variabel}}'}</span>
-                      </div>
-                      <textarea
-                        className="w-full h-full min-h-[400px] p-6 text-sm font-mono text-slate-700 resize-none outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500/50 leading-relaxed"
-                        value={activeTemplateContent}
-                        onChange={(e) => setActiveTemplateContent(e.target.value)}
-                        readOnly={!editMode}
-                        spellCheck="false"
-                      ></textarea>
-                    </div>
+              {/* Hubungkan Paket Select */}
+              <div className="flex-1 max-w-sm relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-indigo-600">
+                  <Sparkles size={14} className="animate-pulse" />
+                </span>
+                <select
+                  value={selectedProjectId}
+                  onChange={(e) => handleConnectProject(e.target.value)}
+                  className="w-full pl-9 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm appearance-none cursor-pointer hover:border-slate-300 transition-colors"
+                >
+                  <option value="">📂 Hubungkan Paket Pengadaan Aktif...</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+                  <ChevronDown size={14} />
+                </div>
+              </div>
+
+              {/* Quick Create template button for admin */}
+              {user?.role === 'Admin' && (
+                <button 
+                  onClick={() => {
+                    const newId = 'TPL-NEW-' + Date.now();
+                    setTemplates(prev => [...prev, { 
+                      id: newId, 
+                      category: 'Tahap Persiapan', 
+                      name: 'Naskah Kustom Baru (' + (templates.length + 1) + ')', 
+                      content: 'Nomor     : {{nomor_surat}}\nYth. Pejabat Pengadaan\n\nIsi surat resmi kustomisasi Anda disini...', 
+                      isDefault: false 
+                    }]);
+                    setSelectedTemplateId(newId);
+                    setControlTab('editor');
+                    setEditMode(true);
+                    setNotification('✓ Naskah dinas baru berhasil dibuat!');
+                    setTimeout(() => setNotification(''), 3000);
+                  }} 
+                  className="py-2.5 px-4 bg-[#0f2942] hover:bg-[#152e52] text-white text-[10px] font-black tracking-wider rounded-xl transition-all flex items-center justify-center gap-1 shadow-sm shrink-0"
+                >
+                  <span>➕</span> BUAT NASKAH
+                </button>
+              )}
+            </div>
+
+            {/* Right side: Tabs switcher & Open/Close drawer toggle */}
+            <div className="flex items-center gap-3 justify-end shrink-0">
+              
+              {/* Tab Pills */}
+              <div className="bg-slate-100/80 p-1 rounded-xl flex gap-0.5 border border-slate-200/50">
+                <button
+                  onClick={() => { setControlTab('variables'); setSidebarOpen(true); }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    controlTab === 'variables' && sidebarOpen
+                      ? 'bg-white text-indigo-700 shadow-sm border border-slate-100' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <FileText size={13} />
+                  VARIABEL
+                </button>
+                
+                <button
+                  onClick={() => { setControlTab('settings'); setSidebarOpen(true); }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    controlTab === 'settings' && sidebarOpen
+                      ? 'bg-white text-indigo-700 shadow-sm border border-slate-100' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Settings size={13} />
+                  KOP & MARGIN
+                </button>
+
+                <button
+                  onClick={() => { setControlTab('editor'); setSidebarOpen(true); }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    controlTab === 'editor' && sidebarOpen
+                      ? 'bg-white text-indigo-700 shadow-sm border border-slate-100' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Edit3 size={13} />
+                  EDIT NASKAH
+                </button>
+              </div>
+
+              {/* Collapsible toggle */}
+              <button 
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className={`p-2.5 rounded-xl border text-xs font-black transition-all flex items-center justify-center gap-1 ${
+                  sidebarOpen 
+                    ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200' 
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                }`}
+                title={sidebarOpen ? "Sembunyikan Panel Input" : "Tampilkan Panel Input"}
+              >
+                {sidebarOpen ? <EyeOff size={14} /> : <Eye size={14} />}
+                <span className="hidden sm:inline">{sidebarOpen ? "Tutup Panel" : "Buka Panel"}</span>
+              </button>
+
+            </div>
+          </div>
+
+          {/* Collapsible Inputs Drawer (Grid Layout) */}
+          {sidebarOpen && (
+            <div className="p-5 border-t border-slate-100/60 bg-white overflow-y-auto max-h-[380px] scrollbar-thin">
+              
+              {/* TAB 1: VARIABLE FILLER IN RESPONSIVE GRID */}
+              {controlTab === 'variables' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">📝 Variabel Pengadaan Terdeteksi</span>
+                    <span className="text-[9px] text-slate-400 font-medium italic">Hubungkan paket diatas untuk mengisi variabel otomatis dari database.</span>
                   </div>
                   
-                  <div className="w-full md:w-1/4">
-                     <div className="bg-white border border-slate-200 rounded-xl p-4 sticky top-0 shadow-sm">
-                        <h4 className="font-bold text-slate-800 text-sm mb-3">🏷️ Variabel Ditemukan</h4>
-                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                           {currentPlaceholders.length === 0 ? (
-                             <p className="text-xs text-slate-400 italic">Tidak ada variabel terdeteksi.</p>
-                           ) : (
-                             currentPlaceholders.map(ph => (
-                               <div key={ph} className="bg-slate-50 border border-slate-100 p-2 rounded text-[11px] font-mono text-indigo-600 break-all">
-                                 {'{'}{'{'}{ph}{'}'}{'}'}
-                               </div>
-                             ))
-                           )}
+                  {currentPlaceholders.length === 0 ? (
+                    <div className="text-center py-6 text-slate-400 italic text-xs">
+                      Tidak ada variabel terdeteksi pada naskah ini.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {currentPlaceholders.map(ph => (
+                        <div key={ph} className="group bg-slate-50/50 p-2.5 rounded-xl border border-slate-100 hover:bg-white hover:border-slate-200 hover:shadow-sm transition-all duration-200">
+                          <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 transition-colors group-focus-within:text-indigo-600">
+                            {ph.replace(/_/g, ' ')}
+                          </label>
+                          <input 
+                            type="text"
+                            value={previewVars[ph] || ''}
+                            onChange={(e) => handleVarChange(ph, e.target.value)}
+                            placeholder={`Ketik ${ph.replace(/_/g, ' ')}...`}
+                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-indigo-500 transition-all text-slate-800 font-semibold shadow-sm"
+                          />
                         </div>
-                     </div>
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* SETTINGS TAB */}
-              {activeTab === 'settings' && (
-                <div className="flex-1 overflow-y-auto p-6 bg-slate-50 print:hidden flex flex-col md:flex-row gap-8">
+              {/* TAB 2: TATA NASKAH & KOP DINAS */}
+              {controlTab === 'settings' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 animate-fade-in items-stretch">
                   
-                  {/* Left Column - Paper & Typo Settings */}
-                  <div className="w-full md:w-1/3 space-y-6">
-                    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                      <h3 className="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">📄 Pengaturan Kertas</h3>
+                  {/* Card 1: Logo & Upload */}
+                  <div className="bg-slate-50/50 border border-slate-200/50 rounded-xl p-4 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider block border-b border-slate-100 pb-2 mb-3">🏛️ Lambang/Logo Kop</span>
+                      <div className="space-y-3">
+                        <div>
+                          <select
+                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-indigo-500 font-semibold"
+                            value={docSettings.logoType || 'pemda'}
+                            onChange={(e) => handleSettingChange('logoType', e.target.value)}
+                          >
+                            <option value="pemda">Lambang Daerah (Kab. Probolinggo)</option>
+                            <option value="garuda">Lambang Negara (Garuda)</option>
+                            <option value="custom">Logo Kustom (Unggah File)</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Prominent Upload Zone - Always Visible for UX ease */}
+                    <div className="p-3 bg-gradient-to-br from-indigo-50/50 to-slate-50 border border-dashed border-indigo-200 rounded-lg text-slate-800 text-xs shadow-inner space-y-2.5 mt-3">
+                      <label className="block text-[9px] font-black text-indigo-800 uppercase tracking-widest flex items-center gap-1">
+                        <span>📤</span> UNGGAH LOGO BARU
+                      </label>
+                      <div 
+                        className="bg-white border-2 border-dashed border-slate-200 hover:border-indigo-500 rounded-lg p-2.5 text-center cursor-pointer transition-all duration-200 flex flex-col items-center justify-center gap-1 group/upload"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <ImageIcon size={20} className="text-indigo-500 group-hover/upload:scale-110 transition-transform duration-200" />
+                        <span className="text-[10px] font-extrabold text-[#0f2942] block leading-none">Pilih File Image</span>
+                        
+                        {docSettings.customLogo ? (
+                          <div className="mt-1 flex items-center gap-1 bg-emerald-50 text-emerald-800 text-[8px] font-extrabold px-1.5 py-0.5 rounded border border-emerald-100">
+                            <span className="text-emerald-500">✓</span> Logo Aktif
+                          </div>
+                        ) : (
+                          <span className="text-[8px] text-slate-400 font-medium">PNG/JPG komputer</span>
+                        )}
+                      </div>
                       
-                      <div className="mb-4">
-                        <label className="block text-xs font-bold text-slate-600 mb-2">Ukuran Kertas</label>
+                      <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              handleSettingChange('customLogo', event.target.result);
+                              handleSettingChange('logoType', 'custom'); // switch logo type to custom automatically!
+                              setNotification('✓ Logo Kop Surat berhasil diunggah!');
+                              setTimeout(() => setNotification(''), 4000);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                      {docSettings.customLogo && (
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            handleSettingChange('customLogo', null);
+                            handleSettingChange('logoType', 'pemda');
+                          }} 
+                          className="w-full text-center text-rose-600 text-[9px] font-extrabold block hover:underline"
+                        >
+                          Reset ke Logo Daerah
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card 2: Naskah Texts */}
+                  <div className="bg-slate-50/50 border border-slate-200/50 rounded-xl p-4 space-y-3">
+                    <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider block border-b border-slate-100 pb-2 mb-1">🏢 Teks Kop Surat</span>
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-0.5">Nama Pemda (Baris 1)</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                        value={docSettings.namaPemda}
+                        onChange={(e) => handleSettingChange('namaPemda', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-0.5">Nama Satker (Baris 2)</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                        value={docSettings.namaInstansi}
+                        onChange={(e) => handleSettingChange('namaInstansi', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-400 uppercase mb-0.5">Kontak (Kaki Kop)</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-indigo-500"
+                        value={docSettings.alamatLengkap}
+                        onChange={(e) => handleSettingChange('alamatLengkap', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Card 3: Margins & Dimensions */}
+                  <div className="bg-slate-50/50 border border-slate-200/50 rounded-xl p-4 space-y-3">
+                    <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider block border-b border-slate-100 pb-2 mb-1">📄 Dimensi & Margin</span>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[8px] font-black text-slate-400 uppercase mb-0.5">Ukuran Kertas</label>
                         <select 
-                          className="w-full glass-input py-2 text-sm"
+                          className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] focus:outline-none font-semibold"
                           value={docSettings.paperSize}
                           onChange={(e) => handleSettingChange('paperSize', e.target.value)}
                         >
-                          <option value="A4">A4 (210 x 297 mm)</option>
-                          <option value="F4">F4 / Folio (215 x 330 mm)</option>
+                          <option value="A4">A4</option>
+                          <option value="F4">F4 / Folio</option>
                         </select>
                       </div>
-
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-2">Margin (milimeter)</label>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <span className="text-[10px] uppercase text-slate-400 font-bold">Atas</span>
-                            <input type="number" className="w-full glass-input py-1.5 text-sm" value={docSettings.marginTop} onChange={(e) => handleSettingChange('marginTop', parseInt(e.target.value) || 0)} />
-                          </div>
-                          <div>
-                            <span className="text-[10px] uppercase text-slate-400 font-bold">Bawah</span>
-                            <input type="number" className="w-full glass-input py-1.5 text-sm" value={docSettings.marginBottom} onChange={(e) => handleSettingChange('marginBottom', parseInt(e.target.value) || 0)} />
-                          </div>
-                          <div>
-                            <span className="text-[10px] uppercase text-slate-400 font-bold">Kiri (Jilid)</span>
-                            <input type="number" className="w-full glass-input py-1.5 text-sm" value={docSettings.marginLeft} onChange={(e) => handleSettingChange('marginLeft', parseInt(e.target.value) || 0)} />
-                          </div>
-                          <div>
-                            <span className="text-[10px] uppercase text-slate-400 font-bold">Kanan</span>
-                            <input type="number" className="w-full glass-input py-1.5 text-sm" value={docSettings.marginRight} onChange={(e) => handleSettingChange('marginRight', parseInt(e.target.value) || 0)} />
-                          </div>
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-3 leading-relaxed">
-                          Sistem menggunakan <i>native browser pagination</i>. Teks yang melebihi batas halaman bawah akan otomatis mengalir ke halaman berikutnya sesuai margin yang Anda tentukan di sini tanpa terpotong.
-                        </p>
-                        
-                        <div className="mt-4 border-t border-slate-100 pt-4">
-                          <span className="block text-xs font-bold text-slate-600 mb-2">Preset Margin Resmi</span>
-                          <div className="flex flex-col gap-2">
-                            <button 
-                              type="button" 
-                              onClick={() => {
-                                handleSettingChange('marginTop', 20);
-                                handleSettingChange('marginBottom', 25);
-                                handleSettingChange('marginLeft', 30);
-                                handleSettingChange('marginRight', 20);
-                              }}
-                              className="w-full px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg border border-indigo-100 transition-colors text-left flex items-center justify-between"
-                            >
-                              <span>🏛️ Pemda (Permendagri 1/2023)</span>
-                              <span className="text-[10px] text-indigo-500 font-mono">20, 25, 30, 20 mm</span>
-                            </button>
-                            <button 
-                              type="button" 
-                              onClick={() => {
-                                handleSettingChange('marginTop', 40);
-                                handleSettingChange('marginBottom', 30);
-                                handleSettingChange('marginLeft', 40);
-                                handleSettingChange('marginRight', 20);
-                              }}
-                              className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 transition-colors text-left flex items-center justify-between"
-                            >
-                              <span>📂 Pusat (ANRI / Klasik)</span>
-                              <span className="text-[10px] text-slate-500 font-mono">40, 30, 40, 20 mm</span>
-                            </button>
-                          </div>
-                        </div>
+                        <label className="block text-[8px] font-black text-slate-400 uppercase mb-0.5">Preset Tata Naskah</label>
+                        <select 
+                          className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] focus:outline-none font-bold text-indigo-700"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === 'pemda') {
+                              handleSettingChange('marginTop', 20);
+                              handleSettingChange('marginBottom', 25);
+                              handleSettingChange('marginLeft', 30);
+                              handleSettingChange('marginRight', 20);
+                              handleSettingChange('fontFamily', 'Arial');
+                              handleSettingChange('lineHeight', '1.15');
+                            } else if (val === 'pusat') {
+                              handleSettingChange('marginTop', 40);
+                              handleSettingChange('marginBottom', 30);
+                              handleSettingChange('marginLeft', 40);
+                              handleSettingChange('marginRight', 20);
+                              handleSettingChange('fontFamily', 'Times New Roman');
+                              handleSettingChange('lineHeight', '1.5');
+                            }
+                          }}
+                        >
+                          <option value="">Preset...</option>
+                          <option value="pemda">🏛️ Pemda</option>
+                          <option value="pusat">📂 Pusat (ANRI)</option>
+                        </select>
                       </div>
                     </div>
 
-                    {/* Typo & Spacing Settings */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mt-6">
-                      <h3 className="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">✒️ Tipografi & Spasi</h3>
-                      
-                      <div className="mb-4">
-                        <label className="block text-xs font-bold text-slate-600 mb-1.5">Jenis Huruf (Font Family)</label>
-                        <select 
-                          className="w-full glass-input py-2 text-sm"
-                          value={docSettings.fontFamily || 'Arial'}
-                          onChange={(e) => handleSettingChange('fontFamily', e.target.value)}
-                        >
-                          <option value="Arial">Arial (Standard Korespondensi Pemda)</option>
-                          <option value="Bookman Old Style">Bookman Old Style (Standard Peraturan)</option>
-                          <option value="Times New Roman">Times New Roman (Standard Klasik)</option>
-                        </select>
-                      </div>
-
-                      <div className="mb-4">
-                        <label className="block text-xs font-bold text-slate-600 mb-1.5">Ukuran Huruf (Font Size)</label>
-                        <select 
-                          className="w-full glass-input py-2 text-sm"
-                          value={docSettings.fontSize || '12pt'}
-                          onChange={(e) => handleSettingChange('fontSize', e.target.value)}
-                        >
-                          <option value="11pt">11 pt (Kompak)</option>
-                          <option value="12pt">12 pt (Standard Resmi)</option>
-                        </select>
-                      </div>
-
+                    {/* Custom Margins Input */}
+                    <div className="grid grid-cols-4 gap-1.5 pt-1">
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1.5">Spasi Baris (Line Height)</label>
-                        <select 
-                          className="w-full glass-input py-2 text-sm"
-                          value={docSettings.lineHeight || '1.5'}
-                          onChange={(e) => handleSettingChange('lineHeight', e.target.value)}
-                        >
-                          <option value="1.0">1.0 (Tunggal)</option>
-                          <option value="1.15">1.15 (Kompak - Permendagri 1/2023)</option>
-                          <option value="1.25">1.25 (Sedang)</option>
-                          <option value="1.5">1.5 (Standard - Permendagri / ANRI)</option>
-                        </select>
+                        <span className="text-[7px] uppercase text-slate-400 font-extrabold block text-center">Atas</span>
+                        <input type="number" className="w-full px-1 py-1 border border-slate-200 rounded-md text-[11px] text-center font-bold" value={docSettings.marginTop} onChange={(e) => handleSettingChange('marginTop', parseInt(e.target.value) || 0)} />
+                      </div>
+                      <div>
+                        <span className="text-[7px] uppercase text-slate-400 font-extrabold block text-center">Bawah</span>
+                        <input type="number" className="w-full px-1 py-1 border border-slate-200 rounded-md text-[11px] text-center font-bold" value={docSettings.marginBottom} onChange={(e) => handleSettingChange('marginBottom', parseInt(e.target.value) || 0)} />
+                      </div>
+                      <div>
+                        <span className="text-[7px] uppercase text-slate-400 font-extrabold block text-center">Kiri</span>
+                        <input type="number" className="w-full px-1 py-1 border border-slate-200 rounded-md text-[11px] text-center font-bold" value={docSettings.marginLeft} onChange={(e) => handleSettingChange('marginLeft', parseInt(e.target.value) || 0)} />
+                      </div>
+                      <div>
+                        <span className="text-[7px] uppercase text-slate-400 font-extrabold block text-center">Kanan</span>
+                        <input type="number" className="w-full px-1 py-1 border border-slate-200 rounded-md text-[11px] text-center font-bold" value={docSettings.marginRight} onChange={(e) => handleSettingChange('marginRight', parseInt(e.target.value) || 0)} />
                       </div>
                     </div>
                   </div>
 
-                  {/* Right Column - Kop Surat Settings */}
-                  <div className="w-full md:w-2/3">
-                    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-4">
-                        <h3 className="font-bold text-slate-800">🏛️ Tata Naskah Dinas (Kop Surat)</h3>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            className="w-4 h-4 text-indigo-600 rounded"
-                            checked={docSettings.showKop}
-                            onChange={(e) => handleSettingChange('showKop', e.target.checked)}
-                          />
-                          <span className="text-sm font-semibold text-slate-700">Gunakan Kop Resmi</span>
-                        </label>
+                  {/* Card 4: Typography & Penomoran */}
+                  <div className="bg-slate-50/50 border border-slate-200/50 rounded-xl p-4 space-y-3">
+                    <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider block border-b border-slate-100 pb-2 mb-1">✒️ Huruf & Penomoran</span>
+                    
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[8px] font-black text-slate-500 uppercase mb-0.5">Font</label>
+                        <select 
+                          className="w-full px-1.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-semibold"
+                          value={docSettings.fontFamily || 'Arial'}
+                          onChange={(e) => handleSettingChange('fontFamily', e.target.value)}
+                        >
+                          <option value="Arial">Arial</option>
+                          <option value="Bookman Old Style">Bookman OS</option>
+                          <option value="Times New Roman">Times NR</option>
+                        </select>
                       </div>
-
-                      <div className={`transition-opacity duration-300 ${!docSettings.showKop ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-xs font-bold text-slate-600 mb-1">Nama Pemerintah Daerah / Level 1</label>
-                            <input 
-                              type="text" 
-                              className="w-full glass-input py-2 text-sm font-semibold"
-                              value={docSettings.namaPemda}
-                              onChange={(e) => handleSettingChange('namaPemda', e.target.value)}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-600 mb-1">Nama Satuan Kerja / Dinas / Level 2</label>
-                            <input 
-                              type="text" 
-                              className="w-full glass-input py-2 text-sm font-bold"
-                              value={docSettings.namaInstansi}
-                              onChange={(e) => handleSettingChange('namaInstansi', e.target.value)}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-600 mb-1">Alamat Lengkap & Kontak (Baris Bawah)</label>
-                            <textarea 
-                              className="w-full glass-input py-2 text-sm resize-none h-20"
-                              value={docSettings.alamatLengkap}
-                              onChange={(e) => handleSettingChange('alamatLengkap', e.target.value)}
-                            ></textarea>
-                          </div>
-
-                          <div className="border-t border-slate-100 pt-4 mt-4">
-                            <label className="block text-xs font-bold text-slate-600 mb-2">Lambang / Logo Instansi</label>
-                            <div className="flex items-center gap-4">
-                              <div className="w-16 h-16 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
-                                {docSettings.customLogo ? (
-                                  <img src={docSettings.customLogo} alt="Logo Instansi" className="max-w-full max-h-full object-contain" />
-                                ) : (
-                                  <div className="flex flex-col items-center justify-center text-slate-300">
-                                    <span className="text-xl">🏛️</span>
-                                    <span className="text-[8px] font-bold mt-0.5">GARUDA</span>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex-1 space-y-1.5">
-                                <div className="flex gap-2">
-                                  <label className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg border border-indigo-100 transition-colors cursor-pointer flex items-center gap-1.5">
-                                    <span>📤 Pilih Gambar</span>
-                                    <input 
-                                      type="file" 
-                                      accept="image/*" 
-                                      className="hidden" 
-                                      onChange={(e) => {
-                                        const file = e.target.files[0];
-                                        if (file) {
-                                          if (file.size > 2 * 1024 * 1024) {
-                                            alert("Ukuran file terlalu besar. Maksimal 2MB agar penyimpanan lokal lancar.");
-                                            return;
-                                          }
-                                          const reader = new FileReader();
-                                          reader.onload = (event) => {
-                                            handleSettingChange('customLogo', event.target.result);
-                                          };
-                                          reader.readAsDataURL(file);
-                                        }
-                                      }}
-                                    />
-                                  </label>
-                                  {docSettings.customLogo && (
-                                    <button 
-                                      type="button" 
-                                      onClick={() => handleSettingChange('customLogo', null)}
-                                      className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-lg border border-rose-100 transition-colors"
-                                    >
-                                      ❌ Hapus Logo
-                                    </button>
-                                  )}
-                                </div>
-                                <p className="text-[10px] text-slate-500">Mendukung file PNG, JPG, JPEG, atau SVG (Maks. 2MB). Jika tidak ada logo yang diunggah, kop surat akan secara otomatis menggunakan Lambang Garuda default.</p>
-                              </div>
-                            </div>
-                          </div>
-
-                        </div>
+                      <div>
+                        <label className="block text-[8px] font-black text-slate-500 uppercase mb-0.5">Ukuran</label>
+                        <select 
+                          className="w-full px-1.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-semibold"
+                          value={docSettings.fontSize || '12pt'}
+                          onChange={(e) => handleSettingChange('fontSize', e.target.value)}
+                        >
+                          <option value="11pt">11 pt</option>
+                          <option value="12pt">12 pt</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[8px] font-black text-slate-500 uppercase mb-0.5">Spasi</label>
+                        <select 
+                          className="w-full px-1.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-semibold"
+                          value={docSettings.lineHeight || '1.15'}
+                          onChange={(e) => handleSettingChange('lineHeight', e.target.value)}
+                        >
+                          <option value="1.0">1.0</option>
+                          <option value="1.15">1.15</option>
+                          <option value="1.5">1.5</option>
+                        </select>
                       </div>
                     </div>
-                    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mt-6">
-                      <h3 className="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">🔢 Format Penomoran Surat</h3>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Format Penomoran Global</label>
-                        <input 
-                          type="text" 
-                          className="w-full glass-input py-2 text-sm font-mono"
-                          value={docSettings.formatNomorSurat || ''}
-                          onChange={(e) => handleSettingChange('formatNomorSurat', e.target.value)}
-                          placeholder="e.g. 027/{nomor}/DKUPP/2026"
-                        />
-                        <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
-                          Gunakan <b>{'{nomor}'}</b> sebagai placeholder nomor urut. Format ini akan menjadi default untuk penomoran dokumen di sistem.
-                        </p>
-                      </div>
+
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase mb-0.5">Format Nomor Surat</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-mono text-slate-800"
+                        value={docSettings.formatNomorSurat || ''}
+                        onChange={(e) => handleSettingChange('formatNomorSurat', e.target.value)}
+                      />
                     </div>
                   </div>
 
                 </div>
               )}
 
-              {/* PREVIEW TAB */}
-              {activeTab === 'preview' && (
-                <div id="pbk-template-inner-body" className="flex-1 flex overflow-hidden print:overflow-visible bg-slate-100">
-                  {/* Left Side: Data Input for Preview (Hidden when printing) */}
-                  <div className="w-[300px] border-r border-slate-200 bg-white p-4 overflow-y-auto print:hidden hidden lg:block shrink-0 shadow-[4px_0_15px_-3px_rgba(0,0,0,0.05)] z-10">
-                     <h3 className="font-bold text-slate-800 text-sm mb-4">🔧 Dummy Data Pratinjau</h3>
-                     <p className="text-xs text-slate-500 mb-4">Data ini digunakan untuk mengisi variabel di pratinjau.</p>
-                     <div className="space-y-4">
-                        {currentPlaceholders.map(ph => (
-                          <div key={ph}>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">{ph.replace(/_/g, ' ')}</label>
-                            <input 
-                              type="text"
-                              className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-400"
-                              value={previewVars[ph] || ''}
-                              onChange={(e) => handleVarChange(ph, e.target.value)}
-                            />
-                          </div>
-                        ))}
-                     </div>
-                  </div>
+              {/* TAB 3: TEMPLATE TEXT/MARKDOWN RAW EDITOR */}
+              {controlTab === 'editor' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-fade-in items-stretch flex-1">
                   
-                  {/* Right Side: Render Physical Page (This is the only thing printed!) */}
-                  <div id="print-sheet-surat-parent" className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center print:w-full print:bg-white print:p-0 print:overflow-visible print:block">
-                     
-                     <div 
-                        ref={printRef}
-                        className="print-container bg-white shadow-xl print:shadow-none text-black relative animate-fade-in"
-                        style={{
-                          width: docSettings.paperSize === 'F4' ? '215mm' : '210mm',
-                          minHeight: docSettings.paperSize === 'F4' ? '330mm' : '297mm',
-                          paddingTop: `${docSettings.marginTop}mm`,
-                          paddingRight: `${docSettings.marginRight}mm`,
-                          paddingBottom: `${docSettings.marginBottom}mm`,
-                          paddingLeft: `${docSettings.marginLeft}mm`,
-                          fontFamily: docSettings.fontFamily === 'Bookman Old Style' 
-                            ? "'Bookman Old Style', Georgia, serif" 
-                            : docSettings.fontFamily === 'Arial' 
-                              ? "Arial, Helvetica, sans-serif" 
-                              : "'Times New Roman', Times, serif",
-                          fontSize: docSettings.fontSize || '12pt',
-                          lineHeight: docSettings.lineHeight || '1.5'
-                        }}
-                     >
-                       <style>
-                         {`
-                           @media print {
-                             html, body {
-                               background: white !important;
-                               margin: 0 !important;
-                               padding: 0 !important;
-                               height: auto !important;
-                               overflow: visible !important;
-                             }
-                             
-                             body * {
-                               visibility: hidden !important;
-                              }
-                              
-                              #root,
-                              main,
-                              #pbk-template-root,
-                              #pbk-template-layout,
-                              #pbk-template-right-panel,
-                              #pbk-template-glass-panel,
-                              #pbk-template-inner-body,
-                              #print-sheet-surat-parent,
-                              .print-container, 
-                              .print-container * {
-                                visibility: visible !important;
-                                position: static !important;
-                                overflow: visible !important;
-                                height: auto !important;
-                                width: auto !important;
-                                min-height: auto !important;
-                                margin: 0 !important;
-                                padding: 0 !important;
-                                box-shadow: none !important;
-                                border: none !important;
-                                display: block !important;
-                                background: none !important;
-                              }
-                              
-                              .print\\:hidden { 
-                                display: none !important; 
-                              }
-                              
-                              /* Re-apply basic visual rules to print-container in block flow */
-                              .print-container {
-                                visibility: visible !important;
-                                position: relative !important;
-                                left: 0 !important;
-                                top: 0 !important;
-                                width: 100% !important;
-                                max-width: 100% !important;
-                                display: block !important;
-                                padding: ${docSettings.marginTop}mm ${docSettings.marginRight}mm ${docSettings.marginBottom}mm ${docSettings.marginLeft}mm !important;
-                                margin: 0 !important;
-                                background: white !important;
-                                font-family: ${docSettings.fontFamily === 'Bookman Old Style' ? "'Bookman Old Style', Georgia, serif" : docSettings.fontFamily === 'Arial' ? "Arial, Helvetica, sans-serif" : "'Times New Roman', Times, serif"} !important;
-                                font-size: ${docSettings.fontSize || '12pt'} !important;
-                                line-height: ${docSettings.lineHeight || '1.5'} !important;
-                              }
-                              
-                              /* Table and list rules */
-                              table {
-                                width: 100% !important;
-                                border-collapse: collapse !important;
-                                page-break-inside: auto !important;
-                              }
-                              tr {
-                                page-break-inside: avoid !important;
-                                break-inside: avoid !important;
-                              }
-                              td, th {
-                                page-break-inside: avoid !important;
-                                break-inside: avoid !important;
-                              }
-                              
-                              /* Prevent orphan headers */
-                              h1, h2, h3, h4, h5, h6 {
-                                page-break-after: avoid !important;
-                                break-after: avoid !important;
-                              }
-                              
-                              /* Avoid splitting signature blocks */
-                              .signature-section {
-                                page-break-inside: avoid !important;
-                                break-inside: avoid !important;
-                              }
-                              
-                              /* Hide scrollbars during print */
-                              ::-webkit-scrollbar {
-                                display: none !important;
-                              }
+                  {/* Metadata left column (1/3 width) */}
+                  <div className="space-y-4 bg-slate-50/50 p-4 rounded-xl border border-slate-200/50 flex flex-col justify-start">
+                    <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider block border-b border-slate-100 pb-2 mb-1">📝 Metadata Naskah</span>
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase mb-0.5">Nama Dokumen Resmi</label>
+                      <input 
+                        type="text"
+                        value={activeTemplateName}
+                        onChange={e => setActiveTemplateName(e.target.value)}
+                        readOnly={user?.role !== 'Admin' || !editMode}
+                        className={`w-full px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-indigo-500 font-bold border transition-all ${
+                          user?.role === 'Admin' && editMode ? 'bg-white border-slate-200' : 'bg-slate-100 border-slate-200 text-slate-700 cursor-not-allowed'
+                        }`}
+                      />
+                    </div>
 
-                              /* Inject dynamic page size and margins for native pagination */
-                              @page { 
-                                size: ${docSettings.paperSize === 'F4' ? '215mm 330mm' : 'A4'} portrait; 
-                                margin: 0 !important; 
-                              }
-                            }
-                         `}
-                       </style>
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase mb-0.5">Kategori Tahap Pengadaan</label>
+                      <select 
+                        value={activeCategory}
+                        onChange={e => setActiveCategory(e.target.value)}
+                        disabled={user?.role !== 'Admin' || !editMode}
+                        className={`w-full px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-indigo-500 font-semibold border transition-all ${
+                          user?.role === 'Admin' && editMode ? 'bg-white border-slate-200' : 'bg-slate-100 border-slate-200 text-slate-700 cursor-not-allowed'
+                        }`}
+                      >
+                        {categories.map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                       {/* TATA NASKAH DINAS KOP SURAT */}
-                       {docSettings.showKop && (
-                         <div className="w-full mb-6" style={{ 
-                            pageBreakInside: 'avoid', 
+                    {user?.role !== 'Admin' ? (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[10px] text-amber-800 flex items-start gap-2 shadow-inner mt-2">
+                        <LockIcon size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-extrabold block text-xs mb-0.5">🔒 Read-Only Draft</span>
+                          Perubahan struktur induk surat dinas resmi hanya dapat disimpan oleh **Administrator UKPBJ / BPBJ** demi legalitas hukum.
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex justify-end mt-4">
+                        {editMode ? (
+                          <button onClick={handleSaveTemplate} className="w-full py-2 bg-emerald-600 text-white hover:bg-emerald-700 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 shadow-sm">
+                            💾 Simpan Perubahan Naskah
+                          </button>
+                        ) : (
+                          <button onClick={() => setEditMode(true)} className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-lg border border-indigo-100 transition-all flex items-center justify-center gap-1">
+                            ✏️ Aktifkan Mode Edit
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Text/code editor right column (2/3 width) */}
+                  <div className="lg:col-span-2 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-inner min-h-[220px]">
+                    <div className="bg-slate-950 text-slate-400 text-[10px] px-3.5 py-1.5 font-mono border-b border-slate-800 flex justify-between select-none">
+                      <span>Workspace Editor Naskah Induk</span>
+                      <span>Format: {'{{nama_variabel}}'}</span>
+                    </div>
+                    <textarea
+                      value={activeTemplateContent}
+                      onChange={(e) => setActiveTemplateContent(e.target.value)}
+                      readOnly={user?.role !== 'Admin' || !editMode}
+                      spellCheck="false"
+                      className="w-full flex-1 p-3 text-[11px] font-mono text-slate-300 bg-transparent resize-none outline-none leading-relaxed overflow-y-auto"
+                      placeholder="Isi surat resmi disini..."
+                    ></textarea>
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+          )}
+        </div>
+
+        {/* ================= BOTTOM COLUMN: Centered centered preview sheet (100% Width) ================= */}
+        <div id="pbk-template-right-panel" className="w-full flex flex-col print:w-full print:h-auto items-center transition-all duration-300">
+          {selectedTemplate ? (
+            <div className="bg-slate-200/80 border border-slate-300/40 rounded-2xl shadow-sm overflow-hidden flex flex-col w-full min-h-[700px] print:border-none print:shadow-none print:bg-white print:overflow-visible">
+              
+              {/* Paper Top Toolbar (Hidden when printing) */}
+              <div className="bg-white border-b border-slate-300/60 p-3.5 flex items-center justify-between print:hidden shadow-sm z-10 shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 border border-emerald-600 animate-pulse"></span>
+                  <span className="text-[10px] font-black text-slate-700 tracking-wider uppercase">Live Official Paper Sheet</span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {/* Toggle Margins Guideline */}
+                  <button 
+                    onClick={() => setShowMargins(!showMargins)}
+                    className={`px-3 py-1.5 rounded-lg border text-[10px] font-bold transition-all flex items-center gap-1 ${
+                      showMargins 
+                        ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 shadow-sm' 
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                    title={showMargins ? "Sembunyikan Garis Batas Margin" : "Tampilkan Garis Batas Margin"}
+                  >
+                    <span>📏</span>
+                    <span>{showMargins ? "Batas Margin Aktif" : "Tampilkan Margin"}</span>
+                  </button>
+
+                  {/* Focus mode toggle */}
+                  <button 
+                    onClick={() => setSidebarOpen(!sidebarOpen)}
+                    className={`px-3 py-1.5 rounded-lg border text-[10px] font-bold transition-all flex items-center gap-1.5 ${
+                      sidebarOpen 
+                        ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200' 
+                        : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700 shadow-sm animate-pulse'
+                    }`}
+                    title={sidebarOpen ? "Sembunyikan Panel Kontrol" : "Tampilkan Panel Kontrol"}
+                  >
+                    {sidebarOpen ? <EyeOff size={11} className="text-slate-600" /> : <Eye size={11} className="text-white" />}
+                    <span className={sidebarOpen ? "text-slate-700" : "text-white"}>{sidebarOpen ? "Tutup Pilihan" : "Buka Pilihan"}</span>
+                  </button>
+                  {user?.role === 'Admin' && selectedTemplate.isDefault && selectedTemplate.content !== DEFAULT_TEMPLATES.find(t=>t.id === selectedTemplate.id)?.content && (
+                    <button 
+                      onClick={handleResetTemplate} 
+                      className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 text-[10px] font-bold rounded-lg border border-amber-100 transition-colors flex items-center gap-1"
+                      title="Kembalikan ke standar resmi sistem"
+                    >
+                      <RefreshCw size={11} />
+                      Reset Standard
+                    </button>
+                  )}
+
+                  {/* Duplicate template */}
+                  <button 
+                    onClick={handleDuplicate} 
+                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition-colors flex items-center gap-1"
+                    title="Ganda / salin kustomisasi"
+                  >
+                    <Copy size={11} />
+                    Copy
+                  </button>
+
+                  {/* Print and Export Actions */}
+                  <button 
+                    onClick={handlePrint} 
+                    className="px-3.5 py-1.5 bg-[#0f2942] hover:bg-[#152e52] text-white text-[10px] font-bold rounded-lg shadow-sm transition-colors flex items-center gap-1"
+                  >
+                    <Printer size={11} className="safe-white-text" />
+                    <span className="safe-white-text">Cetak PDF</span>
+                  </button>
+                  
+                  <button 
+                    onClick={handleExportWord} 
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg shadow-sm transition-colors flex items-center gap-1"
+                  >
+                    <Download size={11} className="safe-white-text" />
+                    <span className="safe-white-text">Word</span>
+                  </button>
+
+                  {/* Delete if custom */}
+                  {user?.role === 'Admin' && !selectedTemplate.isDefault && (
+                    <button onClick={handleDelete} className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg border border-rose-100 transition-colors" title="Hapus Template Kustom">
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Local Sheet Print CSS Override - MOVED OUTSIDE print-container to prevent bleeding */}
+              <style>
+                {`
+                  .margin-guideline::before {
+                    content: '';
+                    position: absolute;
+                    top: ${docSettings.marginTop}mm;
+                    left: ${docSettings.marginLeft}mm;
+                    right: ${docSettings.marginRight}mm;
+                    bottom: ${docSettings.marginBottom}mm;
+                    border: 1px dashed rgba(99, 102, 241, 0.4) !important;
+                    pointer-events: none;
+                    z-index: 99;
+                  }
+                  @media print {
+                    .margin-guideline::before {
+                      display: none !important;
+                    }
+                    html, body {
+                      background: white !important;
+                      margin: 0 !important;
+                      padding: 0 !important;
+                      height: auto !important;
+                      overflow: visible !important;
+                    }
+                    body * {
+                      visibility: hidden !important;
+                    }
+                    #root,
+                    main,
+                    #pbk-template-root,
+                    #pbk-template-layout,
+                    #pbk-template-right-panel,
+                    .print-container, 
+                    .print-container * {
+                      visibility: visible !important;
+                      position: static !important;
+                      overflow: visible !important;
+                      height: auto !important;
+                      width: auto !important;
+                      min-height: auto !important;
+                      margin: 0 !important;
+                      padding: 0 !important;
+                      box-shadow: none !important;
+                      border: none !important;
+                      display: block !important;
+                      background: none !important;
+                    }
+                    .print\\:hidden { 
+                      display: none !important; 
+                    }
+                    .print-container {
+                      visibility: visible !important;
+                      position: relative !important;
+                      left: 0 !important;
+                      top: 0 !important;
+                      width: 100% !important;
+                      max-width: 100% !important;
+                      display: block !important;
+                      padding: ${docSettings.marginTop}mm ${docSettings.marginRight}mm ${docSettings.marginBottom}mm ${docSettings.marginLeft}mm !important;
+                      margin: 0 !important;
+                      background: white !important;
+                      font-family: ${docSettings.fontFamily === 'Bookman Old Style' ? "'Bookman Old Style', Georgia, serif" : docSettings.fontFamily === 'Arial' ? "Arial, Helvetica, sans-serif" : "'Times New Roman', Times, serif"} !important;
+                      font-size: ${docSettings.fontSize || '12pt'} !important;
+                      line-height: ${docSettings.lineHeight || '1.15'} !important;
+                    }
+                    @page { 
+                      size: ${docSettings.paperSize === 'F4' ? '215mm 330mm' : 'A4'} portrait; 
+                      margin: 0 !important; 
+                    }
+                    .print-container span {
+                      background: transparent !important;
+                      color: black !important;
+                      border: none !important;
+                      padding: 0 !important;
+                    }
+                  }
+                `}
+              </style>
+
+              {/* The Desk / Workspace where the sheet lies */}
+              <div 
+                ref={scrollContainerRef}
+                className="flex-1 overflow-y-auto p-6 md:p-8 flex justify-center print:w-full print:bg-white print:p-0 print:overflow-visible print:block scrollbar-thin shadow-inner bg-slate-300/40"
+              >
+                {/* Visual A4/F4 Paper Sheet */}
+                <div 
+                  ref={printRef}
+                  className={`print-container bg-white shadow-xl print:shadow-none text-black relative select-text transition-all duration-300 rounded-[4px] ${
+                    showMargins ? 'margin-guideline' : ''
+                  }`}
+                  style={{
+                    width: docSettings.paperSize === 'F4' ? '215mm' : '210mm',
+                    minHeight: docSettings.paperSize === 'F4' ? '330mm' : '297mm',
+                    paddingTop: `${docSettings.marginTop}mm`,
+                    paddingRight: `${docSettings.marginRight}mm`,
+                    paddingBottom: `${docSettings.marginBottom}mm`,
+                    paddingLeft: `${docSettings.marginLeft}mm`,
+                    fontFamily: docSettings.fontFamily === 'Bookman Old Style' 
+                      ? "'Bookman Old Style', Georgia, serif" 
+                      : docSettings.fontFamily === 'Arial' 
+                        ? "Arial, Helvetica, sans-serif" 
+                        : "'Times New Roman', Times, serif",
+                    fontSize: docSettings.fontSize || '12pt',
+                    lineHeight: docSettings.lineHeight || '1.15'
+                  }}
+                >
+                  
+                  {/* Paper Size floating badge - print-hidden */}
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#0f2942] text-white text-[9px] font-black px-3.5 py-1.5 rounded-full shadow-md border border-slate-700/35 print:hidden z-50 flex items-center gap-1.5 select-none tracking-wider whitespace-nowrap">
+                    <span className="flex h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
+                    <span>STANDAR {docSettings.paperSize === 'F4' ? 'F4 / FOLIO (215x330mm)' : 'A4 (210x297mm)'}</span>
+                    <span className="text-slate-500">|</span>
+                    <span className="text-indigo-200">Preset Pemda</span>
+                  </div>
+
+                  {/* OFFICIAL KOP SURAT GOVT PRESET */}
+                  {docSettings.showKop && (
+                    <div className="w-full mb-6 select-none relative group/kop" style={{ 
+                      pageBreakInside: 'avoid',
+                      borderBottom: '4.5px solid black',
+                      paddingBottom: '10px',
+                      marginBottom: '20px'
+                    }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <tbody>
+                          <tr>
+                            {/* Emblem Left Column - Clickable for Instant Upload! */}
+                            <td 
+                              style={{ width: '15%', verticalAlign: 'middle', textAlign: 'center', paddingRight: '12px', cursor: 'pointer' }}
+                              className="relative group/logo cursor-pointer hover:opacity-95 transition-all duration-200"
+                              onClick={() => fileInputRef.current?.click()}
+                              title="Klik untuk ganti/unggah logo daerah"
+                            >
+                              <div className="relative inline-block">
+                                {docSettings.logoType === 'pemda' ? (
+                                  <img 
+                                    src="https://upload.wikimedia.org/wikipedia/commons/2/25/Lambang_Kabupaten_Probolinggo.png" 
+                                    alt="Logo Daerah" 
+                                    style={{ maxHeight: '76px', maxWidth: '76px', objectFit: 'contain', display: 'inline-block' }} 
+                                  />
+                                ) : docSettings.logoType === 'garuda' ? (
+                                  <LogoGarudaPlaceholder />
+                                ) : docSettings.customLogo ? (
+                                  <img 
+                                    src={docSettings.customLogo} 
+                                    alt="Logo Kustom" 
+                                    style={{ maxHeight: '80px', maxWidth: '80px', objectFit: 'contain', display: 'inline-block' }} 
+                                  />
+                                ) : (
+                                  <LogoGarudaPlaceholder />
+                                )}
+                                
+                                {/* Hover overlay for WYSIWYG Upload - hidden during print */}
+                                <div className="absolute inset-0 bg-indigo-900/85 opacity-0 group-hover/logo:opacity-100 rounded-lg flex flex-col items-center justify-center transition-all duration-200 print:hidden text-white p-1 text-center border border-indigo-300/30">
+                                  <span className="text-[12px]">📤</span>
+                                  <span className="text-[8px] font-black tracking-wider leading-none mt-1 uppercase">UNGGAH<br/>LOGO</span>
+                                </div>
+                              </div>
+                              {/* Small print-hidden floating badge */}
+                              <div className="mt-1 print:hidden text-[7px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-full px-1.5 py-0.5 inline-flex items-center gap-0.5 hover:bg-indigo-100 transition-all select-none">
+                                <span>✏️</span> GANTI LOGO
+                              </div>
+                            </td>
+                            {/* Text Header Middle Column */}
+                            <td style={{ width: '85%', textAlign: 'center', verticalAlign: 'middle' }}>
+                              <div style={{ fontWeight: 'bold', fontSize: '11pt', textTransform: 'uppercase', lineHeight: '1.2', letterSpacing: '0.04em', color: 'black' }}>
+                                {docSettings.namaPemda}
+                              </div>
+                              <div style={{ fontWeight: 'bold', fontSize: '13pt', textTransform: 'uppercase', lineHeight: '1.25', marginTop: '4px', color: 'black', whiteSpace: 'pre-line' }}>
+                                {docSettings.namaInstansi.split(', ').map((part, idx, arr) => (
+                                  <React.Fragment key={idx}>
+                                    {part}{idx < arr.length - 1 ? ',' : ''}
+                                    {idx < arr.length - 1 && <br />}
+                                  </React.Fragment>
+                                ))}
+                              </div>
+                              <div 
+                                style={{ fontSize: '8.5pt', marginTop: '6px', lineHeight: '1.35', color: '#0f172a' }}
+                                dangerouslySetInnerHTML={{ __html: formatAlamatKop(docSettings.alamatLengkap) }}
+                              />
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* DOCUMENT BODY CONTENT */}
+                  <div className="document-body-content text-justify text-black" style={{ color: 'black' }}>
+                    {activeTemplateContent.split(/\n\s*\n/).map((para, i) => {
+                      if (!para.trim()) return null;
+                      return (
+                        <div 
+                          key={i} 
+                          className="document-paragraph text-justify" 
+                          style={{ 
+                            lineHeight: docSettings.lineHeight || '1.15',
                             fontFamily: docSettings.fontFamily === 'Bookman Old Style' 
                               ? "'Bookman Old Style', Georgia, serif" 
                               : docSettings.fontFamily === 'Arial' 
                                 ? "Arial, Helvetica, sans-serif" 
-                                : "'Times New Roman', Times, serif"
-                         }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', borderBottom: '3px solid black', marginBottom: '2px' }}>
-                              <tbody>
-                                <tr>
-                                  <td style={{ width: '18%', verticalAlign: 'middle', textAlign: 'center', paddingBottom: '10px', paddingRight: '15px' }}>
-                                     {docSettings.customLogo ? (
-                                       <img 
-                                         src={docSettings.customLogo} 
-                                         alt="Logo Instansi" 
-                                         style={{ 
-                                           maxHeight: '80px', 
-                                           maxWidth: '95px', 
-                                           objectFit: 'contain',
-                                           display: 'inline-block' 
-                                         }} 
-                                       />
-                                     ) : (
-                                       <LogoGarudaPlaceholder />
-                                     )}
-                                  </td>
-                                  <td style={{ width: '82%', textAlign: 'center', verticalAlign: 'middle', paddingBottom: '10px' }}>
-                                     <div style={{ fontWeight: 'bold', fontSize: '13pt', textTransform: 'uppercase', lineHeight: '1.2' }}>{docSettings.namaPemda}</div>
-                                     <div style={{ fontWeight: 'bold', fontSize: '16pt', textTransform: 'uppercase', lineHeight: '1.2', marginTop: '2px' }}>{docSettings.namaInstansi}</div>
-                                     <div style={{ fontSize: '9pt', marginTop: '6px', lineHeight: '1.3' }}>{docSettings.alamatLengkap}</div>
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                            <div style={{ width: '100%', borderBottom: '1px solid black' }}></div>
-                         </div>
-                       )}
-
-                       {/* DYNAMIC DOCUMENT CONTENT */}
-                       <div className="document-content">
-                          {renderPreview(activeTemplateContent).split(/\n\s*\n/).map((para, i) => {
-                            if (!para.trim()) return null;
-                            return (
-                              <div 
-                                key={i} 
-                                className="document-paragraph text-justify" 
-                                style={{ 
-                                  lineHeight: docSettings.lineHeight || '1.5',
-                                  fontFamily: docSettings.fontFamily === 'Bookman Old Style' 
-                                    ? "'Bookman Old Style', Georgia, serif" 
-                                    : docSettings.fontFamily === 'Arial' 
-                                      ? "Arial, Helvetica, sans-serif" 
-                                      : "'Times New Roman', Times, serif",
-                                  fontSize: docSettings.fontSize || '12pt',
-                                  whiteSpace: 'pre-wrap',
-                                  textAlign: 'justify',
-                                  textJustify: 'inter-word',
-                                  marginBottom: '1.25em'
-                                }}
-                              >
-                                {para}
-                              </div>
-                            );
-                          })}
-                       </div>
-                       
-                     </div>
+                                : "'Times New Roman', Times, serif",
+                            fontSize: docSettings.fontSize || '12pt',
+                            whiteSpace: 'pre-wrap',
+                            textAlign: 'justify',
+                            textJustify: 'inter-word',
+                            marginBottom: '1.15em',
+                            color: 'black'
+                          }}
+                          dangerouslySetInnerHTML={{ __html: renderPreviewHTML(para) }}
+                        />
+                      );
+                    })}
                   </div>
+                  
                 </div>
-              )}
+              </div>
+
             </div>
           ) : (
-             <div className="glass-panel h-[calc(100vh-140px)] flex flex-col items-center justify-center text-slate-400 print:hidden">
-                <span className="text-4xl mb-4">📄</span>
-                <p>Pilih template dari daftar di sebelah kiri.</p>
-             </div>
+            <div className="bg-slate-200 border border-slate-300/40 rounded-2xl h-[calc(100vh-140px)] flex flex-col items-center justify-center text-slate-400 print:hidden shadow-inner">
+              <BookOpen size={48} className="text-slate-400/80 mb-3" />
+              <p className="text-sm font-semibold">Silakan pilih template naskah dinas di kolom kiri.</p>
+            </div>
           )}
         </div>
+
       </div>
     </div>
   );

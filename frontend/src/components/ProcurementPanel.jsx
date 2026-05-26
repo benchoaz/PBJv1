@@ -129,6 +129,15 @@ export default function ProcurementPanel() {
     }
   })
 
+  // Inaproc final documents state
+  const [inaprocDocs, setInaprocDocs] = useState({
+    bast: null,
+    sp: null,
+    invoice: null,
+    transfer: null,
+    pnbp: null
+  })
+
   // Real-world Catalog Mock Data matching Kecamatan Besuk DPA TA 2026
   const mockCatalogProducts = {
     ATK: [
@@ -602,6 +611,12 @@ export default function ProcurementPanel() {
           className={`px-4 py-2 rounded-lg text-[11px] font-semibold transition-all duration-200 ${activeTab === 'docs' ? 'bg-slate-100 text-slate-800 border border-slate-200 shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-200'}`}
         >
           📂 Arsip Dokumen Hasil Pemilihan (BAHP)
+        </button>
+        <button 
+          onClick={() => setActiveTab('inaproc_docs')}
+          className={`px-4 py-2 rounded-lg text-[11px] font-semibold transition-all duration-200 ${activeTab === 'inaproc_docs' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/50 border border-transparent hover:border-indigo-100'}`}
+        >
+          📥 Unggah Arsip Inaproc (BAST/SP)
         </button>
       </div>
 
@@ -1768,6 +1783,86 @@ export default function ProcurementPanel() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 4: Arsip Final Inaproc (BAST, SP, Invoice) */}
+      {activeTab === 'inaproc_docs' && (
+        <div className="glass-panel p-8 animate-slide-up bg-white border border-slate-200 rounded-2xl shadow-sm max-w-4xl mx-auto">
+          <div className="text-center mb-8 border-b border-slate-100 pb-6">
+            <span className="text-4xl block mb-3">📥</span>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Laci Arsip Final Inaproc</h2>
+            <p className="text-sm text-slate-500 mt-2">
+              Silakan unggah dokumen <b>Surat Pesanan (SP), Invoice, Bukti Transfer, BAST, dan Potongan PNBP</b> asli yang diterbitkan oleh sistem e-Katalog LKPP (Inaproc) untuk menyelesaikan pengadaan ini.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {[
+              { id: 'sp', title: '📜 Surat Pesanan (SP)', desc: 'Kontrak SP yang disetujui penyedia' },
+              { id: 'invoice', title: '🧾 Invoice / Tagihan', desc: 'Faktur tagihan pembayaran' },
+              { id: 'transfer', title: '💸 Bukti Transfer', desc: 'Bukti transfer pencairan dana riil' },
+              { id: 'pnbp', title: '✂️ Tarif Potongan PNBP', desc: 'Bukti pembayaran PNBP e-Katalog' },
+              { id: 'bast', title: '🤝 BAST (Berita Acara Serah Terima)', desc: 'Dokumen serah terima Inaproc' },
+            ].map(item => (
+              <div key={item.id} className="border border-slate-200 rounded-xl p-5 hover:border-indigo-300 transition-all bg-slate-50 relative group">
+                {inaprocDocs[item.id] && (
+                  <div className="absolute -top-2 -right-2 bg-emerald-500 text-white rounded-full p-1 shadow-md">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                  </div>
+                )}
+                <h4 className="font-bold text-slate-800 text-sm">{item.title}</h4>
+                <p className="text-[10px] text-slate-500 mt-0.5 mb-3">{item.desc}</p>
+                <div className="relative">
+                  <input 
+                    type="file" 
+                    accept="application/pdf,image/*" 
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    onChange={(e) => {
+                      if (e.target.files[0]) {
+                        setInaprocDocs(prev => ({ ...prev, [item.id]: e.target.files[0].name }))
+                      }
+                    }}
+                  />
+                  <div className={`text-center py-3 border-2 border-dashed rounded-lg text-xs font-bold transition-all ${inaprocDocs[item.id] ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 bg-white text-slate-600 group-hover:bg-indigo-50 group-hover:border-indigo-400 group-hover:text-indigo-600'}`}>
+                    {inaprocDocs[item.id] ? inaprocDocs[item.id] : 'Klik/Tarik file ke sini'}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center">
+            <h4 className="font-bold text-indigo-900 mb-2">Tutup Pekerjaan & Serahkan ke PPK</h4>
+            <p className="text-xs text-indigo-700 mb-6">Pastikan seluruh dokumen dari Inaproc sudah terunggah sebelum menyegel paket ini secara permanen.</p>
+            <button 
+              onClick={async () => {
+                if (!Object.values(inaprocDocs).some(doc => doc !== null)) {
+                  alert('Harap unggah minimal satu dokumen (BAST/SP) terlebih dahulu sebelum menyelesaikan paket.');
+                  return;
+                }
+                if (!confirm('Anda yakin ingin menyegel paket ini? Status paket di Dashboard PPK akan berubah menjadi "Selesai (Arsip Lengkap)".')) return;
+                
+                try {
+                  // Simulate fetching the correct projectId from localStorage
+                  // In real app we would have the projectId in submittedPack or from URL
+                  const savedPackStr = localStorage.getItem('pbj_submitted_package');
+                  const pack = JSON.parse(savedPackStr);
+                  
+                  // In this mock context we don't have the explicit projectId.
+                  // But we simulate success.
+                  alert('🎉 Luar Biasa! Pekerjaan selesai! Dokumen arsip lengkap Inaproc telah diunggah dan dikembalikan ke PPK untuk keperluan audit BPK.');
+                  localStorage.removeItem('pbj_submitted_package');
+                  window.location.href = '/'; // Go back to PPK Dashboard to see it green
+                } catch (e) {
+                  alert('Gagal menyelesaikan paket: ' + e.message);
+                }
+              }}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-3.5 rounded-xl shadow-xl shadow-indigo-600/20 transition-all text-sm w-full md:w-auto"
+            >
+              🔒 Segel & Kembalikan Arsip Lengkap ke PPK
+            </button>
           </div>
         </div>
       )}

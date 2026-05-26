@@ -90,12 +90,12 @@ export default function Header() {
   }
 
   const menuItems = [
-    { path: '/', label: 'Projects', Icon: Icons.FolderOpen, roles: ['Admin', 'PPK', 'PP'] },
+    { path: '/', label: 'Daftar Paket', Icon: Icons.FolderOpen, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/tickets', label: 'Tickets', Icon: Icons.Ticket, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/ppk/persiapan', label: 'PPK Persiapan', Icon: Icons.ClipboardEdit, roles: ['Admin', 'PPK'] },
     { path: '/pp/panel', label: 'PP Panel', Icon: Icons.Briefcase, roles: ['Admin', 'PP'] },
     { path: '/admin/ocr', label: 'API AI OCR', Icon: Icons.ScanText, roles: ['Admin', 'PPK', 'PP'] },
-    { path: '/admin/templates', label: 'Template Surat', Icon: Icons.FileText, roles: ['Admin'] },
+    { path: '/admin/templates', label: 'Template Surat', Icon: Icons.FileText, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/users', label: 'Users', Icon: Icons.Users, roles: ['Admin'] },
   ]
 

@@ -203,8 +203,11 @@ def extract_rincian_from_block(block_text: str) -> List[RincianItem]:
     for line in merged_lines:
         if len(line) < 4:
             continue
-        # Skip header-like lines
-        if any(kw in line.lower() for kw in ['kode rekening', 'uraian rekening', 'anggaran']):
+        if any(kw in line.lower() for kw in ['kode rekening', 'uraian rekening', 'anggaran', 'rencana realisasi', 'jumlah anggaran sub kegiatan']):
+            continue
+
+        # Skip rows that are just month names for Rencana Realisasi
+        if re.match(r'^(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)\b', line.lower()):
             continue
 
         # Skip jika barang sudah dihapus (Rp0,00 atau Rp0)
@@ -306,20 +309,33 @@ def extract_rincian_from_block(block_text: str) -> List[RincianItem]:
             except:
                 pass
 
-        # Cari satuan dan volume menggunakan SATUAN_PAT
-        sat_match = SATUAN_PAT.search(line)
-        satuan = sat_match.group(2) if sat_match else None
-        vol_str = sat_match.group(1) if sat_match else None
+        # Parse volume multiplication (e.g. 50 Orang x 10 Kali)
+        vol_multi = None
+        satuan = None
+        vol_str = None
+        multi_match = re.search(r'(\d+(?:[,.]\d+)?)\s*([a-zA-Z]{2,10})\s*x\s*(\d+(?:[,.]\d+)?)\s*([a-zA-Z]{2,10})', line, re.IGNORECASE)
+        
+        if multi_match:
+            v1 = float(multi_match.group(1).replace(',', '.'))
+            v2 = float(multi_match.group(3).replace(',', '.'))
+            vol_multi = v1 * v2
+            vol_str = str(vol_multi)
+            satuan = f"{multi_match.group(2).capitalize()} / {multi_match.group(4).capitalize()}"
+        else:
+            # Cari satuan dan volume menggunakan SATUAN_PAT biasa
+            sat_match = SATUAN_PAT.search(line)
+            satuan = sat_match.group(2) if sat_match else None
+            vol_str = sat_match.group(1) if sat_match else None
 
-        # Jika tidak ketemu satuan standar, cari pola alternatif volume (misal: "Volume: 120 Rim")
-        if not satuan:
-            alt_match = re.search(r'(?:volume:?\s*)?(\d+[\.,]?\d*)\s*([a-zA-Z]{2,12})\b', line, re.IGNORECASE)
-            if alt_match:
-                vol_str = alt_match.group(1)
-                sat_candidate = alt_match.group(2)
-                # Pastikan bukan kata kunci terlarang
-                if sat_candidate.lower() not in ['volume', 'rupiah', 'harga', 'total', 'dpa', 'pagu', 'dan', 'atau']:
-                    satuan = sat_candidate
+            # Jika tidak ketemu satuan standar, cari pola alternatif volume (misal: "Volume: 120 Rim")
+            if not satuan:
+                alt_match = re.search(r'(?:volume:?\s*)?(\d+[\.,]?\d*)\s*([a-zA-Z]{2,12})\b', line, re.IGNORECASE)
+                if alt_match:
+                    vol_str = alt_match.group(1)
+                    sat_candidate = alt_match.group(2)
+                    # Pastikan bukan kata kunci terlarang
+                    if sat_candidate.lower() not in ['volume', 'rupiah', 'harga', 'total', 'dpa', 'pagu', 'dan', 'atau']:
+                        satuan = sat_candidate
 
         # Ekstrak nama/uraian barang
         first_num = re.search(r'\b\d', line)
@@ -445,6 +461,10 @@ SPAM FILTERING & GARBAGE EXCLUSION:
 - JANGAN PERNAH memasukkan baris rencana realisasi bulanan (seperti 'Januari', 'Februari', dst.), baris total/jumlah sub kegiatan (seperti 'Jumlah Anggaran Sub Kegiatan', 'Jumlah'), nama pejabat/Camat, NIP, tanda tangan, atau baris rekapitulasi ke dalam hasil ekstraksi rincian!
 - JIKA di teks DPA terdapat item dengan nominal harga/jumlah Rp 0,00 (atau Rp 0), itu berarti item tersebut sudah terhapus/dihapus, sehingga JANGAN dimasukkan ke dalam hasil ekstraksi!
 
+ATURAN KALKULASI VOLUME & HARGA:
+- Jika volume dalam bentuk perkalian (misal: "50 Orang x 10 Kali"), Anda WAJIB mengalikan angkanya (50 x 10 = 500) dan memasukkan hasil akhirnya (500) ke field "volume". Satuan menjadi gabungannya (misal: "Orang / Kali").
+- Pastikan rumus `volume * harga_satuan = harga_total` selalu akurat!
+
 Format output WAJIB berupa JSON ARRAY murni yang berisi objek dengan format berikut (tanpa kata pengantar, penjelasan, atau pembungkus markdown ```json):
 [
   {{
@@ -489,6 +509,7 @@ Potongan Teks DPA:
                         "model": model_name,
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.1,
+                        "max_tokens": 8192,
                         "response_format": {"type": "json_object"}
                     }
                     data_bytes = json.dumps(req_body).encode("utf-8")
@@ -547,7 +568,7 @@ Potongan Teks DPA:
             headers["anthropic-version"] = "2023-06-01"
             req_body = {
                 "model": "claude-3-haiku-20240307",
-                "max_tokens": 1500,
+                "max_tokens": 4096,
                 "messages": [
                     {"role": "user", "content": prompt}
                 ]
@@ -650,7 +671,8 @@ def call_ai_api(prompt: str, provider: str, api_key: str, json_format: bool = Fa
         req_body = {
             "model": "llama-3.3-70b-versatile",
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.1
+            "temperature": 0.1,
+            "max_tokens": 8192
         }
         if json_format:
             req_body["response_format"] = {"type": "json_object"}
@@ -660,7 +682,7 @@ def call_ai_api(prompt: str, provider: str, api_key: str, json_format: bool = Fa
         headers["anthropic-version"] = "2023-06-01"
         req_body = {
             "model": "claude-3-haiku-20240307",
-            "max_tokens": 1000,
+            "max_tokens": 4096,
             "messages": [{"role": "user", "content": prompt}]
         }
     elif provider == "openai":

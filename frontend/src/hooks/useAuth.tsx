@@ -38,20 +38,31 @@ export function AuthProvider({ children }) {
     if (!res.ok) throw new Error('Login failed')
     const data = await res.json()
     
-    // Load registered users from User Management to cross-reference NIP
-    const defaultList = [
-      { id: 1, name: 'Handik Hariyanto, S.Kom., M.Si', role: 'PPK', nip: '197909102002121004', departments: ['Kecamatan Besuk'], password: 'admin' },
-      { id: 2, name: 'Beni Trisna Wijaya, S.Kom', role: 'PP', nip: '198205192010011010', departments: ['Kecamatan Besuk', 'Kecamatan Kraksaan'], password: 'admin' },
-      { id: 3, name: 'Beni (Super Admin)', role: 'Admin', nip: 'admin', departments: ['Unit Kerja Pengadaan Barang/Jasa (UKPBJ)'], password: 'admin' }
+    // ✅ PERBAIKAN: Selalu baca dari localStorage. Jika kosong, baru isi dengan default.
+    // Default canonical ini HARUS SAMA PERSIS dengan yang ada di UserManagement.jsx
+    // sehingga setiap perubahan yang dibuat admin (nama satker, idSatker, password) selalu terjaga.
+    const canonicalDefaults = [
+      { id: 1, name: 'Handik Hariyanto, S.Kom., M.Si', role: 'PPK', nip: '197909102002121004', department: 'Kecamatan Besuk', idSatker: '67081', perangkatDaerah: 'Pemerintah Daerah Kabupaten Probolinggo', password: 'admin' },
+      { id: 2, name: 'Beni Trisna Wijaya, S.Kom', role: 'PP', nip: '198205192010011010', department: 'Kecamatan Besuk', idSatker: '67081', perangkatDaerah: 'Pemerintah Daerah Kabupaten Probolinggo', password: 'admin' },
+      { id: 3, name: 'Beni (Super Admin)', role: 'Admin', nip: 'admin', department: 'Unit Kerja Pengadaan Barang/Jasa (UKPBJ)', idSatker: '308386', perangkatDaerah: 'Pemerintah Daerah Kabupaten Probolinggo', password: 'admin' }
     ]
     const savedUsers = localStorage.getItem('pbj_users')
     let userList = []
     if (savedUsers) {
+      // Pakai data dari localStorage (sudah diedit admin), bersihkan akun mock lama
       userList = JSON.parse(savedUsers).filter(u => u.name !== 'Budi Santoso' && u.name !== 'Siti Aminah' && u.name !== 'Ahmad Dahlan')
+      // Pastikan tidak ada canonical user yang hilang (misal jika dihapus tidak sengaja)
+      for (const canon of canonicalDefaults) {
+        const exists = userList.find(u => u.nip === canon.nip)
+        if (!exists) {
+          userList.push(canon)
+        }
+      }
       localStorage.setItem('pbj_users', JSON.stringify(userList))
     } else {
-      userList = defaultList
-      localStorage.setItem('pbj_users', JSON.stringify(defaultList))
+      // localStorage kosong (baru install / clear), isi dengan default
+      userList = canonicalDefaults
+      localStorage.setItem('pbj_users', JSON.stringify(canonicalDefaults))
     }
 
     let matchedUser = userList.find(u => u.nip.toLowerCase() === nip.trim().toLowerCase())

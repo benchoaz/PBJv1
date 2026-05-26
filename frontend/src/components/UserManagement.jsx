@@ -1,6 +1,58 @@
 import { useState, useEffect } from 'react'
 
-// satkerOptions has been removed as the system now relies on real user input
+const PROBOLINGGO_SATKERS = [
+  { name: "Unit Kerja Pengadaan Barang/Jasa (UKPBJ)", idSatker: "308386" },
+  { name: "Bagian Pengadaan Barang dan Jasa (BPBJ)", idSatker: "308386" },
+  { name: "Kecamatan Besuk", idSatker: "67081" },
+  { name: "Kecamatan Kraksaan", idSatker: "67082" },
+  { name: "Kecamatan Dringu", idSatker: "67083" },
+  { name: "Kecamatan Paiton", idSatker: "67084" },
+  { name: "Kecamatan Gending", idSatker: "67085" },
+  { name: "Kecamatan Banyuanyar", idSatker: "67086" },
+  { name: "Kecamatan Maron", idSatker: "67087" },
+  { name: "Kecamatan Leces", idSatker: "67088" },
+  { name: "Kecamatan Tongas", idSatker: "67089" },
+  { name: "Kecamatan Sumberasih", idSatker: "67090" },
+  { name: "Kecamatan Wonomerto", idSatker: "67091" },
+  { name: "Kecamatan Kuripan", idSatker: "67092" },
+  { name: "Kecamatan Bantaran", idSatker: "67093" },
+  { name: "Kecamatan Sukapura", idSatker: "67094" },
+  { name: "Kecamatan Sumber", idSatker: "67095" },
+  { name: "Kecamatan Tegalsiwalan", idSatker: "67096" },
+  { name: "Kecamatan Gading", idSatker: "67097" },
+  { name: "Kecamatan Pakuniran", idSatker: "67098" },
+  { name: "Kecamatan Kotaanyar", idSatker: "67099" },
+  { name: "Kecamatan Pajarakan", idSatker: "67100" },
+  { name: "Kecamatan Tiris", idSatker: "67101" },
+  { name: "Kecamatan Krucil", idSatker: "67102" },
+  { name: "Dinas Kesehatan", idSatker: "67001" },
+  { name: "Dinas Pekerjaan Umum & Penataan Ruang (PUPR)", idSatker: "67002" },
+  { name: "Dinas Pendidikan dan Kebudayaan", idSatker: "67003" },
+  { name: "Dinas Lingkungan Hidup (DLH)", idSatker: "67004" },
+  { name: "RSUD Waluyo Jati Kraksaan (BLU)", idSatker: "67005" },
+  { name: "Dinas Koperasi, Usaha Mikro, Perdagangan dan Perindustrian", idSatker: "67006" },
+  { name: "Badan Perencanaan Pembangunan, Penelitian dan Pengembangan Daerah (Bapelitbangda)", idSatker: "67007" },
+  { name: "Badan Pengelolaan Keuangan dan Pendapatan Daerah (BPKPD)", idSatker: "67008" },
+  { name: "Dinas Perhubungan", idSatker: "67009" },
+  { name: "Dinas Pertanian dan Ketahanan Pangan", idSatker: "67010" },
+  { name: "Dinas Sosial", idSatker: "67011" },
+  { name: "Dinas Pemberdayaan Masyarakat dan Desa (DPMD)", idSatker: "67012" },
+  { name: "Satuan Polisi Pamong Praja (Satpol PP)", idSatker: "67013" },
+  { name: "Dinas Pariwisata dan Kebudayaan", idSatker: "67014" },
+  { name: "Dinas Penanaman Modal dan Pelayanan Terpadu Satu Pintu (DPMPTSP)", idSatker: "67015" },
+  { name: "Badan Kepegawaian dan Pengembangan Sumber Daya Manusia (BKPSDM)", idSatker: "67016" },
+  { name: "Dinas Komunikasi, Informatika, Statistik dan Persandian", idSatker: "67017" },
+  { name: "Dinas Perpustakaan dan Kearsipan", idSatker: "67018" },
+  { name: "Dinas Ketahanan Pangan", idSatker: "67019" },
+  { name: "Dinas Perikanan", idSatker: "67020" },
+  { name: "Dinas Perindustrian dan Perdagangan", idSatker: "67021" },
+  { name: "Badan Penanggulangan Bencana Daerah (BPBD)", idSatker: "67022" },
+  { name: "Badan Kesatuan Bangsa dan Politik (Bakesbangpol)", idSatker: "67023" },
+  { name: "RSUD Tongas", idSatker: "67024" },
+  { name: "Sekretariat Daerah", idSatker: "67025" },
+  { name: "Sekretariat DPRD", idSatker: "67026" },
+  { name: "Inspektorat Daerah", idSatker: "67027" }
+];
 
 export default function UserManagement() {
   // Load initial state from localStorage or default list
@@ -70,6 +122,15 @@ export default function UserManagement() {
     setShowPassword(false)
     setIsModalOpen(true)
   }
+
+  // Handle Satker Datalist selection & autofill ID
+  const handleSatkerChange = (val) => {
+    setDepartment(val);
+    const matched = PROBOLINGGO_SATKERS.find(s => s.name.toLowerCase() === val.trim().toLowerCase());
+    if (matched) {
+      setIdSatker(matched.idSatker);
+    }
+  };
 
   // Save (Add or Update) handler
   const handleSave = (e) => {
@@ -213,7 +274,7 @@ export default function UserManagement() {
               {currentEditUser ? '📝 Edit Data Pengguna' : '👤 Tambah Pengguna Baru'}
             </h2>
             
-            <form onSubmit={handleSave} className="space-y-5">
+            <form onSubmit={handleSave} className="space-y-5" autoComplete="off">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Nama Lengkap</label>
                 <input 
@@ -234,6 +295,7 @@ export default function UserManagement() {
                   value={nip} 
                   onChange={e => setNip(e.target.value)} 
                   placeholder="Masukkan NIP pegawai..."
+                  autoComplete="off"
                   required
                 />
               </div>
@@ -268,12 +330,18 @@ export default function UserManagement() {
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Instansi / Satuan Kerja (Dinas)</label>
                 <input 
                   type="text"
+                  list="satker-list"
                   className="glass-input" 
                   value={department} 
-                  onChange={e => setDepartment(e.target.value)} 
-                  placeholder="Ketik nama Satuan Kerja (Contoh: Unit Kerja Pengadaan Barang/Jasa)"
+                  onChange={e => handleSatkerChange(e.target.value)} 
+                  placeholder="Pilih atau cari Satuan Kerja (Contoh: Kecamatan Besuk)"
                   required
                 />
+                <datalist id="satker-list">
+                  {PROBOLINGGO_SATKERS.map((s, idx) => (
+                    <option key={idx} value={s.name} />
+                  ))}
+                </datalist>
               </div>
 
               <div>
@@ -286,6 +354,7 @@ export default function UserManagement() {
                   value={idSatker} 
                   onChange={e => setIdSatker(e.target.value)} 
                   placeholder="Masukkan ID angka dari SIRUP (Contoh: 308386)"
+                  autoComplete="off"
                   required
                 />
                 <div className="text-[10px] text-slate-400 mt-1.5 font-medium italic">
@@ -304,6 +373,7 @@ export default function UserManagement() {
                     value={password} 
                     onChange={e => setPassword(e.target.value)} 
                     placeholder={currentEditUser ? 'Kosongkan jika tidak ingin mengubah password' : 'Masukkan password akses...'}
+                    autoComplete="new-password"
                     required={!currentEditUser}
                   />
                   <button

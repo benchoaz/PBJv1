@@ -1,6 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useNavigate } from 'react-router-dom'
+import { 
+  User, 
+  Lock, 
+  Eye, 
+  EyeOff, 
+  Building, 
+  Check, 
+  Sparkles, 
+  LogIn, 
+  AlertCircle,
+  HelpCircle
+} from 'lucide-react'
 
 export default function Login() {
   const { user, login } = useAuth()
@@ -14,6 +26,10 @@ export default function Login() {
   // Custom Role and Satker Overrides for Demo
   const [role, setRole] = useState('')
   const [department, setDepartment] = useState('')
+  
+  // Quick-fill helper states
+  const [activeDemo, setActiveDemo] = useState(null)
+  const [notification, setNotification] = useState('')
 
   const satkerOptions = [
     "Bagian Pengadaan Barang dan Jasa (BPBJ)",
@@ -26,18 +42,58 @@ export default function Login() {
     "Kecamatan Kraksaan"
   ]
 
+  const demoAccounts = [
+    {
+      id: 'admin',
+      nip: 'admin',
+      name: 'Beni (Admin)',
+      role: 'Admin',
+      department: 'Unit Kerja Pengadaan Barang/Jasa (UKPBJ)',
+      badgeBg: 'bg-indigo-100 text-indigo-700 border-indigo-200'
+    },
+    {
+      id: 'ppk',
+      nip: '197909102002121004',
+      name: 'Handik H., M.Si (PPK)',
+      role: 'PPK',
+      department: 'Kecamatan Besuk',
+      badgeBg: 'bg-emerald-100 text-emerald-700 border-emerald-200'
+    },
+    {
+      id: 'pp',
+      nip: '198205192010011010',
+      name: 'Beni T. W., S.Kom (PP)',
+      role: 'PP',
+      department: 'Kecamatan Kraksaan',
+      badgeBg: 'bg-purple-100 text-purple-700 border-purple-200'
+    }
+  ]
+
   useEffect(() => {
     if (user) {
       navigate('/')
     }
   }, [user, navigate])
 
+  const handleQuickFill = (account) => {
+    setActiveDemo(account.id)
+    setNip(account.nip)
+    setPassword('admin')
+    setRole(account.role)
+    setDepartment(account.department)
+    
+    setNotification(`Peran ${account.role} diisi otomatis!`)
+    setTimeout(() => {
+      setNotification('')
+    }, 2500)
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     
     if (!nip.trim() || !password.trim()) {
-      setError('NIP dan Password wajib diisi!')
+      setError('Username / NIP dan Password wajib diisi!')
       return
     }
 
@@ -50,190 +106,247 @@ export default function Login() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-white font-sans overflow-hidden">
-      
-      {/* LEFT SIDE (50%) - Illustration & Branding */}
-      <div className="hidden lg:flex flex-col w-1/2 bg-[#837AE6] justify-center items-center p-16 text-center relative overflow-hidden">
+    <div 
+      className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-cover bg-center overflow-y-auto font-sans relative"
+      style={{ 
+        backgroundImage: "url('https://images.unsplash.com/photo-1602181539291-5de156c4293f?q=80&w=1920&auto=format&fit=crop')",
+        backgroundAttachment: 'fixed'
+      }}
+    >
+      {/* Background Overlay for Perfect Contrast */}
+      <div className="absolute inset-0 bg-slate-900/15 backdrop-blur-[1px] pointer-events-none z-0"></div>
+
+      {/* Dynamic Style Injection for Floating Visual Delighters */}
+      <style>{`
+        .input-focus-glow:focus-within {
+          box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.15);
+          border-color: #1e3a8a;
+        }
+        .btn-navy-shimmer::after {
+          content: '';
+          position: absolute;
+          top: 0; right: 0; bottom: 0; left: 0;
+          transform: translateX(-100%);
+          background-image: linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.15) 20%,
+            rgba(255, 255, 255, 0.3) 60%,
+            rgba(255, 255, 255, 0) 100%
+          );
+          animation: btnShimmer 3s infinite;
+        }
+        @keyframes btnShimmer {
+          100% { transform: translateX(100%); }
+        }
+        .custom-glass {
+          background: rgba(255, 255, 255, 0.72) !important;
+          backdrop-filter: blur(16px) !important;
+          -webkit-backdrop-filter: blur(16px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.45) !important;
+        }
+        .custom-glass-sub {
+          background: rgba(255, 255, 255, 0.6) !important;
+          backdrop-filter: blur(10px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        }
+        .system-text-override {
+          color: #0f2942 !important;
+        }
+      `}</style>
+
+      {/* MAIN CONTAINER (Centered Card) */}
+      <div className="w-full max-w-[460px] custom-glass rounded-3xl p-7 lg:p-8 shadow-2xl z-10 transition-all duration-300 transform hover:scale-[1.005]">
         
-        {/* Abstract Vector Illustration (SVG) */}
-        <div className="relative mb-12 w-80 h-80 flex items-center justify-center animate-fade-in">
-          <svg viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-2xl">
-            {/* Background elements */}
-            <circle cx="200" cy="200" r="160" fill="#9991EA" opacity="0.4" />
-            <circle cx="200" cy="200" r="120" fill="#AEAAF0" opacity="0.6" />
-            
-            {/* Globe */}
-            <circle cx="120" cy="140" r="50" stroke="#1E1B4B" strokeWidth="6" fill="#C7D2FE" />
-            <path d="M120 90C140 90 155 110 155 140C155 170 140 190 120 190C100 190 85 170 85 140C85 110 100 90 120 90Z" stroke="#1E1B4B" strokeWidth="4" />
-            <path d="M70 140H170" stroke="#1E1B4B" strokeWidth="4" />
-            <path d="M85 115H155" stroke="#1E1B4B" strokeWidth="4" />
-            <path d="M85 165H155" stroke="#1E1B4B" strokeWidth="4" />
-            
-            {/* Cursor */}
-            <path d="M150 160L180 190M180 190L165 195M180 190L175 175" stroke="#1E1B4B" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-            
-            {/* Lightbulb */}
-            <path d="M260 90C280 90 295 105 295 125C295 140 285 150 280 160V170H240V160C235 150 225 140 225 125C225 105 240 90 260 90Z" stroke="#1E1B4B" strokeWidth="6" fill="#FEF08A" />
-            <path d="M245 180H275" stroke="#1E1B4B" strokeWidth="6" strokeLinecap="round" />
-            <path d="M250 190H270" stroke="#1E1B4B" strokeWidth="6" strokeLinecap="round" />
-            
-            {/* Handshake */}
-            <path d="M80 250L130 220C140 215 155 215 165 225L180 240L230 200C240 190 255 190 265 200L320 250" stroke="#1E1B4B" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M80 230L170 290L230 250" stroke="#1E1B4B" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M140 215L190 250" stroke="#1E1B4B" strokeWidth="6" strokeLinecap="round" />
-            
-            {/* Padlock */}
-            <rect x="250" y="240" width="60" height="50" rx="8" stroke="#1E1B4B" strokeWidth="6" fill="#C7D2FE" />
-            <path d="M265 240V220C265 205 295 205 295 220V240" stroke="#1E1B4B" strokeWidth="6" strokeLinecap="round" />
-            <circle cx="280" cy="265" r="8" fill="#1E1B4B" />
-            <path d="M280 265V280" stroke="#1E1B4B" strokeWidth="4" strokeLinecap="round" />
-            
-            {/* Tech Nodes/Lines */}
-            <circle cx="330" cy="120" r="6" fill="#1E1B4B" />
-            <path d="M295 120H330" stroke="#1E1B4B" strokeWidth="4" strokeLinecap="round" />
-            <circle cx="90" cy="80" r="6" fill="#1E1B4B" />
-            <path d="M90 80V90" stroke="#1E1B4B" strokeWidth="4" strokeLinecap="round" />
-            <path d="M220 280H190V310H150" stroke="#1E1B4B" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx="150" cy="310" r="6" fill="#1E1B4B" />
-            <path d="M280 320H310V290" stroke="#1E1B4B" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx="280" cy="320" r="6" fill="#1E1B4B" />
-          </svg>
+        {/* Government Emblem */}
+        <div className="flex justify-center mb-3">
+          <img 
+            src="https://upload.wikimedia.org/wikipedia/commons/2/25/Lambang_Kabupaten_Probolinggo.png" 
+            alt="Logo Kabupaten Probolinggo" 
+            className="h-16 w-auto object-contain drop-shadow-md"
+          />
         </div>
 
-        <h1 className="text-4xl font-bold text-white tracking-tight mb-4 animate-slide-up">
-          PORTAL PBJ: Sistem Informasi<br />Pengadaan Barang & Jasa Daerah
-        </h1>
-        <p className="text-indigo-100 text-lg font-medium animate-slide-up" style={{ animationDelay: '0.1s' }}>
-          Akses Aman Untuk Efisiensi Pengadaan
-        </p>
+        {/* Brand Headers */}
+        <div className="text-center mb-5">
+          <span className="text-[10px] lg:text-[11px] font-extrabold tracking-[0.16em] text-slate-800 uppercase block mb-1">
+            Pemerintah Kabupaten Probolinggo
+          </span>
+          <h1 className="text-3xl font-black tracking-wide mb-0.5 flex justify-center items-center gap-1.5">
+            <span className="text-[#0f2942]">PBJ</span>
+            <span className="text-[#d97706]">SAE</span>
+          </h1>
+          <span className="text-xs font-bold tracking-[0.2em] text-[#0f2942] uppercase block mb-2">
+            Dashboard Gateway
+          </span>
+          <div className="w-16 h-[2px] bg-gradient-to-r from-blue-900 via-indigo-900 to-amber-500 mx-auto mb-3"></div>
+          
+          <p className="text-slate-700 text-xs font-bold">
+            PBJ SAE: Sinergi, Aman, Efisien
+          </p>
+          <p className="text-slate-500 text-[10px] mt-1 font-medium">
+            Login Sistem Informasi Terintegrasi
+          </p>
+        </div>
+
+        {/* Small Elegant Divider */}
+        <hr className="border-slate-200/60 my-4" />
+
+        {/* Status / Notifications */}
+        {notification && (
+          <div className="mb-4 bg-indigo-50 border border-indigo-100 px-3.5 py-2.5 rounded-xl text-indigo-800 text-[11px] font-bold flex items-center gap-2 shadow-sm animate-fade-in">
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
+            </span>
+            {notification}
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-4 bg-rose-50 border border-rose-100 p-3.5 rounded-xl text-rose-800 text-xs flex items-start gap-2.5 shadow-sm animate-fade-in">
+            <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold block text-rose-900 mb-0.5">Kesalahan Login</span>
+              {error}
+            </div>
+          </div>
+        )}
+
+        {/* The Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="text-left">
+            <span className="text-xs font-bold text-slate-800 tracking-wide block mb-2">
+              Login Pengguna
+            </span>
+
+            {/* Username/NIP Input */}
+            <div className="relative rounded-xl border border-slate-300 bg-white group input-focus-glow transition-all duration-300 flex items-center shadow-inner">
+              <div className="pl-3.5 text-slate-400 group-focus-within:text-blue-900 transition-colors">
+                <User size={16} />
+              </div>
+              <input
+                type="text"
+                value={nip}
+                onChange={e => setNip(e.target.value)}
+                className="w-full pl-2.5 pr-4 py-3 bg-transparent border-0 rounded-xl text-xs focus:outline-none focus:ring-0 text-slate-800 placeholder-slate-400 font-semibold"
+                placeholder="Username / NIP / NIK"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Password Input */}
+          <div className="relative rounded-xl border border-slate-300 bg-white group input-focus-glow transition-all duration-300 flex items-center shadow-inner">
+            <div className="pl-3.5 text-slate-400 group-focus-within:text-blue-900 transition-colors">
+              <Lock size={16} />
+            </div>
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full pl-2.5 pr-10 py-3 bg-transparent border-0 rounded-xl text-xs focus:outline-none focus:ring-0 text-slate-800 placeholder-slate-400 font-semibold"
+              placeholder="Password"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3.5 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+
+          {/* Optional Satker Override Input */}
+          <div className="relative rounded-xl border border-slate-300 bg-white group input-focus-glow transition-all duration-300 flex items-center shadow-inner">
+            <div className="pl-3.5 text-slate-400 group-focus-within:text-blue-900 transition-colors">
+              <Building size={16} />
+            </div>
+            <input 
+              type="text"
+              list="satker-datalist"
+              className="w-full pl-2.5 pr-4 py-3 bg-transparent border-0 rounded-xl text-xs focus:outline-none focus:ring-0 text-slate-800 placeholder-slate-400 font-semibold" 
+              value={department} 
+              onChange={e => setDepartment(e.target.value)} 
+              placeholder="Lingkungan Satker (Opsional)"
+            />
+            <datalist id="satker-datalist">
+              {satkerOptions.map((opt, i) => (
+                <option key={i} value={opt} />
+              ))}
+            </datalist>
+          </div>
+
+          {/* Utilities Row */}
+          <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 px-0.5">
+            <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-800 transition-colors">
+              <input 
+                type="checkbox" 
+                className="rounded border-slate-300 text-blue-900 focus:ring-blue-900/30"
+              />
+              <span>Ingat Saya</span>
+            </label>
+            <a href="#" className="hover:text-blue-900 transition-colors">Lupa Password?</a>
+          </div>
+
+          {/* Submit Button */}
+          <button 
+            type="submit" 
+            className="w-full relative py-3 bg-[#0f2942] hover:bg-[#1b3d5c] text-white text-xs font-bold tracking-widest rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform active:scale-[0.99] flex items-center justify-center gap-2 overflow-hidden btn-navy-shimmer"
+          >
+            <LogIn size={14} className="safe-white-text" />
+            <span className="safe-white-text">MASUK</span>
+          </button>
+
+          {/* Footer Register Link */}
+          <div className="text-center text-[11px] text-slate-500 pt-2">
+            Belum punya akun? <a href="#" className="font-extrabold text-[#0f2942] hover:underline">Daftar Sekarang</a>
+          </div>
+        </form>
       </div>
 
-      {/* RIGHT SIDE (50%) - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white overflow-y-auto">
-        <div className="w-full max-w-md animate-fade-in">
-          
-          {/* Logo & Header */}
-          <div className="text-center mb-10">
-            <div className="inline-block bg-[#837AE6]/10 p-3 rounded-2xl mb-4">
-               <span className="text-5xl font-black text-[#837AE6] tracking-tighter shadow-sm">PBJ</span>
-            </div>
-            <h2 className="text-3xl font-bold text-slate-800 tracking-tight">LOGIN PORTAL</h2>
-            <p className="text-slate-500 mt-2 text-sm">Silakan masuk dengan akun Anda.</p>
-          </div>
-          
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="bg-rose-50 border-l-4 border-rose-500 text-rose-700 p-4 rounded text-sm shadow-sm">
-                {error}
-              </div>
-            )}
-            
-            {/* NIP Input */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-2">NIP</label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  {/* ID Card Icon */}
-                  <svg className="h-5 w-5 text-slate-400 group-focus-within:text-[#837AE6] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  value={nip}
-                  onChange={e => setNip(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-[#837AE6]/20 focus:border-[#837AE6] transition-all text-slate-800"
-                  placeholder="Masukkan NIP (18 Digit)"
-                  required
-                />
-              </div>
-              <p className="mt-2 text-xs text-slate-400">Contoh: 197909102002121004</p>
-            </div>
-            
-            {/* Password Input */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-2">PASSWORD</label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  {/* Padlock Icon */}
-                  <svg className="h-5 w-5 text-slate-400 group-focus-within:text-[#837AE6] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                </div>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-12 py-3.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-[#837AE6]/20 focus:border-[#837AE6] transition-all text-slate-800"
-                  placeholder="Masukkan Password"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  {/* Eye Icon */}
-                  {showPassword ? (
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
-                    </svg>
-                  ) : (
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Optional Satker Override (Maintained from previous requirement) */}
-            <div className="pt-2">
-              <label className="block text-xs font-bold text-slate-700 mb-2">LINGKUNGAN SATKER (Opsional)</label>
-              <div className="relative group">
-                <input 
-                  type="text"
-                  list="satker-datalist"
-                  className="w-full px-4 py-3 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-[#837AE6]/20 focus:border-[#837AE6] transition-all text-slate-800" 
-                  value={department} 
-                  onChange={e => setDepartment(e.target.value)} 
-                  placeholder="Bawaan (Default)"
-                />
-                <datalist id="satker-datalist">
-                  {satkerOptions.map((opt, i) => (
-                    <option key={i} value={opt} />
-                  ))}
-                </datalist>
-              </div>
-              <p className="mt-1 text-[10px] text-slate-400">Pilih jika merangkap jabatan di instansi lain.</p>
-            </div>
-            
-            {/* Submit Button & Links */}
-            <div className="pt-4 flex flex-col items-end gap-3">
-              <button 
-                type="submit" 
-                className="w-full py-4 bg-[#837AE6] hover:bg-[#6c62df] text-white text-sm font-bold tracking-wider rounded-xl shadow-lg shadow-[#837AE6]/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+      {/* SECONDARY CONTAINER: Premium Interactive Quick-Fill Demo Cards */}
+      <div className="w-full max-w-[460px] custom-glass-sub rounded-2xl p-4.5 mt-4 shadow-xl z-10 text-center flex flex-col gap-2">
+        <div className="flex items-center justify-between px-1 mb-1">
+          <span className="text-[10px] font-extrabold text-[#0f2942] uppercase tracking-wider flex items-center gap-1">
+            <Sparkles size={12} className="text-amber-600" />
+            <span>Akses Cepat (Akun Demo)</span>
+          </span>
+          <span className="text-[9px] text-slate-500 font-bold">Klik kartu untuk mengisi</span>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-2">
+          {demoAccounts.map((account) => {
+            const isActive = activeDemo === account.id;
+            return (
+              <button
+                key={account.id}
+                type="button"
+                onClick={() => handleQuickFill(account)}
+                className={`p-2.5 rounded-xl border bg-white/80 transition-all duration-300 text-left relative group flex flex-col justify-between ${
+                  isActive 
+                    ? 'ring-2 ring-blue-900 bg-white border-blue-900 shadow-md' 
+                    : 'hover:shadow-md hover:bg-white border-slate-300/60 hover:-translate-y-0.5'
+                }`}
               >
-                MASUK PORTAL
+                {isActive && (
+                  <div className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-[#0f2942] flex items-center justify-center text-white p-0.5">
+                    <Check size={8} className="safe-white-text stroke-[3]" />
+                  </div>
+                )}
+                
+                <div>
+                  <span className={`text-[8px] font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded border inline-block mb-1.5 ${account.badgeBg}`}>
+                    {account.role}
+                  </span>
+                  <h5 className="text-[10px] font-bold text-slate-800 group-hover:text-blue-900 transition-colors truncate">
+                    {account.name.split(' (')[0]}
+                  </h5>
+                </div>
               </button>
-              <a href="#" className="text-xs text-slate-500 hover:text-[#837AE6] transition-colors font-medium">Lupa Password?</a>
-            </div>
-
-            {/* Demo Helpers (Hidden strictly, only text hints) */}
-            <div className="mt-8 pt-6 border-t border-slate-100">
-               <h4 className="text-xs font-bold text-slate-400 mb-3 flex items-center gap-1">
-                 <span>💡</span> Akun Demo
-               </h4>
-               <div className="space-y-1.5 text-[11px] text-slate-500 font-mono bg-slate-50 p-3 rounded-lg border border-slate-100">
-                 <div><span className="font-bold text-[#837AE6]">admin</span> : Super Admin (UKPBJ)</div>
-                 <div><span className="font-bold text-[#837AE6]">197909102002121004</span> : PPK</div>
-                 <div><span className="font-bold text-[#837AE6]">198205192010011010</span> : PP</div>
-                 <div className="mt-2 text-[10px] italic">Password untuk semua akun: admin</div>
-               </div>
-            </div>
-
-          </form>
+            );
+          })}
         </div>
       </div>
     </div>

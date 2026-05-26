@@ -1,11 +1,15 @@
 FROM ghcr.io/puppeteer/puppeteer:latest
-USER root
+
 WORKDIR /app
-COPY package*.json ./
-ENV PUPPETEER_CACHE_DIR=/app/.cache
+
+# Salin package.json dengan kepemilikan pptruser
+COPY --chown=pptruser:pptruser package*.json ./
+
+# Jalankan npm install sebagai user pptruser (default di base image) agar Puppeteer mengunduh Chrome ke cache pptruser
 RUN npm install
-COPY server.js .
-RUN chown -R pptruser:pptruser /app
-USER pptruser
+
+# Salin source code dengan kepemilikan pptruser
+COPY --chown=pptruser:pptruser server.js .
+
 EXPOSE 3001
 CMD ["node", "server.js"]

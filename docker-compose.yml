@@ -22,7 +22,6 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     volumes:
-      - ./dpa-parser:/app
       - paddlex-cache:/root/.paddlex
     networks:
       - pbj-network
@@ -55,6 +54,8 @@ services:
       - POSTGRES_DB=pbj_db
     ports:
       - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
       - pbj-network
@@ -106,10 +107,9 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+
     volumes:
-      - ./frontend/public/screenshots:/screenshots
-      - ./survey-service/server.js:/app/server.js
-      - ./logs:/app/logs
+      - ./frontend/public/screenshots:/app/screenshots
     depends_on:
       - redis
     restart: unless-stopped
@@ -134,3 +134,4 @@ networks:
 
 volumes:
   paddlex-cache:
+  pgdata:

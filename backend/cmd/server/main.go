@@ -1,15 +1,16 @@
 package main
 
 import (
-	"database/sql"
 	"log"
 	"net/http"
 	"os"
 
 	"pbj/internal/handlers"
+	"pbj/internal/models"
 	"pbj/internal/repository"
 
-	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -18,21 +19,33 @@ func main() {
 		dbURL = "host=localhost port=5432 user=postgres password=postgres dbname=pbj sslmode=disable"
 	}
 
-	db, err := sql.Open("postgres", dbURL)
+	// GORM DB Connection
+	gormDB, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("Failed to connect to database via GORM: %v", err)
 	}
-	defer db.Close()
 
-	if err := db.Ping(); err != nil {
+	sqlDB, err := gormDB.DB()
+	if err != nil {
+		log.Fatalf("Failed to get sql.DB from gorm: %v", err)
+	}
+	defer sqlDB.Close()
+
+	if err := sqlDB.Ping(); err != nil {
 		log.Fatalf("Failed to ping database: %v", err)
 	}
-	log.Println("Connected to PostgreSQL")
+	log.Println("Connected to PostgreSQL via GORM")
 
-	projectRepo := repository.NewProjectRepository(db)
+	// Auto Migrate PBJ Schema
+	if err := gormDB.AutoMigrate(&models.Package{}, &models.PackageItem{}, &models.SurveyResult{}); err != nil {
+		log.Fatalf("Failed to auto-migrate models: %v", err)
+	}
+
+	projectRepo := repository.NewProjectRepository(sqlDB)
 
 	projectHandler := handlers.NewProjectHandler(projectRepo)
 	authHandler := handlers.NewAuthHandler()
+	pbjHandler := handlers.NewPBJHandler(gormDB)
 
 	mux := http.NewServeMux()
 
@@ -55,6 +68,13 @@ func main() {
 	mux.HandleFunc("POST /api/dpa/align-rincian", handlers.AlignRincian)
 	mux.HandleFunc("OPTIONS /api/dpa/align-rincian", handlers.AlignRincianOptions)
 	mux.HandleFunc("GET /api/dpa/health", handlers.DpaHealthCheck)
+
+	// PBJ / Package routes (GORM)
+	mux.HandleFunc("POST /api/pbj/packages", pbjHandler.CreateOrUpdatePackage)
+	mux.HandleFunc("OPTIONS /api/pbj/packages", pbjHandler.Options)
+	mux.HandleFunc("PUT /api/pbj/packages/{id}/survey", pbjHandler.UpdateSurvey)
+	mux.HandleFunc("OPTIONS /api/pbj/packages/{id}/survey", pbjHandler.Options)
+	mux.HandleFunc("GET /api/pbj/packages/{id}", pbjHandler.GetPackage)
 
 	// SIRUP LKPP live proxy endpoint
 	mux.HandleFunc("GET /api/sirup/satker/{id}", handlers.GetSirupPackages)
