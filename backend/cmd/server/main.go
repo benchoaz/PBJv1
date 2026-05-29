@@ -36,9 +36,31 @@ func main() {
 	}
 	log.Println("Connected to PostgreSQL via GORM")
 
-	// Auto Migrate PBJ Schema
-	if err := gormDB.AutoMigrate(&models.Package{}, &models.PackageItem{}, &models.SurveyResult{}); err != nil {
+	// Auto Migrate
+	err = gormDB.AutoMigrate(
+		&models.User{},
+		&models.Package{},
+		&models.PackageItem{},
+		&models.SurveyResult{},
+		&models.AppSetting{},
+		&models.Project{}, // Added Project here
+	)
+	if err != nil {
 		log.Fatalf("Failed to auto-migrate models: %v", err)
+	}
+
+	// Seed default users if none exist
+	var count int64
+	gormDB.Model(&models.User{}).Count(&count)
+	if count == 0 {
+		defaultUsers := []models.User{
+			{ID: 1, Name: "Handik Hariyanto, S.Kom., M.Si", Role: "PPK", NIP: "197909102002121004", Department: "Kecamatan Besuk", IdSatker: "67081", PerangkatDaerah: "Pemerintah Daerah Kabupaten Probolinggo", Password: "admin"},
+			{ID: 2, Name: "Beni Trisna Wijaya, S.Kom", Role: "PP", NIP: "198205192010011010", Department: "Kecamatan Besuk", IdSatker: "67081", PerangkatDaerah: "Pemerintah Daerah Kabupaten Probolinggo", Password: "admin"},
+			{ID: 3, Name: "Beni (Super Admin)", Role: "Admin", NIP: "admin", Department: "Unit Kerja Pengadaan Barang/Jasa (UKPBJ)", IdSatker: "308386", PerangkatDaerah: "Pemerintah Daerah Kabupaten Probolinggo", Password: "admin"},
+		}
+		for _, u := range defaultUsers {
+			gormDB.Create(&u)
+		}
 	}
 
 	projectRepo := repository.NewProjectRepository(sqlDB)
@@ -46,6 +68,8 @@ func main() {
 	projectHandler := handlers.NewProjectHandler(projectRepo)
 	authHandler := handlers.NewAuthHandler()
 	pbjHandler := handlers.NewPBJHandler(gormDB)
+	userHandler := handlers.NewUserHandler(gormDB)
+	settingHandler := handlers.NewSettingHandler(gormDB)
 
 	mux := http.NewServeMux()
 
@@ -55,6 +79,17 @@ func main() {
 
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
 	mux.HandleFunc("GET /api/auth/me", authHandler.Me)
+	
+	// User Routes
+	mux.HandleFunc("GET /api/users", userHandler.GetAll)
+	mux.HandleFunc("POST /api/users", userHandler.Create)
+	mux.HandleFunc("PUT /api/users/{id}", userHandler.Update)
+	mux.HandleFunc("DELETE /api/users/{id}", userHandler.Delete)
+
+	// Setting Routes
+	mux.HandleFunc("GET /api/settings/{key}", settingHandler.GetSetting)
+	mux.HandleFunc("POST /api/settings", settingHandler.SetSetting)
+
 	mux.HandleFunc("GET /api/projects", projectHandler.GetAll)
 	mux.HandleFunc("GET /api/projects/{id}", projectHandler.GetByID)
 	mux.HandleFunc("POST /api/projects", projectHandler.Create)

@@ -747,6 +747,31 @@ export default function TemplateSuratManager() {
     setTimeout(() => setNotification(''), 3000);
   };
 
+  // Function to insert formatting tags at cursor in textarea
+  const insertFormatting = (prefix, suffix = '') => {
+    const textarea = document.getElementById('template-editor-textarea');
+    if (!textarea) return;
+    
+    textarea.focus();
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = activeTemplateContent;
+    const selectedText = text.substring(start, end);
+    const newText = prefix + selectedText + suffix;
+    
+    // Use execCommand to preserve the native browser Undo/Redo stack!
+    const success = document.execCommand('insertText', false, newText);
+    
+    if (!success) {
+      const updatedText = text.substring(0, start) + newText + text.substring(end);
+      setActiveTemplateContent(updatedText);
+    }
+    
+    setTimeout(() => {
+      textarea.setSelectionRange(start + prefix.length, end + prefix.length);
+    }, 10);
+  };
+
   const handleDelete = () => {
     if(window.confirm('Hapus template surat dinas ini secara permanen dari sistem?')) {
       setTemplates(prev => prev.filter(t => t.id !== selectedTemplateId));
@@ -970,7 +995,7 @@ export default function TemplateSuratManager() {
                     setNotification('✓ Naskah dinas baru berhasil dibuat!');
                     setTimeout(() => setNotification(''), 3000);
                   }} 
-                  className="py-2.5 px-4 bg-[#0f2942] hover:bg-[#152e52] text-white text-[10px] font-black tracking-wider rounded-xl transition-all flex items-center justify-center gap-1 shadow-sm shrink-0"
+                  className="py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black tracking-wider rounded-xl transition-all flex items-center justify-center gap-1 shadow-sm shrink-0"
                 >
                   <span>➕</span> BUAT NASKAH
                 </button>
@@ -1070,12 +1095,18 @@ export default function TemplateSuratManager() {
                       ))}
                     </div>
                   )}
+                  <div className="flex justify-end mt-4 pt-3 border-t border-slate-100">
+                    <button type="button" onClick={() => { localStorage.setItem('pbj_doc_settings', JSON.stringify(docSettings)); setNotification('✅ Variabel Naskah berhasil diterapkan ke preview!'); setTimeout(() => setNotification(''), 3000); }} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all shadow-sm flex items-center gap-1.5">
+                      💾 Simpan & Terapkan Variabel
+                    </button>
+                  </div>
                 </div>
               )}
 
               {/* TAB 2: TATA NASKAH & KOP DINAS */}
               {controlTab === 'settings' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 animate-fade-in items-stretch">
+                <div className="space-y-4 animate-fade-in">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 items-stretch">
                   
                   {/* Card 1: Logo & Upload */}
                   <div className="bg-slate-50/50 border border-slate-200/50 rounded-xl p-4 flex flex-col justify-between">
@@ -1302,7 +1333,13 @@ export default function TemplateSuratManager() {
                       />
                     </div>
                   </div>
-
+                </div>
+                {/* Save button for settings tab */}
+                <div className="flex justify-end mt-2 pt-3 border-t border-slate-100">
+                    <button type="button" onClick={() => { localStorage.setItem('pbj_doc_settings', JSON.stringify(docSettings)); setNotification('✅ Pengaturan Kop & Margin berhasil disimpan ke sistem!'); setTimeout(() => setNotification(''), 3000); }} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all shadow-sm flex items-center gap-1.5">
+                      💾 Simpan Pengaturan Naskah
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1366,17 +1403,59 @@ export default function TemplateSuratManager() {
                   </div>
 
                   {/* Text/code editor right column (2/3 width) */}
-                  <div className="lg:col-span-2 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-inner min-h-[220px]">
-                    <div className="bg-slate-950 text-slate-400 text-[10px] px-3.5 py-1.5 font-mono border-b border-slate-800 flex justify-between select-none">
-                      <span>Workspace Editor Naskah Induk</span>
+                  <div className="lg:col-span-2 flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm min-h-[550px]">
+                    <div className="bg-slate-50 text-slate-500 text-[10px] px-3.5 py-2 font-mono border-b border-slate-200 flex justify-between select-none items-center flex-wrap gap-2">
+                      <div className="flex gap-1.5 items-center flex-wrap">
+                        {/* Undo / Redo */}
+                        <button type="button" onClick={() => { document.getElementById('template-editor-textarea')?.focus(); document.execCommand('undo'); }} className="p-1 px-1.5 hover:bg-slate-200 rounded text-slate-700 font-bold" title="Undo (Ctrl+Z)">↩️</button>
+                        <button type="button" onClick={() => { document.getElementById('template-editor-textarea')?.focus(); document.execCommand('redo'); }} className="p-1 px-1.5 hover:bg-slate-200 rounded text-slate-700 font-bold" title="Redo (Ctrl+Y)">↪️</button>
+                        <div className="w-px h-4 bg-slate-300 mx-1"></div>
+
+                        {/* Text Styles */}
+                        <button type="button" onClick={() => insertFormatting('<b>', '</b>')} className="p-1.5 hover:bg-slate-200 rounded text-slate-700 font-bold" title="Tebal (Bold)">B</button>
+                        <button type="button" onClick={() => insertFormatting('<i>', '</i>')} className="p-1.5 hover:bg-slate-200 rounded text-slate-700 italic font-serif" title="Miring (Italic)">I</button>
+                        <button type="button" onClick={() => insertFormatting('<u>', '</u>')} className="p-1.5 hover:bg-slate-200 rounded text-slate-700 underline" title="Garis Bawah (Underline)">U</button>
+                        <button type="button" onClick={() => insertFormatting('<s>', '</s>')} className="p-1.5 hover:bg-slate-200 rounded text-slate-700 line-through" title="Coret (Strikethrough)">S</button>
+                        
+                        <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                        
+                        {/* Headers */}
+                        <button type="button" onClick={() => insertFormatting('<h1 style="font-size: 18pt; font-weight: bold; margin-bottom: 10px;">\n', '\n</h1>')} className="p-1 px-1.5 hover:bg-slate-200 rounded text-slate-700 font-bold text-[9px]" title="Heading 1">H1</button>
+                        <button type="button" onClick={() => insertFormatting('<h2 style="font-size: 14pt; font-weight: bold; margin-bottom: 8px;">\n', '\n</h2>')} className="p-1 px-1.5 hover:bg-slate-200 rounded text-slate-700 font-bold text-[9px]" title="Heading 2">H2</button>
+                        <button type="button" onClick={() => insertFormatting('<h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 6px;">\n', '\n</h3>')} className="p-1 px-1.5 hover:bg-slate-200 rounded text-slate-700 font-bold text-[9px]" title="Heading 3">H3</button>
+
+                        <div className="w-px h-4 bg-slate-300 mx-1"></div>
+
+                        {/* Alignments */}
+                        <button type="button" onClick={() => insertFormatting('<div style="text-align: left;">\n', '\n</div>')} className="p-1.5 hover:bg-slate-200 rounded text-slate-700 flex flex-col gap-0.5 w-6 items-center" title="Rata Kiri">
+                          <div className="w-3.5 h-[1.5px] bg-slate-600 self-start"></div><div className="w-2.5 h-[1.5px] bg-slate-600 self-start"></div><div className="w-3.5 h-[1.5px] bg-slate-600 self-start"></div>
+                        </button>
+                        <button type="button" onClick={() => insertFormatting('<div style="text-align: center;">\n', '\n</div>')} className="p-1.5 hover:bg-slate-200 rounded text-slate-700 flex flex-col gap-0.5 w-6 items-center" title="Rata Tengah">
+                          <div className="w-3.5 h-[1.5px] bg-slate-600"></div><div className="w-2.5 h-[1.5px] bg-slate-600"></div><div className="w-3.5 h-[1.5px] bg-slate-600"></div>
+                        </button>
+                        <button type="button" onClick={() => insertFormatting('<div style="text-align: right;">\n', '\n</div>')} className="p-1.5 hover:bg-slate-200 rounded text-slate-700 flex flex-col gap-0.5 w-6 items-center" title="Rata Kanan">
+                          <div className="w-3.5 h-[1.5px] bg-slate-600 self-end"></div><div className="w-2.5 h-[1.5px] bg-slate-600 self-end"></div><div className="w-3.5 h-[1.5px] bg-slate-600 self-end"></div>
+                        </button>
+                        <button type="button" onClick={() => insertFormatting('<div style="text-align: justify;">\n', '\n</div>')} className="p-1.5 hover:bg-slate-200 rounded text-slate-700 flex flex-col gap-0.5 w-6 items-center" title="Rata Kiri Kanan (Justify)">
+                          <div className="w-3.5 h-[1.5px] bg-slate-600"></div><div className="w-3.5 h-[1.5px] bg-slate-600"></div><div className="w-3.5 h-[1.5px] bg-slate-600"></div>
+                        </button>
+                        
+                        <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                        
+                        {/* Lists & Tables */}
+                        <button type="button" onClick={() => insertFormatting('<ol style="padding-left: 20px;">\n  <li>', '</li>\n</ol>')} className="p-1 px-1.5 hover:bg-slate-200 rounded text-slate-700 text-[9px] font-bold" title="Numbering">1.</button>
+                        <button type="button" onClick={() => insertFormatting('<ul style="padding-left: 20px;">\n  <li>', '</li>\n</ul>')} className="p-1 px-1.5 hover:bg-slate-200 rounded text-slate-700 text-[9px] font-bold" title="Bullets">•</button>
+                        <button type="button" onClick={() => insertFormatting('<table border="1" style="width: 100%; border-collapse: collapse;">\n  <tbody>\n    <tr>\n      <td style="padding: 4px 8px;">Kolom 1</td>\n      <td style="padding: 4px 8px;">Kolom 2</td>\n    </tr>\n  </tbody>\n</table>\n', '')} className="p-1 px-1.5 hover:bg-slate-200 rounded text-slate-700 text-[10px]" title="Sisipkan Tabel">📊</button>
+                      </div>
                       <span>Format: {'{{nama_variabel}}'}</span>
                     </div>
                     <textarea
+                      id="template-editor-textarea"
                       value={activeTemplateContent}
                       onChange={(e) => setActiveTemplateContent(e.target.value)}
                       readOnly={user?.role !== 'Admin' || !editMode}
                       spellCheck="false"
-                      className="w-full flex-1 p-3 text-[11px] font-mono text-slate-300 bg-transparent resize-none outline-none leading-relaxed overflow-y-auto"
+                      className="w-full flex-1 p-3 text-[11px] font-mono text-slate-700 bg-transparent resize-none outline-none leading-relaxed overflow-y-auto"
                       placeholder="Isi surat resmi disini..."
                     ></textarea>
                   </div>
@@ -1452,7 +1531,7 @@ export default function TemplateSuratManager() {
                   {/* Print and Export Actions */}
                   <button 
                     onClick={handlePrint} 
-                    className="px-3.5 py-1.5 bg-[#0f2942] hover:bg-[#152e52] text-white text-[10px] font-bold rounded-lg shadow-sm transition-colors flex items-center gap-1"
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg shadow-sm transition-colors flex items-center gap-1"
                   >
                     <Printer size={11} className="safe-white-text" />
                     <span className="safe-white-text">Cetak PDF</span>
@@ -1584,7 +1663,7 @@ export default function TemplateSuratManager() {
                 >
                   
                   {/* Paper Size floating badge - print-hidden */}
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#0f2942] text-white text-[9px] font-black px-3.5 py-1.5 rounded-full shadow-md border border-slate-700/35 print:hidden z-50 flex items-center gap-1.5 select-none tracking-wider whitespace-nowrap">
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[9px] font-black px-3.5 py-1.5 rounded-full shadow-md border border-indigo-700/35 print:hidden z-50 flex items-center gap-1.5 select-none tracking-wider whitespace-nowrap">
                     <span className="flex h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
                     <span>STANDAR {docSettings.paperSize === 'F4' ? 'F4 / FOLIO (215x330mm)' : 'A4 (210x297mm)'}</span>
                     <span className="text-slate-500">|</span>
@@ -1665,7 +1744,34 @@ export default function TemplateSuratManager() {
 
                   {/* DOCUMENT BODY CONTENT */}
                   <div className="document-body-content text-justify text-black" style={{ color: 'black' }}>
-                    {activeTemplateContent.split(/\n\s*\n/).map((para, i) => {
+                    {(() => {
+                      const parseSmartColons = (text) => {
+                        if (!text) return text;
+                        const lines = text.split('\n');
+                        let output = [];
+                        let inTable = false;
+                        for (let i = 0; i < lines.length; i++) {
+                          const line = lines[i];
+                          const match = line.match(/^([A-Za-z0-9/ ()\-_.,]+?)\s*:\s*(.*)$/);
+                          if (match && !line.includes('<') && match[1].length < 45) {
+                            if (!inTable) {
+                              inTable = true;
+                              output.push('<table style="width: 100%; border: none; margin-top: 4px; margin-bottom: 4px; border-collapse: collapse;"><tbody>');
+                            }
+                            output[output.length - 1] += `<tr><td style="width: 1%; white-space: nowrap; padding-right: 15px; vertical-align: top; border: none; padding-top: 2px;">${match[1]}</td><td style="width: 1%; padding-right: 8px; vertical-align: top; border: none; padding-top: 2px;">:</td><td style="vertical-align: top; border: none; padding-top: 2px;">${match[2]}</td></tr>`;
+                          } else {
+                            if (inTable) {
+                              inTable = false;
+                              output[output.length - 1] += '</tbody></table>';
+                            }
+                            output.push(line);
+                          }
+                        }
+                        if (inTable) output[output.length - 1] += '</tbody></table>';
+                        return output.join('\n');
+                      };
+
+                      return parseSmartColons(activeTemplateContent).split(/\n\s*\n/).map((para, i) => {
                       if (!para.trim()) return null;
                       return (
                         <div 
@@ -1688,7 +1794,7 @@ export default function TemplateSuratManager() {
                           dangerouslySetInnerHTML={{ __html: renderPreviewHTML(para) }}
                         />
                       );
-                    })}
+                    })})()}
                   </div>
                   
                 </div>

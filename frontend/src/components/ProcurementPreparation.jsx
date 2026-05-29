@@ -4,6 +4,33 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { syncPackageToDB, syncSurveyToDB, fetchPackageFromDB } from '../utils/dbSync'
 
+// ─── Utility: Parse colons into aligned tables ───────────────
+const parseSmartColons = (text) => {
+  if (!text) return text;
+  const lines = text.split('\n');
+  let output = [];
+  let inTable = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(/^([A-Za-z0-9/ ()\-_.,]+?)\s*:\s*(.*)$/);
+    if (match && !line.includes('<') && match[1].length < 45) {
+      if (!inTable) {
+        inTable = true;
+        output.push('<table style="width: 100%; border: none; margin-top: 4px; margin-bottom: 4px; border-collapse: collapse;"><tbody>');
+      }
+      output[output.length - 1] += `<tr><td style="width: 1%; white-space: nowrap; padding-right: 15px; vertical-align: top; border: none; padding-top: 2px;">${match[1]}</td><td style="width: 1%; padding-right: 8px; vertical-align: top; border: none; padding-top: 2px;">:</td><td style="vertical-align: top; border: none; padding-top: 2px;">${match[2]}</td></tr>`;
+    } else {
+      if (inTable) {
+        inTable = false;
+        output[output.length - 1] += '</tbody></table>';
+      }
+      output.push(line);
+    }
+  }
+  if (inTable) output[output.length - 1] += '</tbody></table>';
+  return output.join('\n');
+};
+
 // ─── Utility: cari paket SIRUP terbaik untuk satu rekening DPA ───────────────
 function findBestSirupMatch(acc, packages) {
   if (!packages || packages.length === 0 || !acc) return null;
@@ -180,6 +207,23 @@ export default function ProcurementPreparation() {
   const [techSpecs, setTechSpecs] = useState(() => {
     return localStorage.getItem('pbj_tech_specs') || ''
   })
+  
+  const [packageMetadata, setPackageMetadata] = useState(() => {
+    const saved = localStorage.getItem('pbj_package_metadata');
+    return saved ? JSON.parse(saved) : {
+      lokasi_pekerjaan: '',
+      waktu_penyelesaian: '14 (empat belas) hari kalender',
+      program: '',
+      kegiatan: '',
+      sub_kegiatan: '',
+      nomor_dpp: ''
+    };
+  });
+  useEffect(() => {
+    localStorage.setItem('pbj_package_metadata', JSON.stringify(packageMetadata));
+  }, [packageMetadata]);
+
+  const [selectedTplId, setSelectedTplId] = useState('');
 
   const [matchedDpaTypes, setMatchedDpaTypes] = useState(() => {
     const saved = localStorage.getItem('pbj_matched_dpa_types')
@@ -319,6 +363,8 @@ export default function ProcurementPreparation() {
   const [searchLocations, setSearchLocations] = useState('');
   const [globalTargetVendor, setGlobalTargetVendor] = useState('');
   const [customTargets, setCustomTargets] = useState({});
+  const [customPrices, setCustomPrices] = useState({});
+  const [globalPriceTolerance, setGlobalPriceTolerance] = useState(2.5);
 
   const [justifications, setJustifications] = useState(() => {
     const saved = localStorage.getItem('pbj_justifications');
@@ -350,9 +396,17 @@ export default function ProcurementPreparation() {
   const getPacketCategory = (packName) => {
     if (!packName) return 'ATK';
     const name = packName.toLowerCase();
-    if (name.includes('makan') || name.includes('minum') || name.includes('mamin') || name.includes('snack') || name.includes('konsumsi')) return 'Mamin';
+    
     if (name.includes('laptop') || name.includes('printer') || name.includes('komputer') || name.includes('kendaraan') || name.includes('mesin') || name.includes('elektronik') || name.includes('modal')) return 'Modal';
     if (name.includes('kertas sektoral') || name.includes('seragam dinas') || name.includes('konsolidasi')) return 'Konsolidasi';
+    if (name.includes('prasmanan') || name.includes('katering') || name.includes('catering')) return 'Mamin-Prasmanan';
+    if (name.includes('nasi kotak') || name.includes('nasi bungkus') || name.includes('kotak')) return 'Mamin-Bungkus';
+    if (name.includes('snack') || name.includes('kudapan')) return 'Mamin-Snack';
+    if (name.includes('makan') || name.includes('minum') || name.includes('mamin') || name.includes('konsumsi')) return 'Mamin-Bungkus';
+    
+    // Jasa
+    if (name.includes('jasa') || name.includes('pemeliharaan') || name.includes('service')) return 'Jasa';
+
     return 'ATK';
   };
 
@@ -384,11 +438,13 @@ export default function ProcurementPreparation() {
     const category = getPacketCategory(selectedPack.packName);
     const items = getPackageItems(selectedPack);
 
-    const requestItems = items.map(item => ({
+    const requestItems = items.map((item, idx) => ({
       name: item.name,
-      query: item.name,
-      fallbackPrice: item.price,
-      targetVendor: globalTargetVendor || ''
+      query: customKeywords[idx] && customKeywords[idx].trim() !== '' ? customKeywords[idx].trim() : item.name,
+      fallbackPrice: customPrices[idx] ? parseInt(customPrices[idx], 10) : item.price,
+      priceTolerance: globalPriceTolerance,
+      targetVendor: globalTargetVendor || customTargets[idx] || '',
+      targetUrl: (customTargets[idx] && customTargets[idx].startsWith('http')) ? customTargets[idx] : ''
     }));
 
     try {
@@ -626,7 +682,8 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
     const requestItems = [{
       name: targetItem.name,
       query: customQuery,
-      fallbackPrice: targetItem.price,
+      fallbackPrice: customPrices[productIndex] ? parseInt(customPrices[productIndex], 10) : targetItem.price,
+      priceTolerance: globalPriceTolerance,
       targetVendor: globalTargetVendor || customTargets[productIndex] || '',
       targetUrl: (customTargets[productIndex] && customTargets[productIndex].startsWith('http')) ? customTargets[productIndex] : ''
     }];
@@ -740,7 +797,8 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
         requestItems.push({
           name: items[idx].name,
           query: customKeywords[idx].trim(),
-          fallbackPrice: items[idx].price || items[idx].paguDpa,
+          fallbackPrice: customPrices[idx] ? parseInt(customPrices[idx], 10) : (items[idx].price || items[idx].paguDpa),
+          priceTolerance: globalPriceTolerance,
           targetVendor: globalTargetVendor || customTargets[idx] || '',
           targetUrl: (customTargets[idx] && customTargets[idx].startsWith('http')) ? customTargets[idx] : ''
         });
@@ -1089,6 +1147,29 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
       localStorage.setItem('pbj_selected_pack', JSON.stringify(selectedPack))
     } else {
       localStorage.removeItem('pbj_selected_pack')
+    }
+  }, [selectedPack])
+
+  useEffect(() => {
+    if (selectedPack) {
+      const packId = selectedPack.id || selectedPack.noSirup;
+      const savedTplId = localStorage.getItem(`pbj_selected_template_${packId}`);
+      if (savedTplId) {
+        setSelectedTplId(savedTplId);
+      } else {
+        const cat = getPacketCategory(selectedPack.packName || '');
+        let tplId = 'TPL-006A';
+        
+        if (cat === 'Mamin-Prasmanan') tplId = 'TPL-006B-PR';
+        else if (cat === 'Mamin-Bungkus') tplId = 'TPL-006B-NK';
+        else if (cat === 'Mamin-Snack') tplId = 'TPL-006B-SN';
+        else if (cat === 'Mamin') tplId = 'TPL-006B'; // fallback
+        else if (cat === 'Modal') tplId = 'TPL-006C';
+        else if (cat === 'Jasa' || cat === 'Konstruksi') tplId = 'TPL-006D';
+        else if (cat === 'Konsolidasi') tplId = 'TPL-006E';
+        
+        setSelectedTplId(tplId);
+      }
     }
   }, [selectedPack])
 
@@ -1986,36 +2067,39 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
             <>
               <div className="text-3xl mb-3">{isAnalyzingDpa ? '⚙️' : '📂'}</div>
               <label className="border-2 border-dashed border-indigo-200 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-indigo-50/50 transition-colors group">
-                <input type="file" className="hidden" accept=".pdf, .xlsx, .xls" onChange={async (e) => {
+                <input type="file" className="hidden" accept=".pdf, .xlsx, .xls, .png, .jpg, .jpeg" onChange={async (e) => {
                   const file = e.target.files[0]
                   if (!file) return
                   setDpaName(file.name)
                   setIsAnalyzingDpa(true)
                   try {
-                    // 1. Ekstrak API Key aktif dari localStorage (Groq / Gemini / OpenAI / Claude)
-                    const savedKeys = localStorage.getItem('pbj_ocr_api_keys')
+                    // 1. Ekstrak API Key aktif dari Backend Database (Groq / Gemini / OpenAI / Claude)
                     let activeProvider = ""
                     let activeKey = ""
-                    if (savedKeys) {
-                      try {
-                        const keys = JSON.parse(savedKeys)
-                        // Prioritaskan Groq / Gemini sesuai tangkapan layar admin Bapak Beni
-                        if (keys.groq) {
-                          activeProvider = "groq"
-                          activeKey = keys.groq
-                        } else if (keys.gemini) {
-                          activeProvider = "gemini"
-                          activeKey = keys.gemini
-                        } else if (keys.openai) {
-                          activeProvider = "openai"
-                          activeKey = keys.openai
-                        } else if (keys.anthropic) {
-                          activeProvider = "anthropic"
-                          activeKey = keys.anthropic
+                    try {
+                      const res = await fetch('/api/settings/ocr_api_keys')
+                      if (res.ok) {
+                        const data = await res.json()
+                        if (data.value) {
+                          const keys = JSON.parse(data.value)
+                          // Prioritaskan Groq / Gemini sesuai tangkapan layar admin
+                          if (keys.groq) {
+                            activeProvider = "groq"
+                            activeKey = keys.groq
+                          } else if (keys.gemini) {
+                            activeProvider = "gemini"
+                            activeKey = keys.gemini
+                          } else if (keys.openai) {
+                            activeProvider = "openai"
+                            activeKey = keys.openai
+                          } else if (keys.anthropic) {
+                            activeProvider = "anthropic"
+                            activeKey = keys.anthropic
+                          }
                         }
-                      } catch (errKey) {
-                        console.error('Gagal mem-parse kunci API OCR:', errKey)
                       }
+                    } catch (errKey) {
+                      console.error('Gagal mengambil/mem-parse kunci API OCR dari database:', errKey)
                     }
 
                     // 2. Persiapkan request multipart formData
@@ -2044,6 +2128,16 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                     if (!result.success || !result.rekening || result.rekening.length === 0) {
                       throw new Error('Tidak ditemukan rekening belanja di berkas DPA ini.')
                     }
+                    
+                    // 3.5. Otomatis isi Metadata Paket dari hasil DPA (jika ada)
+                    setPackageMetadata(prev => ({
+                      ...prev,
+                      program: result.program || prev.program,
+                      kegiatan: result.kegiatan || prev.kegiatan,
+                      sub_kegiatan: result.sub_kegiatan || prev.sub_kegiatan,
+                      lokasi_pekerjaan: result.lokasi || prev.lokasi_pekerjaan,
+                      waktu_penyelesaian: result.waktu_pelaksanaan || prev.waktu_penyelesaian
+                    }))
 
                     // 4. Catat mode ekstraksi yang berhasil dilakukan (ai atau local)
                     const returnedMode = result.ocr_mode || (activeKey ? 'ai' : 'local')
@@ -3148,9 +3242,20 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                         value={globalTargetVendor}
                         onChange={(e) => setGlobalTargetVendor(e.target.value)}
                         placeholder="Target Penyedia Massal (Opsional, misal: CV ABC)"
-                        className="w-full text-[11px] px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                        className="w-full text-[11px] px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none mb-2"
                         title="Jika diisi, AI akan memprioritaskan penyedia ini untuk seluruh barang"
                       />
+                      <div className="flex items-center border border-slate-300 rounded-lg focus-within:ring-2 focus-within:ring-emerald-500 bg-white">
+                        <span className="text-[11px] text-slate-500 pl-3">Toleransi Harga Survei (±)</span>
+                        <input 
+                          type="number"
+                          step="0.1"
+                          value={globalPriceTolerance}
+                          onChange={(e) => setGlobalPriceTolerance(e.target.value)}
+                          className="flex-1 text-[11px] px-2 py-2 focus:outline-none bg-transparent"
+                        />
+                        <span className="text-[11px] text-slate-500 pr-3">%</span>
+                      </div>
                     </div>
                   </div>
 
@@ -3473,6 +3578,17 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                                   disabled={isLoading}
                                 />
                               </div>
+                              <div>
+                                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Batas Harga Maksimal (Opsional)</label>
+                                <input
+                                  type="number"
+                                  value={customPrices[idx] || ''}
+                                  onChange={(e) => setCustomPrices({ ...customPrices, [idx]: e.target.value })}
+                                  placeholder={`Standar: ${p.price || p.paguDpa}`}
+                                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                  disabled={isLoading}
+                                />
+                              </div>
                             </div>
                           )}
 
@@ -3611,6 +3727,43 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
               </div>
 
               <div>
+                <label className="block text-[10px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Template Dokumen Persiapan (DPP)</label>
+                <select
+                  value={selectedTplId}
+                  onChange={(e) => {
+                    setSelectedTplId(e.target.value);
+                    const packId = selectedPack.id || selectedPack.noSirup;
+                    localStorage.setItem(`pbj_selected_template_${packId}`, e.target.value);
+                    setIsSigned(false); // Reset signature if template changes
+                    if (step === 4) setStep(3);
+                  }}
+                  className="glass-input text-xs font-semibold bg-white text-slate-800 w-full p-2.5 border border-slate-200 rounded-xl shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  disabled={isSigned}
+                >
+                  {(() => {
+                    const templatesStr = localStorage.getItem('pbj_templates');
+                    let templates = [];
+                    try { if (templatesStr) templates = JSON.parse(templatesStr); } catch (ex) {}
+                    
+                    const dppTemplates = templates.filter(t => 
+                      t.category === 'Tahap Persiapan' || 
+                      t.id.startsWith('TPL-006') || 
+                      t.name.toLowerCase().includes('persiapan') || 
+                      t.name.toLowerCase().includes('dpp')
+                    );
+                    
+                    if (dppTemplates.length === 0) {
+                      return <option value="">Tidak ada template persiapan ditemukan</option>;
+                    }
+                    
+                    return dppTemplates.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ));
+                  })()}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-[10px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Formulir Spesifikasi Teknis Pekerjaan (KAK)</label>
                 <textarea
                   rows="4"
@@ -3629,8 +3782,58 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
               {/* Document Generation Action Center */}
               {(hpsValue || isHpsExemptSelected) && (
                 <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 space-y-4">
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Dokumen Persiapan &amp; Penetapan</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">Tinjau dokumen resmi Anda di bawah sebelum melakukan penandatanganan elektronik.</p>
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Informasi Surat &amp; Penetapan</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">Lengkapi informasi di bawah ini agar sesuai dengan paket yang dikerjakan sebelum dicetak.</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Lokasi Pekerjaan / Tujuan</label>
+                      <input type="text" value={packageMetadata.lokasi_pekerjaan} onChange={(e) => setPackageMetadata({...packageMetadata, lokasi_pekerjaan: e.target.value})} placeholder="Contoh: Kantor Kecamatan Besuk" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Waktu Pelaksanaan</label>
+                      <input type="text" value={packageMetadata.waktu_penyelesaian} onChange={(e) => setPackageMetadata({...packageMetadata, waktu_penyelesaian: e.target.value})} placeholder="Contoh: 14 (empat belas) hari kalender" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Program</label>
+                      <input type="text" value={packageMetadata.program} onChange={(e) => setPackageMetadata({...packageMetadata, program: e.target.value})} placeholder="Nama Program" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Kegiatan</label>
+                      <input type="text" value={packageMetadata.kegiatan} onChange={(e) => setPackageMetadata({...packageMetadata, kegiatan: e.target.value})} placeholder="Nama Kegiatan" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Sub Kegiatan</label>
+                      <input type="text" value={packageMetadata.sub_kegiatan} onChange={(e) => setPackageMetadata({...packageMetadata, sub_kegiatan: e.target.value})} placeholder="Nama Sub Kegiatan" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nomor DPP (Manual)</label>
+                      <input type="text" value={packageMetadata.nomor_dpp} onChange={(e) => setPackageMetadata({...packageMetadata, nomor_dpp: e.target.value})} placeholder="Opsional (Kosongi jika otomatis)" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                  </div>
+
+                  {/* Badge Indikator Jenis DPP */}
+                  <div className="mb-6 p-4 border rounded-xl bg-blue-50 border-blue-200">
+                    <div className="font-bold text-blue-900 text-sm mb-1 flex items-center gap-2">
+                      <span className="text-lg">📋</span> Template DPP: {
+                        getPacketCategory(selectedPack.packName) === 'Mamin-Prasmanan' ? 'Mamin — Prasmanan/Katering' :
+                        getPacketCategory(selectedPack.packName) === 'Mamin-Bungkus' ? 'Mamin — Nasi Kotak / Bungkus' :
+                        getPacketCategory(selectedPack.packName) === 'Mamin-Snack' ? 'Mamin — Snack' :
+                        getPacketCategory(selectedPack.packName) === 'Modal' ? 'Belanja Modal' :
+                        getPacketCategory(selectedPack.packName) === 'Konsolidasi' ? 'Konsolidasi' :
+                        getPacketCategory(selectedPack.packName) === 'Jasa' ? 'Jasa' : 'ATK / Standar'
+                      }
+                    </div>
+                    <div className="text-xs text-blue-800 leading-relaxed">
+                      {getPacketCategory(selectedPack.packName) === 'Mamin-Prasmanan' && "Pasal kunci: I.e (Peralatan saji & Personil Layanan), VII (Wajib SLHS). Status: Jasa Katering."}
+                      {getPacketCategory(selectedPack.packName) === 'Mamin-Bungkus' && "Pasal kunci: I.e (Higienis, kemasan individual, 1 jam sebelum), VII (Wajib SLHS)."}
+                      {getPacketCategory(selectedPack.packName) === 'Mamin-Snack' && "Pasal kunci: I.e (Kemasan tertutup, masa kadaluarsa), VII (Wajib SLHS)."}
+                      {getPacketCategory(selectedPack.packName) === 'Modal' && "Pasal kunci: I.b (Merek & Service Center), VII (Surat Dukungan Pabrikan)."}
+                      {getPacketCategory(selectedPack.packName) === 'Konsolidasi' && "Pasal kunci: VI (Direct Purchasing ke Penyedia Konsolidasi). Status: Bebas HPS."}
+                      {getPacketCategory(selectedPack.packName) === 'Jasa' && "Pasal kunci: standar untuk Jasa lainnya."}
+                      {getPacketCategory(selectedPack.packName) === 'ATK' && "Pasal kunci: standar pengadaan ATK."}
+                    </div>
+                  </div>
 
                   <div className="flex flex-wrap gap-4">
                     {!isHpsExemptSelected && (
@@ -3879,7 +4082,8 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
           {/* White Paper A4 Sheet */}
           <div
             id="print-sheet"
-            className="bg-white text-slate-900 w-full shadow-2xl rounded-sm my-20 border border-slate-200 relative print:my-0 print:border-none print:shadow-none mx-auto flex-none"
+
+            className="bg-white text-slate-900 w-full shadow-2xl rounded-sm my-20 border border-slate-200 relative print:my-0 print:border-none print:shadow-none mx-auto flex-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-4 transition-shadow"
             style={{
               width: docSettings.paperSize === 'F4' ? '215mm' : '210mm',
               minHeight: docSettings.paperSize === 'F4' ? '330mm' : '297mm',
@@ -4006,64 +4210,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
               ) : (
                 // DOKUMEN PERSIAPAN PENGADAAN (DPP)
                 <div className="space-y-4 relative">
-                  {/* KOP SURAT — data diambil dari pengaturan di menu Template Surat → KOP & MARGIN */}
-                  {(() => {
-                    const docSettingsStr = localStorage.getItem('pbj_doc_settings');
-                    let docSettings = { showKop: true };
-                    try { if (docSettingsStr) docSettings = JSON.parse(docSettingsStr); } catch (e) {}
-                    
-                    docSettings.showKop = true; // FORCE SHOW KOP SURAT
-                    if (docSettings.showKop) {
-                      return (
-                        <div className="w-full select-none" style={{ pageBreakInside: 'avoid' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <tbody>
-                              <tr>
-                                {/* Logo di kiri */}
-                                <td style={{ width: '15%', verticalAlign: 'middle', textAlign: 'center', paddingRight: '12px' }}>
-                                  <div className="relative inline-block">
-                                    {docSettings.logoType === 'pemda' ? (
-                                      <img 
-                                        src="https://upload.wikimedia.org/wikipedia/commons/2/25/Lambang_Kabupaten_Probolinggo.png" 
-                                        alt="Logo Daerah" 
-                                        style={{ maxHeight: '76px', maxWidth: '76px', objectFit: 'contain', display: 'inline-block' }} 
-                                      />
-                                    ) : docSettings.logoType === 'garuda' ? (
-                                      <LogoGarudaPlaceholder />
-                                    ) : docSettings.customLogo ? (
-                                      <img 
-                                        src={docSettings.customLogo} 
-                                        alt="Logo Kustom" 
-                                        style={{ maxHeight: '80px', maxWidth: '80px', objectFit: 'contain', display: 'inline-block' }} 
-                                      />
-                                    ) : (
-                                      <LogoGarudaPlaceholder />
-                                    )}
-                                  </div>
-                                </td>
-                                {/* Teks Kop di tengah-kanan */}
-                                <td style={{ verticalAlign: 'middle', textAlign: 'center' }}>
-                                  <div style={{ fontSize: '14pt', fontWeight: 'normal', fontFamily: 'Arial, sans-serif', lineHeight: '1.4', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                    {docSettings.namaPemda || 'PEMERINTAH KABUPATEN PROBOLINGGO'}
-                                  </div>
-                                  <div style={{ fontSize: '18pt', fontWeight: 'bold', fontFamily: 'Arial, sans-serif', lineHeight: '1.2', textTransform: 'uppercase', letterSpacing: '1.5px', marginTop: '2px' }}>
-                                    {docSettings.namaInstansi || currentUser.department?.toUpperCase() || 'KECAMATAN BESUK'}
-                                  </div>
-                                  <div style={{ fontSize: '10pt', fontFamily: 'Arial, sans-serif', lineHeight: '1.5', marginTop: '6px' }}
-                                    dangerouslySetInnerHTML={{ __html: formatAlamatKop(docSettings.alamatLengkap || 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283') }}
-                                  />
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                          {/* Garis ganda di bawah kop — sesuai referensi visual */}
-                          <div style={{ borderTop: '3px solid black', marginTop: '8px' }}></div>
-                          <div style={{ borderTop: '1px solid black', marginTop: '2px', marginBottom: '16px' }}></div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
+                  {/* KOP SURAT DIHAPUS - KOP SURAT GLOBAL SUDAH ADA DI ATAS */}
 
                   {(() => {
                     const templatesStr = localStorage.getItem('pbj_templates');
@@ -4077,17 +4224,19 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                     else if (cat === 'Jasa' || cat === 'Konstruksi') tplId = 'TPL-006D';
                     else if (cat === 'Konsolidasi') tplId = 'TPL-006E';
 
-                    const template = templates.find(t => t.id === tplId);
+                    const template = templates.find(t => t.id === selectedTplId) || templates.find(t => t.id === tplId);
                     
                     if (template && template.content.includes('{{komponen_dinamis_dpp}}')) {
                       // Template parsing logic
                       let content = template.content;
-                      const nomorBase = docSettingsStr ? (JSON.parse(docSettingsStr).formatNomorSurat || '027/{nomor}/BPBJ/2026') : '027/{nomor}/BPBJ/2026';
+                      const currentDocSettingsStr = localStorage.getItem('pbj_doc_settings');
+                      const docSettingsFallback = currentDocSettingsStr ? JSON.parse(currentDocSettingsStr) : null;
+                      const nomorBase = docSettingsFallback ? (docSettingsFallback.formatNomorSurat || '027/{nomor}/BPBJ/2026') : '027/{nomor}/BPBJ/2026';
                       // Replace variables
                       const replacements = {
                         '{{nama_satker}}': currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
                         '{{nama_satker_kapital}}': (currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
-                        '{{alamat_satker}}': 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283',
+                        '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283',
                         '{{nama_pekerjaan}}': selectedPack.packName || '',
                         '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
                         '{{sumber_dana}}': `${selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date().getFullYear()}`,
@@ -4113,15 +4262,15 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                         '{{nomor_sp}}': nomorBase.replace('{nomor}', '115/SP'),
                         '{{alamat_penyedia}}': '_______________________',
                         '{{nilai_kontrak}}': '_______________________',
-                        '{{waktu_penyelesaian}}': '14 (empat belas) hari kalender',
-                        '{{nomor_dpp}}': '................................',
+                        '{{waktu_penyelesaian}}': packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
+                        '{{nomor_dpp}}': packageMetadata.nomor_dpp || '................................',
                         '{{tanggal_dpp}}': new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
                         '{{nomor_hps}}': nomorBase.replace('{nomor}', '014/HPS'),
                         '{{tanggal_hps}}': new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
-                        '{{lokasi_pekerjaan}}': 'Komplek Perkantoran Pemerintah Daerah',
-                        '{{program}}': 'Program Penunjang Urusan Pemerintahan Daerah',
-                        '{{kegiatan}}': 'Penyelenggaraan Pemerintahan dan Pelayanan Publik',
-                        '{{sub_kegiatan}}': 'Penyediaan Barang dan Jasa Perkantoran',
+                        '{{lokasi_pekerjaan}}': packageMetadata.lokasi_pekerjaan || (docSettingsFallback ? docSettingsFallback.namaInstansi : 'Komplek Perkantoran Pemerintah Daerah'),
+                        '{{program}}': packageMetadata.program || 'Program Penunjang Urusan Pemerintahan Daerah',
+                        '{{kegiatan}}': packageMetadata.kegiatan || 'Penyelenggaraan Pemerintahan dan Pelayanan Publik',
+                        '{{sub_kegiatan}}': packageMetadata.sub_kegiatan || 'Penyediaan Barang dan Jasa Perkantoran',
                         '{{mak}}': selectedPack.mak || '',
                         '{{pdn}}': 'Ya',
                         '{{usaha_kecil}}': 'Ya',
@@ -4138,7 +4287,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
 
                       return (
                         <>
-                          <div style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', textAlign: 'justify', fontSize: '12pt', fontFamily: 'Arial, sans-serif' }} dangerouslySetInnerHTML={{ __html: parts[0] }} />
+                          <div style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', textAlign: 'justify', fontSize: '12pt', fontFamily: 'Arial, sans-serif' }} dangerouslySetInnerHTML={{ __html: parseSmartColons(parts[0]) }} />
                           
                           {/* The Dynamic Components Section */}
                           <div className="py-4">
@@ -4185,13 +4334,24 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                       <p className="text-justify">Waktu pelaksanaan pengadaan maksimal selama 14 (Empat Belas) hari kalender sejak penerbitan SP.</p>
 
                       <div className="font-bold mt-2">d. Spesifikasi Tempat</div>
-                      <p className="text-justify">Alamat tujuan akhir: {currentUser.department.includes('Bago') ? 'Jl. Raya Bago No. 176, Besuk' : 'Komp. Perkantoran Pemerintah Kabupaten Probolinggo'}</p>
+                      <p className="text-justify">Alamat tujuan akhir: {currentUser.department?.includes('Bago') ? 'Jl. Raya Bago No. 176, Besuk' : 'Komp. Perkantoran Pemerintah Kabupaten Probolinggo'}</p>
 
                       <div className="font-bold mt-2">e. Spesifikasi Tingkat Layanan</div>
                       <ul className="list-disc pl-4 space-y-1">
-                        <li>Produk/barang harus dalam kondisi baru dan baik.</li>
-                        <li>Barang diantarkan langsung ke alamat tujuan akhir.</li>
-                        {getPacketCategory(selectedPack.packName) === 'Mamin' && <li>Kondisi makanan higienis, bersih, terbungkus rapi, dan dikirimkan 1 Jam sebelum jadwal pelaksanaan kegiatan.</li>}
+                        {getPacketCategory(selectedPack.packName) === 'Mamin-Prasmanan' ? (
+                          <>
+                            <li>Menyediakan peralatan saji/prasmanan, personil pelayanan (pramusaji), dan menjaga kebersihan area.</li>
+                            <li>Makanan dalam kondisi higienis dan siap saji selambat-lambatnya 1 Jam sebelum jadwal pelaksanaan kegiatan.</li>
+                          </>
+                        ) : (
+                          <>
+                            <li>Produk/barang harus dalam kondisi baru dan baik.</li>
+                            <li>Barang diantarkan langsung ke alamat tujuan akhir.</li>
+                          </>
+                        )}
+                        {(getPacketCategory(selectedPack.packName) === 'Mamin-Bungkus' || getPacketCategory(selectedPack.packName) === 'Mamin-Snack') && (
+                          <li>Kondisi makanan/minuman higienis, bersih, terbungkus rapi/kemasan tertutup, dan dikirimkan 1 Jam sebelum jadwal pelaksanaan kegiatan.</li>
+                        )}
                         {getPacketCategory(selectedPack.packName) === 'Modal' && <li>Dilengkapi jaminan garansi resmi distributor/pabrikan minimal 1 tahun.</li>}
                         <li>Penyedia wajib mengganti barang yang rusak/tidak sesuai spesifikasi selambat-lambatnya 1x24 jam.</li>
                       </ul>
@@ -4390,14 +4550,14 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                       <li>Memiliki identitas / NIB dan izin usaha sesuai KBLI yang relevan.</li>
                       <li>Memiliki status valid wajib pajak / NPWP.</li>
                       {getPacketCategory(selectedPack.packName) === 'Modal' && <li>Memiliki Surat Dukungan Pabrikan atau Distributor Resmi.</li>}
-                      {getPacketCategory(selectedPack.packName) === 'Mamin' && <li>Memiliki Sertifikat Laik Higiene Sanitasi (SLHS) dari Dinas Kesehatan setempat.</li>}
+                      {getPacketCategory(selectedPack.packName).startsWith('Mamin') && <li>Memiliki Sertifikat Laik Higiene Sanitasi (SLHS) dari Dinas Kesehatan setempat.</li>}
                       <li>Memiliki alamat usaha yang jelas dan kapasitas manajerial yang memadai.</li>
                     </ul>
 
                           </div>
                           {/* Render the second part of the template (footer/signature) */}
                           {parts[1] && (
-                            <div style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', textAlign: 'justify', fontSize: '12pt', fontFamily: 'Arial, sans-serif' }} dangerouslySetInnerHTML={{ __html: parts[1] }} />
+                            <div style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', textAlign: 'justify', fontSize: '12pt', fontFamily: 'Arial, sans-serif' }} dangerouslySetInnerHTML={{ __html: parseSmartColons(parts[1]) }} />
                           )}
                         </>
                       );

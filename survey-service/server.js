@@ -235,6 +235,14 @@ async function searchItem(page, item, index) {
       const query = attempts[i];
       let searchUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(query);
       
+      // Tambahkan filter harga +/- toleransi dari pagu (fallbackPrice)
+      if (item.fallbackPrice && item.fallbackPrice > 0) {
+        const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.025;
+        const minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
+        const maxPrice = Math.floor(item.fallbackPrice * (1 + tolerance));
+        searchUrl += `&minPrice=${minPrice}&maxPrice=${maxPrice}`;
+      }
+      
       if (item.locations && item.locations.length > 0) {
         let rNames = [];
         let rCodes = [];
@@ -399,6 +407,12 @@ async function searchItem(page, item, index) {
 
     // ── STEP 3: Navigate to product detail (Direct clean link) ─────────
     let detailUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(successfulQuery || searchTarget);
+    if (item.fallbackPrice && item.fallbackPrice > 0) {
+      const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.025;
+      const minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
+      const maxPrice = Math.floor(item.fallbackPrice * (1 + tolerance));
+      detailUrl += `&minPrice=${minPrice}&maxPrice=${maxPrice}`;
+    }
     if (item.locations && item.locations.length > 0) {
         let rNames = [];
         let rCodes = [];

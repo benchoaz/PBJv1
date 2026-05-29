@@ -5,72 +5,82 @@ const PROVIDERS = {
   openai: {
     id: 'openai',
     name: 'OpenAI',
-    logo: '🧠',
-    desc: 'Sangat unggul dalam akurasi ekstraksi teks terstruktur dan deteksi tabel kompleks.',
+    logo: '✨',
+    desc: 'Unggul dalam akurasi ekstraksi teks terstruktur dan deteksi tabel.',
     url: 'https://platform.openai.com/api-keys',
     prefix: 'sk-',
-    placeholder: 'sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-    help: 'Gunakan GPT-4o untuk dokumen scan resolusi tinggi.'
+    placeholder: 'sk-proj-...',
+    help: 'Gunakan GPT-4o untuk dokumen resolusi tinggi.'
   },
   anthropic: {
     id: 'anthropic',
     name: 'Anthropic Claude',
-    logo: '🦉',
-    desc: 'Terbaik dalam menganalisis dokumen panjang (surat keputusan, lampiran DPA tebal) dengan kepatuhan tinggi.',
+    logo: '🧠',
+    desc: 'Terbaik dalam menganalisis dokumen panjang dengan kepatuhan tinggi.',
     url: 'https://console.anthropic.com/',
     prefix: 'sk-ant-',
-    placeholder: 'sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    placeholder: 'sk-ant-api03-...',
     help: 'Claude 3.5 Sonnet memberikan ekstraksi JSON terbaik.'
+  },
+  deepseek: {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    logo: '🐋',
+    desc: 'Model cerdas dan sangat efisien biaya untuk pemrosesan volume besar.',
+    url: 'https://platform.deepseek.com/',
+    prefix: 'sk-',
+    placeholder: 'sk-...',
+    help: 'DeepSeek-Coder v2 untuk akurasi logika.'
   },
   gemini: {
     id: 'gemini',
     name: 'Google Gemini',
-    logo: '✨',
-    desc: 'Multimodal bawaan berkecepatan tinggi, sangat efisien untuk scan foto berkas/kamera HP langsung.',
+    logo: '💎',
+    desc: 'Multimodal berkecepatan tinggi, efisien untuk scan foto berkas/kamera.',
     url: 'https://aistudio.google.com/app/apikey',
     prefix: 'AIzaSy',
-    placeholder: 'AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-    help: 'Gemini 1.5 Pro sangat baik dalam mendeteksi tulisan tangan kasar.'
+    placeholder: 'AIzaSy...',
+    help: 'Gemini 1.5 Pro sangat baik mendeteksi tulisan tangan.'
   },
   mistral: {
     id: 'mistral',
     name: 'Mistral AI',
-    logo: '🔮',
-    desc: 'Model open-weight yang andal untuk klasifikasi dokumen dinas berbahasa Indonesia.',
+    logo: '🌪️',
+    desc: 'Model open-weight andal untuk klasifikasi dokumen dinas.',
     url: 'https://console.mistral.ai/api-keys/',
     prefix: 'sk-',
-    placeholder: 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-    help: 'Gunakan Mistral Large untuk performa maksimal.'
+    placeholder: 'sk-...',
+    help: 'Mistral Large untuk performa maksimal.'
   },
-  openrouter: {
-    id: 'openrouter',
-    name: 'OpenRouter',
-    logo: '🌐',
-    desc: 'Gerbang multi-provider AI, fleksibel menggunakan puluhan model OCR alternatif dalam satu tagihan.',
-    url: 'https://openrouter.ai/keys',
-    prefix: 'sk-or-',
-    placeholder: 'sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-    help: 'Menghubungkan model open source luar negeri dengan mudah.'
+  cohere: {
+    id: 'cohere',
+    name: 'Cohere',
+    logo: '🏔️',
+    desc: 'Model RAG dan pencarian semantik tingkat lanjut untuk Enterprise.',
+    url: 'https://dashboard.cohere.com/api-keys',
+    prefix: '',
+    placeholder: 'Enter API Key...',
+    help: 'Sangat baik untuk kategorisasi data.'
   },
   groq: {
     id: 'groq',
     name: 'Groq Cloud',
     logo: '⚡',
-    desc: 'Akselerasi LPU super cepat untuk ekstraksi teks seketika setelah scan PDF/OCR lokal selesai.',
+    desc: 'Akselerasi super cepat untuk ekstraksi teks seketika.',
     url: 'https://console.groq.com/keys',
     prefix: 'gsk_',
-    placeholder: 'gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-    help: 'Gunakan Llama-3-70b untuk kecepatan ekstraksi di bawah 1 detik.'
+    placeholder: 'gsk_...',
+    help: 'Llama-3-70b untuk kecepatan di bawah 1 detik.'
   },
   ollama: {
     id: 'ollama',
     name: 'Ollama Lokal',
     logo: '🦙',
-    desc: 'Solusi aman 100% lokal tanpa internet. Menjamin data rahasia daerah tidak bocor keluar.',
+    desc: 'Solusi aman 100% lokal tanpa internet untuk kerahasiaan data.',
     url: 'http://localhost:11434',
     prefix: 'http',
     placeholder: 'http://localhost:11434',
-    help: 'Pastikan server Ollama lokal sudah aktif di latar belakang.'
+    help: 'Pastikan server Ollama sudah aktif.'
   }
 };
 
@@ -179,21 +189,38 @@ export default function OcrApiKeyManager() {
   const [isOcrRunning, setIsOcrRunning] = useState(false);
   const [ocrResult, setOcrResult] = useState(null);
 
-  // Load API Keys from LocalStorage on mount
+  // Load API Keys from Backend
   useEffect(() => {
-    const savedKeys = localStorage.getItem('pbj_ocr_api_keys');
-    if (savedKeys) {
+    const fetchKeys = async () => {
       try {
-        setApiKeys(JSON.parse(savedKeys));
+        const res = await fetch('/api/settings/ocr_api_keys');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.value) {
+            setApiKeys(JSON.parse(data.value));
+          }
+        }
       } catch (e) {
-        console.error('Failed to parse saved API keys');
+        console.error('Failed to fetch API keys from backend', e);
       }
-    }
+    };
+    fetchKeys();
   }, []);
 
-  const saveKeys = (newKeys) => {
-    localStorage.setItem('pbj_ocr_api_keys', JSON.stringify(newKeys));
-    setApiKeys(newKeys);
+  const saveKeys = async (newKeys) => {
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'ocr_api_keys', value: JSON.stringify(newKeys) })
+      });
+      if (res.ok) {
+        setApiKeys(newKeys);
+      }
+    } catch (e) {
+      console.error('Failed to save API keys to backend', e);
+      alert('Gagal menyimpan API Key ke server.');
+    }
   };
 
   // Helper to mask API keys
@@ -201,9 +228,9 @@ export default function OcrApiKeyManager() {
     if (!key) return '-';
     if (key.startsWith('http')) return key; // Ollama local URL
     if (key.length <= 8) return 'xxxxxxxx';
-    const prefix = key.slice(0, 7);
+    const prefix = key.slice(0, 4);
     const suffix = key.slice(-4);
-    return `${prefix}xxxxxxx${suffix}`;
+    return `${prefix}······${suffix}`;
   };
 
   // Validate API Key format based on provider rules
@@ -213,7 +240,7 @@ export default function OcrApiKeyManager() {
     
     if (provider === 'ollama') {
       if (key.startsWith('http://') || key.startsWith('https://')) {
-        return { valid: true, msg: 'Format URL Ollama lokal valid.' };
+        return { valid: true, msg: 'Format URL valid.' };
       }
       return { valid: false, msg: 'URL Ollama harus diawali dengan http:// atau https://' };
     }
@@ -221,12 +248,12 @@ export default function OcrApiKeyManager() {
     if (p.prefix && !key.startsWith(p.prefix)) {
       return { 
         valid: false, 
-        msg: `Format salah! API Key ${p.name} biasanya harus diawali dengan "${p.prefix}"` 
+        msg: `Format salah! API Key ${p.name} harus diawali dengan "${p.prefix}"` 
       };
     }
 
-    if (key.length < 15) {
-      return { valid: false, msg: 'Panjang API Key terlalu pendek (minimal 15 karakter).' };
+    if (key.length < 15 && provider !== 'ollama' && provider !== 'cohere') {
+      return { valid: false, msg: 'API Key terlalu pendek.' };
     }
 
     return { valid: true, msg: 'Format API Key valid.' };
@@ -236,7 +263,7 @@ export default function OcrApiKeyManager() {
     e.preventDefault();
     const validation = validateFormat(selectedProvider, inputKey);
     if (!validation.valid) {
-      alert(`⚠️ Validasi Gagal: ${validation.msg}`);
+      alert(`Validasi Gagal: ${validation.msg}`);
       return;
     }
 
@@ -245,35 +272,31 @@ export default function OcrApiKeyManager() {
 
     // Simulate connection test
     setTimeout(() => {
-      // Logic simulation: If key contains word "fail" or "expired", trigger failure
-      const isFailed = inputKey.toLowerCase().includes('fail') || inputKey.toLowerCase().includes('expired') || inputKey.length < 16;
+      const isFailed = inputKey.toLowerCase().includes('fail') || inputKey.toLowerCase().includes('expired') || (inputKey.length < 16 && selectedProvider !== 'ollama' && selectedProvider !== 'cohere');
       
       if (!isFailed) {
         const newKeys = { ...apiKeys, [selectedProvider]: inputKey };
         saveKeys(newKeys);
         setTestResult({
           success: true,
-          provider: PROVIDERS[selectedProvider].name,
-          message: `✅ API Key ${PROVIDERS[selectedProvider].name} berhasil terhubung.\nStatus OCR: AKTIF`
+          message: `API Key ${PROVIDERS[selectedProvider].name} berhasil terhubung.`
         });
         setInputKey('');
       } else {
         setTestResult({
           success: false,
-          provider: PROVIDERS[selectedProvider].name,
-          message: `❌ Koneksi Gagal: API Key tidak valid, kuota habis, atau server menolak permintaan.\nSilakan periksa kembali.`
+          message: `Koneksi Gagal: API Key tidak valid.`
         });
       }
       setTestingId(null);
-    }, 2000);
+    }, 1500);
   };
 
   const handleDeleteKey = (providerId) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus API Key untuk ${PROVIDERS[providerId].name}?`)) {
+    if (confirm(`Hapus API Key untuk ${PROVIDERS[providerId].name}?`)) {
       const newKeys = { ...apiKeys };
       delete newKeys[providerId];
       saveKeys(newKeys);
-      alert(`🗑️ API Key ${PROVIDERS[providerId].name} berhasil dihapus.`);
     }
   };
 
@@ -286,18 +309,16 @@ export default function OcrApiKeyManager() {
       if (key && !key.toLowerCase().includes('fail')) {
         setTestResult({
           success: true,
-          provider: PROVIDERS[providerId].name,
-          message: `✅ Test koneksi sukses! API Key ${PROVIDERS[providerId].name} terhubung dan siap digunakan.\nStatus OCR: AKTIF`
+          message: `Test koneksi sukses! ${PROVIDERS[providerId].name} terhubung.`
         });
       } else {
         setTestResult({
           success: false,
-          provider: PROVIDERS[providerId].name,
-          message: `❌ Test koneksi gagal: API Key tidak terdaftar atau bermasalah.\nSilakan periksa kembali.`
+          message: `Test koneksi gagal untuk ${PROVIDERS[providerId].name}.`
         });
       }
       setTestingId(null);
-    }, 1500);
+    }, 1000);
   };
 
   // Run Simulated OCR
@@ -321,96 +342,55 @@ export default function OcrApiKeyManager() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-fadeIn">
-      {/* Upper header card */}
-      <div className="bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-600 rounded-3xl p-8 lg:p-10 text-white shadow-xl relative overflow-hidden">
-        {/* Glow effect */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none"></div>
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-3">
-            <span className="px-3 py-1 text-xs font-bold uppercase bg-white/20 backdrop-blur-md rounded-full border border-white/10 tracking-widest">
-              ⚙️ Pengaturan Canggih
-            </span>
-            <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight">
-              🤖 Portal Integrasi API AI OCR
+    <div className="max-w-5xl mx-auto space-y-10 animate-fadeIn font-sans text-slate-800">
+      {/* Header section (Minimalist) */}
+      <div className="border-b border-slate-200 pb-8">
+        <div className="flex items-end justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+              Integrasi AI OCR
             </h1>
-            <p className="text-indigo-100 max-w-2xl text-sm md:text-base leading-relaxed">
-              Hubungkan kunci API AI terbaik untuk melakukan ekstraksi rekening belanja DPA, dokumen PBJ, surat dinas, dan arsip daerah dengan akurasi maksimal.
+            <p className="text-slate-500 mt-2 text-sm max-w-xl">
+              Kelola kunci API untuk mengekstrak data dari dokumen PBJ, DPA, dan surat dinas dengan multi-engine AI.
             </p>
           </div>
-          <div className="shrink-0 flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/15 px-5 py-4 rounded-2xl">
-            <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></div>
-            <div>
-              <div className="text-[10px] uppercase font-bold text-indigo-200 tracking-wider">Status OCR Sistem</div>
-              <div className="text-sm font-bold text-white">
-                {Object.keys(apiKeys).length > 0 ? 'AKTIF (Multi-Engine)' : 'BELUM TERHUBUNG'}
-              </div>
-            </div>
+          <div className="text-right">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-full ${Object.keys(apiKeys).length > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${Object.keys(apiKeys).length > 0 ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+              {Object.keys(apiKeys).length > 0 ? 'Multi-Engine Aktif' : 'Belum Terhubung'}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Tabs Menu */}
-      <div className="flex border-b border-slate-200 space-x-6">
+      {/* Tabs Menu (Clean) */}
+      <div className="flex space-x-8 border-b border-slate-100">
         <button
           onClick={() => setActiveTab('manager')}
-          className={`pb-4 text-sm font-bold transition-all relative ${
-            activeTab === 'manager'
-              ? 'text-indigo-600'
-              : 'text-slate-400 hover:text-slate-600'
-          }`}
+          className={`pb-3 text-sm font-medium transition-colors relative ${activeTab === 'manager' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
         >
-          🔑 Kelola API Key
-          {activeTab === 'manager' && (
-            <span className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full"></span>
-          )}
+          Kelola API Key
+          {activeTab === 'manager' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900"></span>}
         </button>
         <button
           onClick={() => setActiveTab('simulator')}
-          className={`pb-4 text-sm font-bold transition-all relative ${
-            activeTab === 'simulator'
-              ? 'text-indigo-600'
-              : 'text-slate-400 hover:text-slate-600'
-          }`}
+          className={`pb-3 text-sm font-medium transition-colors relative ${activeTab === 'simulator' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
         >
-          👁️ Simulator SandBox OCR
-          {activeTab === 'simulator' && (
-            <span className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full"></span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('providers')}
-          className={`pb-4 text-sm font-bold transition-all relative ${
-            activeTab === 'providers'
-              ? 'text-indigo-600'
-              : 'text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          📚 Info Provider AI & Keamanan
-          {activeTab === 'providers' && (
-            <span className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-t-full"></span>
-          )}
+          Simulator SandBox
+          {activeTab === 'simulator' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900"></span>}
         </button>
       </div>
 
       {/* TAB CONTENT 1: MANAGER */}
       {activeTab === 'manager' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           {/* Form Tambah API Key */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-3xl p-6 lg:p-8 border border-slate-200/80 shadow-md">
-              <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-                ➕ Hubungkan API Key Baru
-              </h2>
-
+          <div className="lg:col-span-2 space-y-8">
+            <div>
+              <h2 className="text-lg font-medium text-slate-900 mb-6">Hubungkan Provider AI Baru</h2>
               <form onSubmit={handleAddKey} className="space-y-6">
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">
-                    Pilih Provider AI
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {Object.values(PROVIDERS).map((p) => (
                       <button
                         key={p.id}
@@ -420,42 +400,31 @@ export default function OcrApiKeyManager() {
                           setInputKey('');
                           setTestResult(null);
                         }}
-                        className={`flex flex-col items-center p-3 rounded-2xl border text-center transition-all duration-200 ${
+                        className={`p-4 rounded-xl border text-center transition-all ${
                           selectedProvider === p.id
-                            ? 'border-indigo-600 bg-indigo-50/40 text-indigo-700 shadow-sm ring-2 ring-indigo-600/10'
-                            : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
+                            ? 'border-slate-800 ring-1 ring-slate-800 bg-slate-900 text-white shadow-sm'
+                            : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
                         }`}
                       >
-                        <span className="text-2xl mb-1">{p.logo}</span>
-                        <span className="text-xs font-bold truncate w-full">{p.name}</span>
+                        <div className="text-xl mb-2">{p.logo}</div>
+                        <div className={`text-xs font-medium truncate ${selectedProvider === p.id ? 'text-slate-200' : 'text-slate-700'}`}>{p.name}</div>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex items-start gap-3">
-                  <span className="text-xl">💡</span>
-                  <div className="text-xs leading-relaxed text-slate-600">
-                    <span className="font-bold text-indigo-700">{PROVIDERS[selectedProvider].name}:</span> {PROVIDERS[selectedProvider].desc}
-                    <div className="mt-1 font-medium text-slate-400">
-                      Format Kunci: Dimulai dengan <code className="bg-slate-200/60 px-1 rounded font-bold text-slate-700">{PROVIDERS[selectedProvider].prefix}...</code>
-                    </div>
-                  </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    <span className="font-medium text-slate-900">{PROVIDERS[selectedProvider].name}</span>: {PROVIDERS[selectedProvider].desc}
+                  </p>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">
-                      API Key / Kunci Rahasia
-                    </label>
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <label className="text-sm font-medium text-slate-700">API Key</label>
                     {selectedProvider !== 'ollama' && (
-                      <a
-                        href={PROVIDERS[selectedProvider].url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1"
-                      >
-                        Dapatkan API Key Resmi ↗
+                      <a href={PROVIDERS[selectedProvider].url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">
+                        Dapatkan Key ↗
                       </a>
                     )}
                   </div>
@@ -464,143 +433,78 @@ export default function OcrApiKeyManager() {
                     value={inputKey}
                     onChange={(e) => setInputKey(e.target.value)}
                     placeholder={PROVIDERS[selectedProvider].placeholder}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm font-mono placeholder-slate-300 transition-all"
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 text-sm font-mono transition-colors"
                     required
                   />
-                  <p className="text-[10px] text-slate-400 font-medium">
-                    {PROVIDERS[selectedProvider].help}
-                  </p>
+                  <p className="mt-2 text-xs text-slate-500">{PROVIDERS[selectedProvider].help}</p>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setInputKey('');
-                      setTestResult(null);
-                    }}
-                    className="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-100 transition-all"
-                  >
-                    Batal
+                <div className="flex items-center gap-3 pt-2">
+                  <button type="button" onClick={() => { setInputKey(''); setTestResult(null); }} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                    Reset
                   </button>
-                  <button
-                    type="submit"
-                    disabled={testingId !== null}
-                    className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-600/10 hover:bg-indigo-700 transition-all flex items-center gap-2"
-                  >
-                    {testingId === selectedProvider ? (
-                      <>
-                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                        Menguji Koneksi...
-                      </>
-                    ) : (
-                      'Simpan & Test Koneksi'
-                    )}
+                  <button type="submit" disabled={testingId !== null} className="px-5 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors">
+                    {testingId === selectedProvider ? 'Menghubungkan...' : 'Simpan & Test'}
                   </button>
                 </div>
               </form>
 
-              {/* Status Test Koneksi */}
               {testResult && (
-                <div className={`mt-6 p-4 rounded-2xl border text-sm font-medium whitespace-pre-line leading-relaxed transition-all duration-300 ${
-                  testResult.success 
-                    ? 'bg-emerald-50/50 border-emerald-200/60 text-emerald-800' 
-                    : 'bg-rose-50/50 border-rose-200/60 text-rose-800'
-                }`}>
-                  <div className="flex items-start gap-2">
-                    <span className="text-base">{testResult.success ? '✅' : '❌'}</span>
-                    <div>{testResult.message}</div>
-                  </div>
+                <div className={`mt-6 p-4 rounded-lg border text-sm ${testResult.success ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-red-50 border-red-100 text-red-800'}`}>
+                  {testResult.message}
                 </div>
               )}
             </div>
           </div>
 
           {/* Panel Status API Key Terhubung */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-md">
-              <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
-                🟢 API Key Terhubung ({Object.keys(apiKeys).length})
-              </h3>
-              
-              {Object.keys(apiKeys).length === 0 ? (
-                <div className="text-center py-8 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <span className="text-3xl block mb-2">🔑</span>
-                  <p className="text-xs text-slate-500 font-medium">Belum ada API Key terhubung.</p>
-                  <p className="text-[10px] text-slate-400 mt-1">Masukkan API Key di sebelah kiri untuk mengaktifkan AI OCR.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {Object.entries(apiKeys).map(([provId, keyVal]) => {
-                    const p = PROVIDERS[provId];
-                    if (!p) return null;
-                    return (
-                      <div
-                        key={provId}
-                        className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 hover:border-slate-200 transition-all"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">{p.logo}</span>
-                            <span className="text-xs font-bold text-slate-700">{p.name}</span>
-                          </div>
-                          <span className="px-2 py-0.5 text-[8px] font-bold rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/50 uppercase tracking-wide">
-                            Aktif
-                          </span>
-                        </div>
-                        <div className="text-[11px] font-mono text-slate-400 bg-white px-2 py-1 rounded border border-slate-100 flex justify-between items-center">
-                          <span>{maskKey(keyVal)}</span>
-                        </div>
-                        <div className="flex justify-end gap-1.5 pt-1 mt-1 border-t border-slate-200/50">
-                          <button
-                            onClick={() => {
-                              setSelectedProvider(provId);
-                              setInputKey(keyVal);
-                              setActiveTab('manager');
-                              setTestResult(null);
-                            }}
-                            className="px-2 py-1 text-[10px] font-bold text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 rounded-lg transition-all"
-                            title="Ganti API Key"
-                          >
-                            ✏️ Ganti
-                          </button>
-                          <button
-                            onClick={() => handleTestExistingKey(provId)}
-                            disabled={testingId === provId}
-                            className="px-2 py-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-all flex items-center gap-1"
-                            title="Test Koneksi Ulang"
-                          >
-                            {testingId === provId ? (
-                              <span className="w-2.5 h-2.5 border border-indigo-600 border-t-transparent rounded-full animate-spin"></span>
-                            ) : '⚡'} Test
-                          </button>
-                          <button
-                            onClick={() => handleDeleteKey(provId)}
-                            className="px-2 py-1 text-[10px] font-bold text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-all"
-                            title="Hapus API Key"
-                          >
-                            🗑️ Hapus
-                          </button>
+          <div>
+            <h3 className="text-sm font-medium text-slate-900 mb-4">Keys Terhubung ({Object.keys(apiKeys).length})</h3>
+            
+            {Object.keys(apiKeys).length === 0 ? (
+              <div className="p-6 text-center bg-slate-50 border border-slate-100 rounded-xl">
+                <p className="text-sm text-slate-500">Belum ada API Key</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {Object.entries(apiKeys).map(([provId, keyVal]) => {
+                  const p = PROVIDERS[provId];
+                  if (!p) return null;
+                  return (
+                    <div key={provId} className="p-4 border border-slate-200 rounded-xl bg-white hover:border-slate-300 transition-colors group">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-2">
+                          <span>{p.logo}</span>
+                          <span className="text-sm font-medium text-slate-800">{p.name}</span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Rekomendasi Dokumen */}
-            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-5 space-y-3">
-              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                Dokumen PBJ yang Didukung
-              </h4>
-              <div className="text-xs text-slate-600 space-y-2">
-                <p className="flex items-center gap-2">📑 <strong>DPA APBD:</strong> Rekening belanja & pagu HPS</p>
-                <p className="flex items-center gap-2">🛒 <strong>Dokumen PBJ:</strong> Kertas kerja komparasi & spesifikasi</p>
-                <p className="flex items-center gap-2">✒️ <strong>Berita Acara:</strong> BAST, BAHP, & Dokumen Evaluasi</p>
-                <p className="flex items-center gap-2">✉️ <strong>Surat Pengantar:</strong> Nota dinas & surat pengantar OPD</p>
-                <p className="flex items-center gap-2">🗂️ <strong>Scan Arsip Lama:</strong> Berkas bersejarah dinas lama</p>
+                      <div className="text-xs font-mono text-slate-500 bg-slate-50 px-2 py-1.5 rounded border border-slate-100">
+                        {maskKey(keyVal)}
+                      </div>
+                      <div className="flex gap-3 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => { setSelectedProvider(provId); setInputKey(keyVal); }} className="text-xs font-medium text-slate-500 hover:text-slate-900">
+                          Edit
+                        </button>
+                        <button onClick={() => handleTestExistingKey(provId)} className="text-xs font-medium text-blue-600 hover:text-blue-800">
+                          {testingId === provId ? '...' : 'Test'}
+                        </button>
+                        <button onClick={() => handleDeleteKey(provId)} className="text-xs font-medium text-red-500 hover:text-red-700">
+                          Hapus
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            )}
+            
+            <div className="mt-8 pt-6 border-t border-slate-100">
+              <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Kegunaan OCR</h4>
+              <ul className="text-sm text-slate-600 space-y-2">
+                <li>• Ekstraksi tabel DPA</li>
+                <li>• Komparasi spesifikasi HPS</li>
+                <li>• Validasi Berita Acara</li>
+              </ul>
             </div>
           </div>
         </div>
@@ -915,3 +819,4 @@ export default function OcrApiKeyManager() {
     </div>
   );
 }
+ 

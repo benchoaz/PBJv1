@@ -146,6 +146,11 @@ class ParseResult(BaseModel):
     ocr_engine: str
     ocr_confidence: float
     ocr_mode: Optional[str] = "local"
+    program: Optional[str] = None
+    kegiatan: Optional[str] = None
+    sub_kegiatan: Optional[str] = None
+    lokasi: Optional[str] = None
+    waktu_pelaksanaan: Optional[str] = None
     rekening: List[RekeningDPA]
     pesan: str
 
@@ -999,6 +1004,97 @@ def write_log(pages: int, count: int, engine: str, status: str, pdf_bytes: bytes
         f.write(json.dumps(entry) + '\n')
 
 
+def extract_global_metadata(text: str) -> dict:
+    meta = {
+        "program": None,
+        "kegiatan": None,
+        "sub_kegiatan": None,
+        "lokasi": None,
+        "waktu_pelaksanaan": None
+    }
+    if not text:
+        return meta
+        
+    with open('logs/debug_extract_text.txt', 'w') as f:
+        f.write(text)
+        
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    
+    for i, line in enumerate(lines):
+        # 1. Program
+        if not meta["program"] and re.search(r'Program', line, re.IGNORECASE):
+            match = re.search(r'Program\s*(?::|\s{2,})\s*(.+)', line, re.IGNORECASE)
+            if match:
+                meta["program"] = match.group(1).strip()
+            else:
+                for j in range(i + 1, min(i + 15, len(lines))):
+                    if re.match(r'^:?\s*\d\.\d{2}\.\d{2}.*', lines[j]):
+                        meta["program"] = lines[j].replace(':', '', 1).strip()
+                        break
+                        
+        # 2. Kegiatan
+        if not meta["kegiatan"] and re.search(r'Kegiatan', line, re.IGNORECASE) and 'Sub' not in line:
+            match = re.search(r'Kegiatan\s*(?::|\s{2,})\s*(.+)', line, re.IGNORECASE)
+            if match:
+                meta["kegiatan"] = match.group(1).strip()
+            else:
+                for j in range(i + 1, min(i + 15, len(lines))):
+                    if re.match(r'^:?\s*\d\.\d{2}\.\d{2}\.\d\.\d{2}\s*\-.*', lines[j]):
+                        meta["kegiatan"] = lines[j].replace(':', '', 1).strip()
+                        break
+                        
+        # 3. Sub Kegiatan
+        if not meta["sub_kegiatan"] and re.search(r'Sub\s*Kegiatan', line, re.IGNORECASE):
+            match = re.search(r'Sub\s*Kegiatan\s*(?::|\s{2,})\s*(.+)', line, re.IGNORECASE)
+            if match:
+                meta["sub_kegiatan"] = match.group(1).strip()
+            else:
+                for j in range(i + 1, min(i + 15, len(lines))):
+                    if re.match(r'^:?\s*\d\.\d{2}\.\d{2}\.\d\.\d{2}\.\d{4}.*', lines[j]):
+                        meta["sub_kegiatan"] = lines[j].replace(':', '', 1).strip()
+                        break
+                        
+        # 4. Lokasi
+        if not meta["lokasi"] and re.search(r'Lokasi', line, re.IGNORECASE):
+            match = re.search(r'Lokasi\s*(?::|\s{2,})\s*(.+)', line, re.IGNORECASE)
+            if match:
+                meta["lokasi"] = match.group(1).strip()
+            else:
+                for j in range(i + 1, min(i + 15, len(lines))):
+                    if re.match(r'^:?\s*(Kab\.|Kota|Kecamatan|Desa|Kelurahan|Provinsi)\b', lines[j], re.IGNORECASE):
+                        meta["lokasi"] = lines[j].replace(':', '', 1).strip()
+                        break
+                        
+        # 5. Waktu Pelaksanaan
+        if not meta["waktu_pelaksanaan"] and re.search(r'Waktu\s*Pelaksanaan', line, re.IGNORECASE):
+            match = re.search(r'Waktu\s*Pelaksanaan\s*(?::|\s{2,})\s*(.+)', line, re.IGNORECASE)
+            if match:
+                meta["waktu_pelaksanaan"] = match.group(1).strip()
+            else:
+                for j in range(i + 1, min(i + 15, len(lines))):
+                    if re.search(r'(Mulai|Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember|Bulan|Hari)', lines[j], re.IGNORECASE):
+                        meta["waktu_pelaksanaan"] = lines[j].replace(':', '', 1).strip()
+                        break
+    
+    # Fallbacks in case formatting is slightly off but regex matches directly somewhere
+    if not meta["program"]:
+        m = re.search(r'Program\s*(?::\s*|\n:?\s*)([^\n]+)', text, re.IGNORECASE)
+        if m: meta["program"] = m.group(1).strip()
+    if not meta["kegiatan"]:
+        m = re.search(r'Kegiatan\s*(?::\s*|\n:?\s*)([^\n]+)', text, re.IGNORECASE)
+        if m: meta["kegiatan"] = m.group(1).strip()
+    if not meta["sub_kegiatan"]:
+        m = re.search(r'Sub\s*Kegiatan\s*(?::\s*|\n:?\s*)([^\n]+)', text, re.IGNORECASE)
+        if m: meta["sub_kegiatan"] = m.group(1).strip()
+    if not meta["lokasi"]:
+        m = re.search(r'Lokasi\s*(?::\s*|\n:?\s*)([^\n]+)', text, re.IGNORECASE)
+        if m: meta["lokasi"] = m.group(1).strip()
+    if not meta["waktu_pelaksanaan"]:
+        m = re.search(r'Waktu\s*Pelaksanaan\s*(?::\s*|\n:?\s*)([^\n]+)', text, re.IGNORECASE)
+        if m: meta["waktu_pelaksanaan"] = m.group(1).strip()
+
+    return meta
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
 @app.get('/health')
 def health():
@@ -1044,11 +1140,14 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
             excel_text, _ = parse_excel(file_bytes)
             rekening = run_extraction_pipeline(None, excel_text, use_ocr=True, ai_provider=x_ai_provider, api_key=x_ai_key)
             write_log(1, len(rekening), 'pandas', 'ok', file_bytes)
+            meta = extract_global_metadata(excel_text)
             return ParseResult(
                 success=True, filename=file.filename,
                 total_halaman=1, pdf_type='excel',
                 ocr_engine='pandas', ocr_confidence=100.0,
                 ocr_mode=mode_status,
+                program=meta.get("program"), kegiatan=meta.get("kegiatan"), sub_kegiatan=meta.get("sub_kegiatan"),
+                lokasi=meta.get("lokasi"), waktu_pelaksanaan=meta.get("waktu_pelaksanaan"),
                 rekening=rekening,
                 pesan=f'Berhasil mengekstrak lembar Excel dengan AI Refinement ({x_ai_provider or "none"}). {len(rekening)} rekening ditemukan.'
             )
@@ -1061,11 +1160,14 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
             image_text, ocr_conf = ocr_image(file_bytes)
             rekening = run_extraction_pipeline(None, image_text, use_ocr=True, ai_provider=x_ai_provider, api_key=x_ai_key)
             write_log(1, len(rekening), 'paddleocr-image', 'ok', file_bytes)
+            meta = extract_global_metadata(image_text)
             return ParseResult(
                 success=True, filename=file.filename,
                 total_halaman=1, pdf_type='image',
                 ocr_engine='paddleocr', ocr_confidence=round(ocr_conf, 1),
                 ocr_mode=mode_status,
+                program=meta.get("program"), kegiatan=meta.get("kegiatan"), sub_kegiatan=meta.get("sub_kegiatan"),
+                lokasi=meta.get("lokasi"), waktu_pelaksanaan=meta.get("waktu_pelaksanaan"),
                 rekening=rekening,
                 pesan=f'Berhasil mengekstrak gambar DPA dengan AI Refinement ({x_ai_provider or "none"}). {len(rekening)} rekening ditemukan.'
             )
@@ -1088,11 +1190,16 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
                 ocr_text, ocr_conf = ocr_pdf(file_bytes)
                 rekening = run_extraction_pipeline(None, ocr_text, use_ocr=True, ai_provider=x_ai_provider, api_key=x_ai_key)
                 write_log(total_pages, len(rekening), 'paddleocr', 'ok', file_bytes)
+                with open('logs/debug_ocr_text.txt', 'w') as f:
+                    f.write(ocr_text)
+                meta = extract_global_metadata(ocr_text)
                 return ParseResult(
                     success=True, filename=file.filename,
                     total_halaman=total_pages, pdf_type='scan',
                     ocr_engine='paddleocr', ocr_confidence=round(ocr_conf, 1),
                     ocr_mode=mode_status,
+                    program=meta.get("program"), kegiatan=meta.get("kegiatan"), sub_kegiatan=meta.get("sub_kegiatan"),
+                    lokasi=meta.get("lokasi"), waktu_pelaksanaan=meta.get("waktu_pelaksanaan"),
                     rekening=rekening,
                     pesan=f'Berhasil OCR scan PDF dengan AI Refinement ({x_ai_provider or "none"}). {len(rekening)} rekening ditemukan.'
                 )
@@ -1109,21 +1216,32 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
                 if len(rekening_ocr) >= len(rekening):
                     rekening = rekening_ocr
                 write_log(total_pages, len(rekening), 'paddleocr-fallback', 'ok', file_bytes)
+                meta = extract_global_metadata(ocr_text)
                 return ParseResult(
                     success=True, filename=file.filename,
                     total_halaman=total_pages, pdf_type='native-ocr-fallback',
                     ocr_engine='paddleocr', ocr_confidence=round(ocr_conf, 1),
                     ocr_mode=mode_status,
+                    program=meta.get("program"), kegiatan=meta.get("kegiatan"), sub_kegiatan=meta.get("sub_kegiatan"),
+                    lokasi=meta.get("lokasi"), waktu_pelaksanaan=meta.get("waktu_pelaksanaan"),
                     rekening=rekening,
                     pesan=f'Fallback ke OCR dengan AI Refinement. {len(rekening)} rekening ditemukan.'
                 )
 
+            native_text = "\n".join(page.get_text() for page in doc)
+            
+            with open('logs/debug_native_text.txt', 'w') as f:
+                f.write(native_text)
+                
+            meta = extract_global_metadata(native_text)
             write_log(total_pages, len(rekening), 'pymupdf', 'ok', file_bytes)
             return ParseResult(
                 success=True, filename=file.filename,
                 total_halaman=total_pages, pdf_type='native',
                 ocr_engine='pymupdf', ocr_confidence=99.0,
                 ocr_mode=mode_status,
+                program=meta.get("program"), kegiatan=meta.get("kegiatan"), sub_kegiatan=meta.get("sub_kegiatan"),
+                lokasi=meta.get("lokasi"), waktu_pelaksanaan=meta.get("waktu_pelaksanaan"),
                 rekening=rekening,
                 pesan=f'Sukses baca DPA native dengan AI Refinement ({x_ai_provider or "none"}). {len(rekening)} rekening ditemukan.'
             )

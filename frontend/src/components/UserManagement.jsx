@@ -55,27 +55,8 @@ const PROBOLINGGO_SATKERS = [
 ];
 
 export default function UserManagement() {
-  // Load initial state from localStorage or default list
-  const [users, setUsers] = useState(() => {
-    const saved = localStorage.getItem('pbj_users')
-    let list = saved ? JSON.parse(saved) : []
-    
-    // Filter out unwanted mock users permanently!
-    list = list.filter(u => u.name !== 'Budi Santoso' && u.name !== 'Siti Aminah' && u.name !== 'Ahmad Dahlan')
-    
-    if (!saved || list.length === 0) {
-      const defaultList = [
-        { id: 1, name: 'Handik Hariyanto, S.Kom., M.Si', role: 'PPK', nip: '197909102002121004', department: 'Kecamatan Besuk', idSatker: '67081', perangkatDaerah: 'Pemerintah Daerah Kabupaten Probolinggo', password: 'admin' },
-        { id: 2, name: 'Beni Trisna Wijaya, S.Kom', role: 'PP', nip: '198205192010011010', department: 'Kecamatan Besuk', idSatker: '67081', perangkatDaerah: 'Pemerintah Daerah Kabupaten Probolinggo', password: 'admin' },
-        { id: 3, name: 'Beni (Super Admin)', role: 'Admin', nip: 'admin', department: 'Unit Kerja Pengadaan Barang/Jasa (UKPBJ)', idSatker: '308386', perangkatDaerah: 'Pemerintah Daerah Kabupaten Probolinggo', password: 'admin' }
-      ]
-      localStorage.setItem('pbj_users', JSON.stringify(defaultList))
-      return defaultList
-    }
-    
-    localStorage.setItem('pbj_users', JSON.stringify(list))
-    return list
-  })
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [currentEditUser, setCurrentEditUser] = useState(null)
@@ -90,10 +71,25 @@ export default function UserManagement() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
 
-  // Persist to localStorage whenever users list changes
+  // Fetch users from backend
+  const fetchUsers = async () => {
+    try {
+      setLoading(true)
+      const res = await fetch('/api/users')
+      if (res.ok) {
+        const data = await res.json()
+        setUsers(data || [])
+      }
+    } catch (e) {
+      console.error("Failed to fetch users", e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    localStorage.setItem('pbj_users', JSON.stringify(users))
-  }, [users])
+    fetchUsers()
+  }, [])
 
   // Open modal for Adding
   const handleAddClick = () => {
@@ -133,7 +129,7 @@ export default function UserManagement() {
   };
 
   // Save (Add or Update) handler
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault()
     
     if (!name.trim() || !nip.trim() || !department.trim() || !idSatker.trim() || !perangkatDaerah.trim()) {
@@ -146,45 +142,75 @@ export default function UserManagement() {
       return
     }
 
-    if (currentEditUser) {
-      // Update existing user (preserve password if not modified)
-      setUsers(prev => prev.map(u => {
-        if (u.id === currentEditUser.id) {
-          return { 
-            ...u, 
-            name, 
-            role, 
-            nip, 
-            perangkatDaerah,
-            department,
-            idSatker,
-            password: password.trim() ? password.trim() : u.password 
-          }
+    try {
+      if (currentEditUser) {
+        // Update existing user
+        const payload = {
+          name, 
+          role, 
+          nip, 
+          perangkatDaerah,
+          department,
+          idSatker,
         }
-        return u
-      }))
-    } else {
-      // Create new user with password
-      const newUser = {
-        id: Date.now(),
-        name,
-        role,
-        nip,
-        perangkatDaerah,
-        department,
-        idSatker,
-        password: password.trim()
-      }
-      setUsers(prev => [...prev, newUser])
-    }
+        if (password.trim()) {
+          payload.password = password.trim()
+        }
 
-    setIsModalOpen(false)
+        const res = await fetch(`/api/users/${currentEditUser.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        if (res.ok) {
+          fetchUsers()
+        } else {
+          alert('Gagal mengupdate pengguna')
+        }
+      } else {
+        // Create new user
+        const payload = {
+          name,
+          role,
+          nip,
+          perangkatDaerah,
+          department,
+          idSatker,
+          password: password.trim()
+        }
+        const res = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        if (res.ok) {
+          fetchUsers()
+        } else {
+          alert('Gagal menambahkan pengguna baru')
+        }
+      }
+      setIsModalOpen(false)
+    } catch (err) {
+      console.error(err)
+      alert('Terjadi kesalahan jaringan')
+    }
   }
 
   // Delete handler
-  const handleDelete = (id, userName) => {
+  const handleDelete = async (id, userName) => {
     if (confirm(`Apakah Anda yakin ingin menghapus pengguna "${userName}"?`)) {
-      setUsers(prev => prev.filter(u => u.id !== id))
+      try {
+        const res = await fetch(`/api/users/${id}`, {
+          method: 'DELETE'
+        })
+        if (res.ok) {
+          fetchUsers()
+        } else {
+          alert('Gagal menghapus pengguna')
+        }
+      } catch (err) {
+        console.error(err)
+      }
     }
   }
 
