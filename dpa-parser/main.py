@@ -185,7 +185,7 @@ def clean_uraian(text: str) -> str:
 def extract_rincian_from_block(block_text: str) -> List[RincianItem]:
     """
     Parsing baris-baris dalam blok rekening untuk mengekstrak item rincian.
-    Mendukung penggabungan multi-baris dan State-Machine untuk nama/spesifikasi.
+    Mendukung penggabungan multi-baris (informasi volume di atas, nominal murni di bawahnya).
     """
     items = []
     lines = [l.strip() for l in block_text.split('\n') if l.strip()]
@@ -200,144 +200,241 @@ def extract_rincian_from_block(block_text: str) -> List[RincianItem]:
             # Cek apakah next_line adalah nominal murni (misal: 5.400.000 atau 5400000)
             if re.match(r'^\d{1,3}(\.\d{3})+(,\d+)?$', next_line) or re.match(r'^\d+$', next_line):
                 line = line + " " + next_line
-                i += 1
+                i += 1 # Lewati baris berikutnya karena sudah digabung
         merged_lines.append(line)
         i += 1
 
     item_no = 1
-    current_name_buffer = []  # State-machine buffer untuk nama & spesifikasi
-
     for line in merged_lines:
         if len(line) < 4:
             continue
-        lower_line = line.lower()
-        if any(kw in lower_line for kw in ['kode rekening', 'uraian rekening', 'anggaran', 'rencana realisasi', 'jumlah anggaran sub kegiatan', 'rincian perhitungan']):
+        if any(kw in line.lower() for kw in ['kode rekening', 'uraian rekening', 'anggaran', 'rencana realisasi', 'jumlah anggaran sub kegiatan']):
             continue
-        if re.match(r'^(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)\b', lower_line):
+
+        # Skip rows that are just month names for Rencana Realisasi
+        if re.match(r'^(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)\b', line.lower()):
             continue
+
+        # Skip jika barang sudah dihapus (Rp0,00 atau Rp0)
         if re.search(r'rp\.?\s*0(?:[,.]00)?\b', line, re.IGNORECASE):
             continue
 
+        # Coba cocokkan dengan pola rincian spesifik: "Volume Satuan x Rp HargaSatuan"
         dpa_match = DPA_LINE_PAT.search(line)
-        nominals = NOMINAL.findall(line)
-        
-        # Cek apakah baris ini memiliki indikasi angka (volume/harga)
-        has_volume_satuan = False
-        vol_str, satuan, harga_sat, harga_total = None, None, 0, 0
-        vol = 1.0
-
         if dpa_match:
-            has_volume_satuan = True
-            vol_str = dpa_match.group(1)
-            satuan = dpa_match.group(2)
-            harga_sat = int(dpa_match.group(3).replace('.', ''))
-            vol = float(vol_str.replace(',', '.'))
-            harga_total = int(vol * harga_sat)
-            
-            pos_pat = dpa_match.start()
-            if 'volume:' in lower_line:
-                nama_raw = line[:lower_line.find('volume:')].strip()
-            else:
-                nama_raw = line[:pos_pat].strip()
-        else:
-            multi_match = re.search(r'(\d+(?:[,.]\d+)?)\s*([a-zA-Z]{2,10})\s*x\s*(\d+(?:[,.]\d+)?)\s*([a-zA-Z]{2,10})', line, re.IGNORECASE)
-            if multi_match:
-                has_volume_satuan = True
-                v1 = float(multi_match.group(1).replace(',', '.'))
-                v2 = float(multi_match.group(3).replace(',', '.'))
-                vol = v1 * v2
-                satuan = f"{multi_match.group(2).capitalize()} / {multi_match.group(4).capitalize()}"
-            else:
-                sat_match = SATUAN_PAT.search(line)
-                if sat_match:
-                    has_volume_satuan = True
-                    vol_str = sat_match.group(1)
-                    satuan = sat_match.group(2)
-                    vol = float(vol_str.replace(',', '.'))
-                else:
-                    alt_match = re.search(r'(?:volume:?\s*)?(\d+[\.,]?\d*)\s*([a-zA-Z]{2,12})\b', line, re.IGNORECASE)
-                    if alt_match and alt_match.group(2).lower() not in ['volume', 'rupiah', 'harga', 'total', 'dpa', 'pagu', 'dan', 'atau']:
-                        has_volume_satuan = True
-                        vol_str = alt_match.group(1)
-                        satuan = alt_match.group(2)
-                        vol = float(vol_str.replace(',', '.'))
+            try:
+                vol_str = dpa_match.group(1)
+                satuan = dpa_match.group(2)
+                harga_sat_str = dpa_match.group(3)
 
-            if has_volume_satuan:
-                vals = []
-                for n in nominals:
-                    try:
-                        v = int(n.replace('.', ''))
-                        if v >= 1000: vals.append(v)
-                    except: pass
+                vol = float(vol_str.replace(',', '.'))
+                harga_sat = int(harga_sat_str.replace('.', ''))
+                harga_total = int(vol * harga_sat)
+
+                # Ekstrak nama/uraian barang
+                pos_pat = dpa_match.start()
+                if 'volume:' in line.lower():
+                    pos_vol = line.lower().find('volume:')
+                    nama_raw = line[:pos_vol].strip()
+                else:
+                    nama_raw = line[:pos_pat].strip()
+
+                nama_raw = re.sub(r'[^\w\s/\-\.&,()\u00C0-\u024F]', '', nama_raw).strip()
+                nama_raw = re.sub(r'[\-\s\.:]+$', '', nama_raw).strip()
+
+                # JIKA nama kosong/pendek/hanya kata "Spesifikasi" atau diawali dengan "Spesifikasi", cari baris nama riil ke belakang (hingga 5 baris)
+                idx_line = merged_lines.index(line)
+                if (not nama_raw or len(nama_raw) < 3 or nama_raw.lower() == 'spesifikasi' or nama_raw.lower().startswith('spesifikasi')) and idx_line > 0:
+                    spec_candidates = []
+                    # Jika nama_raw adalah spesifikasi valid (bukan sekadar label kosong), masukkan sebagai kandidat spesifikasi awal
+                    if nama_raw:
+                        if re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*(.+)$', nama_raw, re.IGNORECASE):
+                            spec_candidates.append(nama_raw)
+                    
+                    name_candidate = None
+                    for offset in range(1, min(6, idx_line + 1)):
+                        prev_line = merged_lines[idx_line - offset].strip()
+                        if not prev_line:
+                            continue
+                        prev_clean = re.sub(r'[^\w\s/\-\.&,()\u00C0-\u024F]', '', prev_line).strip()
+                        prev_clean = re.sub(r'[\-\s\.:]+$', '', prev_clean).strip()
+                        
+                        # Cek label kosong spesifikasi
+                        if re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*$', prev_clean, re.IGNORECASE):
+                            continue
+                        
+                        # Cek jika baris adalah spesifikasi dengan detail
+                        spec_match = re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*(.+)$', prev_clean, re.IGNORECASE)
+                        if spec_match:
+                            if prev_clean not in spec_candidates:
+                                spec_candidates.append(prev_clean)
+                            continue
+                        
+                        if any(kw in prev_line.lower() for kw in ['kode rekening', 'uraian rekening', 'anggaran', 'rincian perhitungan', 'sumber pendanaan', 'sumber dana']):
+                            continue
+                        if re.match(r'^[0-9\s.,xX*()\-]+$', prev_clean):
+                            continue
+                        if len(prev_clean) >= 3:
+                            name_candidate = prev_clean
+                            break
+                    
+                    if name_candidate:
+                        if spec_candidates:
+                            spec_str = ", ".join(reversed(spec_candidates))
+                            nama_raw = f"{name_candidate} ({spec_str})"
+                        else:
+                            nama_raw = name_candidate
+                    elif spec_candidates:
+                        nama_raw = spec_candidates[0]
+
+                if len(nama_raw) < 3:
+                    nama_raw = "Item Detail DPA"
+
+                items.append(RincianItem(
+                    no=item_no,
+                    nama=nama_raw[:100],
+                    volume=vol,
+                    satuan=normalize_satuan(satuan),
+                    harga_satuan=harga_sat,
+                    harga_total=harga_total
+                ))
+                item_no += 1
+                continue # Lanjut ke baris berikutnya, bypass pemrosesan umum
+            except Exception:
+                pass
+
+        # Cari nominal-nominal di baris ini
+        nominals = NOMINAL.findall(line)
+        vals = []
+        for n in nominals:
+            try:
+                v = int(n.replace('.', ''))
+                if v >= 1000:
+                    vals.append(v)
+            except:
+                pass
+
+        # Parse volume multiplication (e.g. 50 Orang x 10 Kali)
+        vol_multi = None
+        satuan = None
+        vol_str = None
+        multi_match = re.search(r'(\d+(?:[,.]\d+)?)\s*([a-zA-Z]{2,10})\s*x\s*(\d+(?:[,.]\d+)?)\s*([a-zA-Z]{2,10})', line, re.IGNORECASE)
+        
+        if multi_match:
+            v1 = float(multi_match.group(1).replace(',', '.'))
+            v2 = float(multi_match.group(3).replace(',', '.'))
+            vol_multi = v1 * v2
+            vol_str = str(vol_multi)
+            satuan = f"{multi_match.group(2).capitalize()} / {multi_match.group(4).capitalize()}"
+        else:
+            # Cari satuan dan volume menggunakan SATUAN_PAT biasa
+            sat_match = SATUAN_PAT.search(line)
+            satuan = sat_match.group(2) if sat_match else None
+            vol_str = sat_match.group(1) if sat_match else None
+
+            # Jika tidak ketemu satuan standar, cari pola alternatif volume (misal: "Volume: 120 Rim")
+            if not satuan:
+                alt_match = re.search(r'(?:volume:?\s*)?(\d+[\.,]?\d*)\s*([a-zA-Z]{2,12})\b', line, re.IGNORECASE)
+                if alt_match:
+                    vol_str = alt_match.group(1)
+                    sat_candidate = alt_match.group(2)
+                    # Pastikan bukan kata kunci terlarang
+                    if sat_candidate.lower() not in ['volume', 'rupiah', 'harga', 'total', 'dpa', 'pagu', 'dan', 'atau']:
+                        satuan = sat_candidate
+
+        # Ekstrak nama/uraian barang
+        first_num = re.search(r'\b\d', line)
+        if 'volume:' in line.lower():
+            pos_vol = line.lower().find('volume:')
+            nama_raw = line[:pos_vol].strip()
+        elif first_num:
+            nama_raw = line[:first_num.start()].strip()
+        else:
+            nama_raw = line.strip()
+
+        # Bersihkan nama barang dari karakter liar di ujung
+        nama_raw = re.sub(r'[^\w\s/\-\.&,()\u00C0-\u024F]', '', nama_raw).strip()
+        nama_raw = re.sub(r'[\-\s\.:]+$', '', nama_raw).strip()
+
+        # JIKA nama kosong/sangat pendek/hanya kata "Spesifikasi" atau diawali dengan "Spesifikasi", cari baris nama riil ke belakang (hingga 5 baris)
+        idx_line = merged_lines.index(line)
+        if (not nama_raw or len(nama_raw) < 3 or nama_raw.lower() == 'spesifikasi' or nama_raw.lower().startswith('spesifikasi')) and idx_line > 0:
+            spec_candidates = []
+            if nama_raw:
+                if re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*(.+)$', nama_raw, re.IGNORECASE):
+                    spec_candidates.append(nama_raw)
+            
+            name_candidate = None
+            for offset in range(1, min(6, idx_line + 1)):
+                prev_line = merged_lines[idx_line - offset].strip()
+                if not prev_line:
+                    continue
+                prev_clean = re.sub(r'[^\w\s/\-\.&,()\u00C0-\u024F]', '', prev_line).strip()
+                prev_clean = re.sub(r'[\-\s\.:]+$', '', prev_clean).strip()
                 
+                # Cek label kosong spesifikasi
+                if re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*$', prev_clean, re.IGNORECASE):
+                    continue
+                
+                # Cek jika baris adalah spesifikasi dengan detail
+                spec_match = re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*(.+)$', prev_clean, re.IGNORECASE)
+                if spec_match:
+                    if prev_clean not in spec_candidates:
+                        spec_candidates.append(prev_clean)
+                    continue
+                
+                if any(kw in prev_line.lower() for kw in ['kode rekening', 'uraian rekening', 'anggaran', 'rincian perhitungan', 'sumber pendanaan', 'sumber dana']):
+                    continue
+                if re.match(r'^[0-9\s.,xX*()\-]+$', prev_clean):
+                    continue
+                if len(prev_clean) >= 3:
+                    name_candidate = prev_clean
+                    break
+            
+            if name_candidate:
+                if spec_candidates:
+                    spec_str = ", ".join(reversed(spec_candidates))
+                    nama_raw = f"{name_candidate} ({spec_str})"
+                else:
+                    nama_raw = name_candidate
+            elif spec_candidates:
+                nama_raw = spec_candidates[0]
+
+        if len(nama_raw) >= 3 and satuan and len(vals) >= 1:
+            try:
+                vol = float(vol_str.replace(',', '.')) if vol_str else 1.0
+                
+                # Heuristik kalkulasi harga satuan & total
                 if len(vals) >= 2:
                     harga_total = max(vals)
                     sorted_vals = sorted(vals, reverse=True)
                     harga_sat = sorted_vals[1] if len(sorted_vals) > 1 else int(harga_total / vol)
+                    # Pastikan hitungan logis (toleransi selisih 10%)
                     if abs(harga_sat * vol - harga_total) / max(harga_total, 1) > 0.10:
                         harga_sat = int(harga_total / vol) if vol > 0 else harga_sat
-                elif len(vals) == 1:
+                else:
                     harga_total = vals[0]
+                    # Jika nominal tunggal itu sangat besar, asumsikan itu total harga
                     if harga_total > 5000:
                         harga_sat = int(harga_total / vol) if vol > 0 else harga_total
                     else:
                         harga_sat = harga_total
                         harga_total = int(harga_sat * vol)
-                else:
-                    has_volume_satuan = False
 
-            if has_volume_satuan:
-                first_num = re.search(r'\b\d', line)
-                if 'volume:' in lower_line:
-                    nama_raw = line[:lower_line.find('volume:')].strip()
-                elif first_num:
-                    nama_raw = line[:first_num.start()].strip()
-                else:
-                    nama_raw = line.strip()
-
-        # STATE MACHINE LOGIC
-        if not has_volume_satuan:
-            # Baris ini bukan item rincian yang valid (kemungkinan nama barang / spesifikasi yang terpotong)
-            clean_text = re.sub(r'[^\w\s/\-\.&,()\u00C0-\u024F]', '', line).strip()
-            clean_text = re.sub(r'[\-\s\.:]+$', '', clean_text).strip()
-            if len(clean_text) >= 3 and not re.match(r'^[0-9\s.,xX*()\-]+$', clean_text):
-                current_name_buffer.append(clean_text)
-        else:
-            # Baris ini adalah item rincian valid!
-            nama_raw = re.sub(r'[^\w\s/\-\.&,()\u00C0-\u024F]', '', nama_raw).strip()
-            nama_raw = re.sub(r'[\-\s\.:]+$', '', nama_raw).strip()
-            
-            final_name_parts = []
-            if current_name_buffer:
-                for buf in current_name_buffer:
-                    if re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*$', buf, re.IGNORECASE):
-                        continue
-                    final_name_parts.append(buf)
-            
-            if nama_raw and not re.match(r'^(spesifikasi|spek|merk|tipe|type|ukuran|warna)\s*[:\-]?\s*$', nama_raw, re.IGNORECASE):
-                final_name_parts.append(nama_raw)
-                
-            if final_name_parts:
-                final_name = " ".join(final_name_parts)
-                if len(final_name_parts) > 1:
-                    main_item = final_name_parts[0]
-                    specs = ", ".join(final_name_parts[1:])
-                    final_name = f"{main_item} ({specs})"
-            else:
-                final_name = "Item Detail DPA"
-            
-            items.append(RincianItem(
-                no=item_no,
-                nama=final_name[:120],
-                volume=vol,
-                satuan=normalize_satuan(satuan),
-                harga_satuan=harga_sat,
-                harga_total=harga_total
-            ))
-            item_no += 1
-            current_name_buffer = []
+                items.append(RincianItem(
+                    no=item_no,
+                    nama=nama_raw[:100],
+                    volume=vol,
+                    satuan=normalize_satuan(satuan),
+                    harga_satuan=harga_sat,
+                    harga_total=harga_total
+                ))
+                item_no += 1
+            except Exception:
+                pass
 
     return items
+
 
 # ── AI Refinement: Merapikan & Membaca Rincian otomatis ──────────────────────
 def refine_rincian_with_ai(block_text: str, provider: str, api_key: str, is_custom_prompt: bool = False) -> List[RincianItem]:
@@ -1028,7 +1125,6 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
 
     # Save bytes for local debugging and inspection
     try:
-        os.makedirs('logs', exist_ok=True)
         ext = 'xlsx' if (filename.endswith('.xlsx') or filename.endswith('.xls')) else 'png' if (filename.endswith('.png') or filename.endswith('.jpg') or filename.endswith('.jpeg')) else 'pdf'
         with open(f'logs/debug_uploaded_dpa.{ext}', 'wb') as f:
             f.write(file_bytes)
@@ -1111,7 +1207,8 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
             # Native PDF
             rekening = run_extraction_pipeline(doc, '', use_ocr=False, ai_provider=x_ai_provider, api_key=x_ai_key)
             avg_conf = sum(r.confidence for r in rekening) / len(rekening) if rekening else 0
-            
+            doc.close()
+
             # Fallback ke OCR jika confidence rendah atau tidak ada rekening
             if not rekening or avg_conf < 60:
                 ocr_text, ocr_conf = ocr_pdf(file_bytes)
@@ -1149,7 +1246,7 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
                 pesan=f'Sukses baca DPA native dengan AI Refinement ({x_ai_provider or "none"}). {len(rekening)} rekening ditemukan.'
             )
         except Exception as e:
-            if doc is not None:
+            if doc and not doc.is_closed:
                 try: doc.close()
                 except: pass
             raise HTTPException(500, f'Gagal mengekstrak berkas DPA: {str(e)}')
