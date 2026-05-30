@@ -1747,8 +1747,13 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
         Object.values(dpaRincian).forEach(r => { totalPagu += r.pagu || 0; });
       }
 
+      // Nama paket: gunakan namaPaket (DPA) atau packName (SIRUP) atau fallback
+      const namaPaket = selectedPack
+        ? (selectedPack.namaPaket || selectedPack.packName || `Pengadaan ${Object.keys(dpaRincian).join(', ')}`)
+        : `Pengadaan ${Object.keys(dpaRincian).join(', ')}`;
+
       const submissionPayload = {
-        name: selectedPack ? selectedPack.namaPaket : `Pengadaan ${Object.keys(dpaRincian).join(', ')}`,
+        name: namaPaket || 'Paket Pengadaan',
         budget: totalPagu,
         status: 'Draft',
         description: JSON.stringify({
@@ -1769,12 +1774,15 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(submissionPayload)
       });
-      if (!res.ok) throw new Error('Gagal menyimpan ke database backend.')
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error(errBody.error || `HTTP ${res.status}`)
+      }
       
-      alert('Draft Dokumen Persiapan Pengadaan (DPP) berhasil disinkronisasi dengan Database Sentral.')
+      alert('✅ Draft DPP berhasil disimpan ke Database Sentral!')
     } catch (e) {
-      // Fallback
-      alert('Disimpan sementara ke Storage Lokal. (Pastikan backend menyala)')
+      console.error('Simpan paket error:', e)
+      alert('Gagal menyimpan ke database: ' + e.message + '\n\n(Data tetap tersimpan di localStorage browser Anda)')
     } finally {
       setIsUpdating(false)
     }
