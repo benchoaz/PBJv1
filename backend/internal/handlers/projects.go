@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -71,7 +72,8 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	project, err := h.repo.Create(&input)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to create project")
+		fmt.Printf("Create project error: %v\n", err)
+		writeError(w, http.StatusInternalServerError, "Failed to create project: "+err.Error())
 		return
 	}
 
