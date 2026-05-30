@@ -459,7 +459,7 @@ export default function ProcurementPreparation() {
     setSurveyProgressPercent(0);
     setSurveyProgress('Menghubungkan ke sistem e-Katalog LKPP...');
 
-    const category = getPacketCategory(selectedPack.packName);
+    const category = getPacketCategory(selectedPack?.packName || '');
     const items = getPackageItems(selectedPack);
 
     const requestItems = items.map((item, idx) => {
@@ -1905,7 +1905,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                               {p.method}
                             </span>
                           </div>
-                          <p className="text-xs font-semibold text-slate-800 leading-snug">{p.packName}</p>
+                          <p className="text-xs font-semibold text-slate-800 leading-snug">{p?.packName}</p>
                           <div className="text-[10px] text-slate-400">
                             {p.sumberDana} · {p.jadwalPemilihan}
                           </div>
@@ -2031,7 +2031,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                 </span>
                 <span className="font-mono text-[10px] bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded">#{selectedPack.noSirup}</span>
               </div>
-              <h4 className="text-sm font-semibold text-slate-900 leading-relaxed">{selectedPack.packName}</h4>
+              <h4 className="text-sm font-semibold text-slate-900 leading-relaxed">{selectedPack?.packName}</h4>
               <div className="text-xs text-slate-400">
                 Pagu: <span className="font-bold text-slate-700">Rp&nbsp;{selectedPack.pagu?.toLocaleString()}</span> · {selectedPack.satker}
               </div>
@@ -2229,7 +2229,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                         if (rincianItems.length === 0) {
                           rincianItems = [{
                             no: 1,
-                            nama: selectedPack.packName || 'Rincian Belanja DPA',
+                            nama: selectedPack?.packName || 'Rincian Belanja DPA',
                             volume: 1,
                             satuan: 'Paket',
                             harga_satuan: selectedPack.pagu,
@@ -2254,7 +2254,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                     // Fallback manual agar user tidak stuck
                     const fallbackAcc = [{
                       account: '5.1.02.01.001.00024',
-                      name: selectedPack.packName,
+                      name: selectedPack?.packName,
                       pagu: selectedPack.pagu,
                       confidence: 100,
                       ocr_engine: 'manual',
@@ -2284,7 +2284,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                     setDpaName('Rincian_Uraian_Manual.pdf')
                     const manualAcc = [{
                       account: '5.1.02.01.001.00024',
-                      name: selectedPack.packName,
+                      name: selectedPack?.packName,
                       pagu: selectedPack.pagu,
                       confidence: 100,
                       ocr_engine: 'manual',
@@ -2295,7 +2295,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                     setDpaRincian({ '5.1.02.01.001.00024': [] })
                     setRincianModal({
                       kodeRekening: '5.1.02.01.001.00024',
-                      uraian: selectedPack.packName,
+                      uraian: selectedPack?.packName,
                       pagu: selectedPack.pagu,
                       items: [
                         { no: 1, nama: '', volume: 1, satuan: 'Buah', harga_satuan: 0, harga_total: 0 }
@@ -2997,7 +2997,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                             </div>
                             <div className="font-semibold text-slate-800">
                               <span className="font-mono text-indigo-700 font-extrabold bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded text-[10px] mr-1.5">#{linked.noSirup}</span>
-                              {linked.packName}
+                              {linked?.packName}
                             </div>
                             <div className="text-slate-500 font-medium">
                               Pagu SIRUP: <strong className="text-emerald-700">Rp&nbsp;{linked.pagu?.toLocaleString('id-ID')}</strong>
@@ -3120,9 +3120,9 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                         <td className="px-4 py-4 font-mono text-indigo-600 font-bold hover:underline cursor-pointer" onClick={() => setDetailModalPack(pack)}>
                           <span className="inline-block mr-1 text-[10px]">🔗</span>{pack.noSirup}
                         </td>
-                        <td className="px-4 py-4 text-slate-700 max-w-xs font-medium" title={pack.packName}>
+                        <td className="px-4 py-4 text-slate-700 max-w-xs font-medium" title={pack?.packName}>
                           <div className="flex flex-col gap-1.5">
-                            <div className="truncate">{pack.packName}</div>
+                            <div className="truncate">{pack?.packName}</div>
                             {isPackageMatchedWithDpa(pack) && (
                               <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-800 text-[9px] font-extrabold w-fit animate-pulse flex items-center gap-1">
                                 <span>✨</span> Cocok dengan Rincian DPA Anda
@@ -3163,7 +3163,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
             {selectedPack && (
               <div className="mb-6 bg-slate-50 border border-slate-200 rounded-xl p-5 text-sm space-y-2">
                 <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Paket Terpilih</div>
-                <div className="text-slate-900 font-semibold">{selectedPack.packName}</div>
+                <div className="text-slate-900 font-semibold">{selectedPack?.packName}</div>
                 <div className="grid grid-cols-2 gap-3 mt-2 text-xs text-slate-500">
                   <div>Instansi: <span className="text-slate-700 font-medium">{selectedPack.klpd} ({selectedPack.satker})</span></div>
                   <div>Kode MAK: <span className="text-slate-700 font-mono font-medium">{selectedPack.mak}</span></div>
@@ -4133,22 +4133,22 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
                   <div className="mb-6 p-4 border rounded-xl bg-blue-50 border-blue-200">
                     <div className="font-bold text-blue-900 text-sm mb-1 flex items-center gap-2">
                       <span className="text-lg">📋</span> Template DPP: {
-                        getPacketCategory(selectedPack.packName) === 'Mamin-Prasmanan' ? 'Mamin — Prasmanan/Katering' :
-                        getPacketCategory(selectedPack.packName) === 'Mamin-Bungkus' ? 'Mamin — Nasi Kotak / Bungkus' :
-                        getPacketCategory(selectedPack.packName) === 'Mamin-Snack' ? 'Mamin — Snack' :
-                        getPacketCategory(selectedPack.packName) === 'Modal' ? 'Belanja Modal' :
-                        getPacketCategory(selectedPack.packName) === 'Konsolidasi' ? 'Konsolidasi' :
-                        getPacketCategory(selectedPack.packName) === 'Jasa' ? 'Jasa' : 'ATK / Standar'
+                        getPacketCategory(selectedPack?.packName || '') === 'Mamin-Prasmanan' ? 'Mamin — Prasmanan/Katering' :
+                        getPacketCategory(selectedPack?.packName || '') === 'Mamin-Bungkus' ? 'Mamin — Nasi Kotak / Bungkus' :
+                        getPacketCategory(selectedPack?.packName || '') === 'Mamin-Snack' ? 'Mamin — Snack' :
+                        getPacketCategory(selectedPack?.packName || '') === 'Modal' ? 'Belanja Modal' :
+                        getPacketCategory(selectedPack?.packName || '') === 'Konsolidasi' ? 'Konsolidasi' :
+                        getPacketCategory(selectedPack?.packName || '') === 'Jasa' ? 'Jasa' : 'ATK / Standar'
                       }
                     </div>
                     <div className="text-xs text-blue-800 leading-relaxed">
-                      {getPacketCategory(selectedPack.packName) === 'Mamin-Prasmanan' && "Pasal kunci: I.e (Peralatan saji & Personil Layanan), VII (Wajib SLHS). Status: Jasa Katering."}
-                      {getPacketCategory(selectedPack.packName) === 'Mamin-Bungkus' && "Pasal kunci: I.e (Higienis, kemasan individual, 1 jam sebelum), VII (Wajib SLHS)."}
-                      {getPacketCategory(selectedPack.packName) === 'Mamin-Snack' && "Pasal kunci: I.e (Kemasan tertutup, masa kadaluarsa), VII (Wajib SLHS)."}
-                      {getPacketCategory(selectedPack.packName) === 'Modal' && "Pasal kunci: I.b (Merek & Service Center), VII (Surat Dukungan Pabrikan)."}
-                      {getPacketCategory(selectedPack.packName) === 'Konsolidasi' && "Pasal kunci: VI (Direct Purchasing ke Penyedia Konsolidasi). Status: Bebas HPS."}
-                      {getPacketCategory(selectedPack.packName) === 'Jasa' && "Pasal kunci: standar untuk Jasa lainnya."}
-                      {getPacketCategory(selectedPack.packName) === 'ATK' && "Pasal kunci: standar pengadaan ATK."}
+                      {getPacketCategory(selectedPack?.packName || '') === 'Mamin-Prasmanan' && "Pasal kunci: I.e (Peralatan saji & Personil Layanan), VII (Wajib SLHS). Status: Jasa Katering."}
+                      {getPacketCategory(selectedPack?.packName || '') === 'Mamin-Bungkus' && "Pasal kunci: I.e (Higienis, kemasan individual, 1 jam sebelum), VII (Wajib SLHS)."}
+                      {getPacketCategory(selectedPack?.packName || '') === 'Mamin-Snack' && "Pasal kunci: I.e (Kemasan tertutup, masa kadaluarsa), VII (Wajib SLHS)."}
+                      {getPacketCategory(selectedPack?.packName || '') === 'Modal' && "Pasal kunci: I.b (Merek & Service Center), VII (Surat Dukungan Pabrikan)."}
+                      {getPacketCategory(selectedPack?.packName || '') === 'Konsolidasi' && "Pasal kunci: VI (Direct Purchasing ke Penyedia Konsolidasi). Status: Bebas HPS."}
+                      {getPacketCategory(selectedPack?.packName || '') === 'Jasa' && "Pasal kunci: standar untuk Jasa lainnya."}
+                      {getPacketCategory(selectedPack?.packName || '') === 'ATK' && "Pasal kunci: standar pengadaan ATK."}
                     </div>
                   </div>
 
@@ -4466,7 +4466,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
  PENETAPAN HARGA PERKIRAAN SENDIRI (HPS)
  </div>
  <div className="text-center font-bold uppercase text-slate-800">
- PEKERJAAN: "{selectedPack.packName}"
+ PEKERJAAN: "{selectedPack?.packName}"
  </div>
 
  <div className="pt-4 space-y-3">
@@ -4741,9 +4741,9 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
 
  <div className="font-bold mt-2">b. Justifikasi Teknis Dalam Penggunaan Merek</div>
  <p className="text-justify">
- {dppSpecs.merek || (getPacketCategory(selectedPack.packName) === 'Modal'
+ {dppSpecs.merek || (getPacketCategory(selectedPack?.packName || '') === 'Modal'
  ? 'Mengingat spesifikasi yang dibutuhkan berteknologi tinggi dan memerlukan jaminan purna jual, maka ditetapkan standar merek pabrikan yang memiliki Service Center resmi di sekitar lokasi dinas.'
- : getPacketCategory(selectedPack.packName) === 'Konsolidasi'
+ : getPacketCategory(selectedPack?.packName || '') === 'Konsolidasi'
  ? 'Pengadaan merujuk pada penetapan merek dan spesifikasi hasil konsolidasi terpusat Katalog Sektoral sesuai Keputusan UKPBJ.'
  : 'Tidak mensyaratkan merek tertentu dan mengutamakan persaingan sehat sesuai spesifikasi teknis yang dibutuhkan.')}
  </p>
@@ -4758,7 +4758,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
  <ul className="list-disc pl-4 space-y-1">
  {dppSpecs.layanan ? (
    dppSpecs.layanan.split('\n').map((line, i) => line.trim() ? <li key={i}>{line}</li> : null)
- ) : (getPacketCategory(selectedPack.packName) === 'Mamin-Prasmanan' ? (
+ ) : (getPacketCategory(selectedPack?.packName || '') === 'Mamin-Prasmanan' ? (
  <>
  <li>Menyediakan peralatan saji/prasmanan, personil pelayanan (pramusaji), dan menjaga kebersihan area.</li>
  <li>Makanan dalam kondisi higienis dan siap saji selambat-lambatnya 1 Jam sebelum jadwal pelaksanaan kegiatan.</li>
@@ -4769,10 +4769,10 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
  <li>Barang diantarkan langsung ke alamat tujuan akhir.</li>
  </>
  ))}
- {(getPacketCategory(selectedPack.packName) === 'Mamin-Bungkus' || getPacketCategory(selectedPack.packName) === 'Mamin-Snack') && (
+ {(getPacketCategory(selectedPack?.packName || '') === 'Mamin-Bungkus' || getPacketCategory(selectedPack?.packName || '') === 'Mamin-Snack') && (
  <li>Kondisi makanan/minuman higienis, bersih, terbungkus rapi/kemasan tertutup, dan dikirimkan 1 Jam sebelum jadwal pelaksanaan kegiatan.</li>
  )}
- {getPacketCategory(selectedPack.packName) === 'Modal' && <li>Dilengkapi jaminan garansi resmi distributor/pabrikan minimal 1 tahun.</li>}
+ {getPacketCategory(selectedPack?.packName || '') === 'Modal' && <li>Dilengkapi jaminan garansi resmi distributor/pabrikan minimal 1 tahun.</li>}
  <li>Penyedia wajib mengganti barang yang rusak/tidak sesuai spesifikasi selambat-lambatnya 1x24 jam.</li>
  </ul>
  </div>
@@ -4969,7 +4969,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
 
  <div className="font-bold uppercase mt-4">VI. Rencana Metode Pemilihan Penyedia</div>
  <p className="text-justify">
- {getPacketCategory(selectedPack.packName) === 'Konsolidasi'
+ {getPacketCategory(selectedPack?.packName || '') === 'Konsolidasi'
  ? 'Pengadaan dilakukan secara langsung (Direct Purchasing) kepada Penyedia Konsolidasi Sektoral yang telah ditetapkan UKPBJ.'
  : 'E-Purchasing dengan metode Negosiasi Harga terhadap harga dan/atau layanan pendukung sesuai ketentuan Katalog Elektronik.'}
  </p>
@@ -4979,8 +4979,8 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
  <ul className="list-disc pl-8 space-y-1 ">
  <li>Memiliki identitas / NIB dan izin usaha sesuai KBLI yang relevan.</li>
  <li>Memiliki status valid wajib pajak / NPWP.</li>
- {getPacketCategory(selectedPack.packName) === 'Modal' && <li>Memiliki Surat Dukungan Pabrikan atau Distributor Resmi.</li>}
- {getPacketCategory(selectedPack.packName).startsWith('Mamin') && <li>Memiliki Sertifikat Laik Higiene Sanitasi (SLHS) dari Dinas Kesehatan setempat.</li>}
+ {getPacketCategory(selectedPack?.packName || '') === 'Modal' && <li>Memiliki Surat Dukungan Pabrikan atau Distributor Resmi.</li>}
+ {getPacketCategory(selectedPack?.packName || '').startsWith('Mamin') && <li>Memiliki Sertifikat Laik Higiene Sanitasi (SLHS) dari Dinas Kesehatan setempat.</li>}
  <li>Memiliki alamat usaha yang jelas dan kapasitas manajerial yang memadai.</li>
  </ul>
 
@@ -5100,7 +5100,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
  {/* Row 2 */}
  <div className="grid grid-cols-3 border-b border-slate-200">
  <div className="bg-slate-50 px-4 py-2.5 font-semibold border-r border-slate-200">Nama Paket</div>
- <div className="col-span-2 px-4 py-2.5 font-bold leading-relaxed text-slate-800">{detailModalPack.packName}</div>
+ <div className="col-span-2 px-4 py-2.5 font-bold leading-relaxed text-slate-800">{detailModalPack?.packName}</div>
  </div>
 
  {/* Row 3 */}
@@ -5337,7 +5337,7 @@ function SirupInputRow({ acc, onLink, sirupPackages = [], onFetchSirup }) {
  
  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
  <div className="flex-1 space-y-1">
- <div className="text-xs font-bold text-slate-800 leading-relaxed">{autoMatch.packName}</div>
+ <div className="text-xs font-bold text-slate-800 leading-relaxed">{autoMatch?.packName}</div>
  <div className=" text-slate-500 flex items-center gap-2 flex-wrap">
  <span className="font-mono text-indigo-700 font-extrabold bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded ">
  #{autoMatch.noSirup}
@@ -5437,7 +5437,7 @@ function SirupInputRow({ acc, onLink, sirupPackages = [], onFetchSirup }) {
  #{p.noSirup}
  </span>
  <span className="text-slate-700 font-semibold group-hover:text-indigo-950 transition-colors leading-relaxed">
- {p.packName}
+ {p?.packName}
  </span>
  <span className="block text-slate-400 mt-1 font-medium">
  Pagu: <strong className="text-emerald-700">Rp&nbsp;{p.pagu?.toLocaleString('id-ID')}</strong>
