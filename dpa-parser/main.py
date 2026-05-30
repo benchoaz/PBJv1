@@ -1207,7 +1207,6 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
             # Native PDF
             rekening = run_extraction_pipeline(doc, '', use_ocr=False, ai_provider=x_ai_provider, api_key=x_ai_key)
             avg_conf = sum(r.confidence for r in rekening) / len(rekening) if rekening else 0
-            doc.close()
 
             # Fallback ke OCR jika confidence rendah atau tidak ada rekening
             if not rekening or avg_conf < 60:
@@ -1246,7 +1245,7 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
                 pesan=f'Sukses baca DPA native dengan AI Refinement ({x_ai_provider or "none"}). {len(rekening)} rekening ditemukan.'
             )
         except Exception as e:
-            if doc and not doc.is_closed:
+            if doc is not None and not getattr(doc, 'is_closed', False):
                 try: doc.close()
                 except: pass
             raise HTTPException(500, f'Gagal mengekstrak berkas DPA: {str(e)}')
