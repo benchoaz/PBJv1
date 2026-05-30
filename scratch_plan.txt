@@ -1,0 +1,14 @@
+I need to synchronize TemplateSuratManager.jsx and ProcurementPreparation.jsx so that the dynamic templates are used correctly.
+
+Problems in ProcurementPreparation.jsx:
+1. `print-container` is hardcoded to A4 (210x297) and p-12 (padding). It ignores `docSettings.paperSize`, `docSettings.margin*`.
+2. Font family, font size, and line height are not applied to the `print-container`.
+3. Kop Surat rendering is duplicated but broken/incomplete (missing logoType 'garuda', missing `formatAlamatKop`).
+4. Template variables are partially implemented. `ProcurementPreparation.jsx` only replaces a subset of variables compared to what `TemplateSuratManager` shows in preview, and it does so statically.
+5. The `formatAlamatKop` function handles links formatting but is missing in `ProcurementPreparation`.
+
+Fixes:
+1. Update `ProcurementPreparation.jsx` to parse `docSettings` at the top level of the component and apply the styles (width, minHeight, padding, fontFamily, fontSize, lineHeight) to the `print-container` div exactly like in `TemplateSuratManager.jsx`.
+2. Copy the `LogoGarudaPlaceholder` and `formatAlamatKop` functions from `TemplateSuratManager.jsx` to `ProcurementPreparation.jsx`.
+3. Update the `Kop Surat` block in `ProcurementPreparation.jsx` to perfectly match `TemplateSuratManager.jsx` (including the 4.5px solid black border bottom instead of the two thin lines, the exact font sizes, and `logoType` handling).
+4. For variable replacement in `ProcurementPreparation.jsx`, expand the `replacements` map to cover all dynamic variables shown in `TemplateSuratManager.jsx`, filling them with the real `selectedPack` data.

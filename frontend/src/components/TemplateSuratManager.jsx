@@ -39,12 +39,7 @@ Sumber Dana    : {{sumber_dana}}
 
 Berkenaan dengan hal tersebut, mohon bantuan Saudara untuk dapat memproses pengadaan dimaksud sesuai dengan ketentuan perundang-undangan yang berlaku.
 
-Demikian disampaikan, atas perhatian dan kerjasamanya diucapkan terima kasih.
-
-Pejabat Pembuat Komitmen (PPK),
-
-{{nama_ppk}}
-NIP. {{nip_ppk}}`,
+Demikian disampaikan, atas perhatian dan kerjasamanya diucapkan terima kasih.`,
     isDefault: true
   },
   {
@@ -172,10 +167,17 @@ Penyedia,
     category: 'Tahap Persiapan',
     name: 'Dokumen Persiapan Pengadaan (ATK / Barang Umum)',
     content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
-Nomor: {{nomor_dpp}}
-Tanggal: {{tanggal_dpp}}
+Nomor : {{nomor_dpp}}
 
-Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah beserta perubahannya, Pejabat Pembuat Komitmen (PPK) telah menyusun Dokumen Persiapan Pengadaan (DPP) untuk paket pekerjaan berikut:
+Yang bertanda tangan di bawah ini:
+Nama   : {{nama_ppk}}
+Selaku : Pejabat Pembuat Komitmen (PPK) pada {{nama_satker}}
+
+Pada hari ini, tanggal {{tanggal_dpp}}, menetapkan Dokumen Persiapan Pengadaan (DPP) sebagai berikut:
+1. Nama Paket : {{nama_pekerjaan}}
+2. Kode RUP   : {{kode_rup}}
+
+Spesifikasi Teknis, Pagu Anggaran, dan Rancangan Kontrak sebagai berikut:
 
 Perangkat Daerah       : {{nama_satker}}
 Program                : {{program}}
@@ -210,10 +212,17 @@ NIP. {{nip_ppk}}`,
     category: 'Tahap Persiapan',
     name: 'Dokumen Persiapan Pengadaan (Makanan dan Minuman)',
     content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
-Nomor: {{nomor_dpp}}
-Tanggal: {{tanggal_dpp}}
+Nomor : {{nomor_dpp}}
 
-Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah beserta perubahannya, Pejabat Pembuat Komitmen (PPK) telah menyusun Dokumen Persiapan Pengadaan (DPP) untuk paket pekerjaan berikut:
+Yang bertanda tangan di bawah ini:
+Nama   : {{nama_ppk}}
+Selaku : Pejabat Pembuat Komitmen (PPK) pada {{nama_satker}}
+
+Pada hari ini, tanggal {{tanggal_dpp}}, menetapkan Dokumen Persiapan Pengadaan (DPP) sebagai berikut:
+1. Nama Paket : {{nama_pekerjaan}}
+2. Kode RUP   : {{kode_rup}}
+
+Spesifikasi Teknis, Pagu Anggaran, dan Rancangan Kontrak sebagai berikut:
 
 Perangkat Daerah       : {{nama_satker}}
 Program                : {{program}}
@@ -248,10 +257,17 @@ NIP. {{nip_ppk}}`,
     category: 'Tahap Persiapan',
     name: 'Dokumen Persiapan Pengadaan (Peralatan Modal / Teknologi)',
     content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
-Nomor: {{nomor_dpp}}
-Tanggal: {{tanggal_dpp}}
+Nomor : {{nomor_dpp}}
 
-Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah beserta perubahannya, Pejabat Pembuat Komitmen (PPK) telah menyusun Dokumen Persiapan Pengadaan (DPP) untuk paket pekerjaan berikut:
+Yang bertanda tangan di bawah ini:
+Nama   : {{nama_ppk}}
+Selaku : Pejabat Pembuat Komitmen (PPK) pada {{nama_satker}}
+
+Pada hari ini, tanggal {{tanggal_dpp}}, menetapkan Dokumen Persiapan Pengadaan (DPP) sebagai berikut:
+1. Nama Paket : {{nama_pekerjaan}}
+2. Kode RUP   : {{kode_rup}}
+
+Spesifikasi Teknis, Pagu Anggaran, dan Rancangan Kontrak sebagai berikut:
 
 Perangkat Daerah       : {{nama_satker}}
 Program                : {{program}}
@@ -286,10 +302,17 @@ NIP. {{nip_ppk}}`,
     category: 'Tahap Persiapan',
     name: 'Dokumen Persiapan Pengadaan (Jasa Lainnya / Konstruksi)',
     content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
-Nomor: {{nomor_dpp}}
-Tanggal: {{tanggal_dpp}}
+Nomor : {{nomor_dpp}}
 
-Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah beserta perubahannya, Pejabat Pembuat Komitmen (PPK) telah menyusun Dokumen Persiapan Pengadaan (DPP) untuk paket pekerjaan berikut:
+Yang bertanda tangan di bawah ini:
+Nama   : {{nama_ppk}}
+Selaku : Pejabat Pembuat Komitmen (PPK) pada {{nama_satker}}
+
+Pada hari ini, tanggal {{tanggal_dpp}}, menetapkan Dokumen Persiapan Pengadaan (DPP) sebagai berikut:
+1. Nama Paket : {{nama_pekerjaan}}
+2. Kode RUP   : {{kode_rup}}
+
+Spesifikasi Teknis, Pagu Anggaran, dan Rancangan Kontrak sebagai berikut:
 
 Perangkat Daerah       : {{nama_satker}}
 Program                : {{program}}
@@ -324,10 +347,17 @@ NIP. {{nip_ppk}}`,
     category: 'Tahap Persiapan',
     name: 'Dokumen Persiapan Pengadaan (Konsolidasi Sektoral)',
     content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
-Nomor: {{nomor_dpp}}
-Tanggal: {{tanggal_dpp}}
+Nomor : {{nomor_dpp}}
 
-Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah beserta perubahannya, Pejabat Pembuat Komitmen (PPK) telah menyusun Dokumen Persiapan Pengadaan (DPP) untuk paket pekerjaan berikut:
+Yang bertanda tangan di bawah ini:
+Nama   : {{nama_ppk}}
+Selaku : Pejabat Pembuat Komitmen (PPK) pada {{nama_satker}}
+
+Pada hari ini, tanggal {{tanggal_dpp}}, menetapkan Dokumen Persiapan Pengadaan (DPP) sebagai berikut:
+1. Nama Paket : {{nama_pekerjaan}}
+2. Kode RUP   : {{kode_rup}}
+
+Spesifikasi Teknis, Pagu Anggaran, dan Rancangan Kontrak sebagai berikut:
 
 Perangkat Daerah       : {{nama_satker}}
 Program                : {{program}}

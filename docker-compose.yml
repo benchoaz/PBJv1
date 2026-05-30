@@ -23,6 +23,7 @@ services:
     restart: unless-stopped
     volumes:
       - paddlex-cache:/root/.paddlex
+      - ./dpa-parser/main.py:/app/main.py
 
   api:
     image: alpine:latest

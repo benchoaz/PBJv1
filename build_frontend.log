@@ -1,0 +1,74 @@
+#0 building with "default" instance using docker-container driver
+
+#1 [frontend internal] load build definition from Dockerfile
+#1 transferring dockerfile: 341B 0.1s done
+#1 DONE 0.1s
+
+#2 [frontend internal] load metadata for docker.io/library/node:20-alpine
+#2 DONE 2.8s
+
+#3 [frontend internal] load .dockerignore
+#3 transferring context: 2B 0.1s done
+#3 DONE 0.1s
+
+#4 [frontend 1/5] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+#4 resolve docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 0.0s done
+#4 DONE 0.0s
+
+#5 [frontend 2/5] WORKDIR /app
+#5 CACHED
+
+#6 [frontend internal] load build context
+#6 transferring context: 21.37MB 4.9s
+#6 transferring context: 27.48MB 10.0s
+#6 transferring context: 39.88MB 15.0s
+#6 transferring context: 43.64MB 20.1s
+#6 transferring context: 50.03MB 25.2s
+#6 transferring context: 54.92MB 30.2s
+#6 transferring context: 61.17MB 35.2s
+#6 transferring context: 63.87MB 40.3s
+#6 transferring context: 65.62MB 45.3s
+#6 transferring context: 70.70MB 50.5s
+#6 transferring context: 80.65MB 55.5s
+#6 transferring context: 85.14MB 60.5s
+#6 transferring context: 85.85MB 65.6s
+#6 transferring context: 86.17MB 70.6s
+#6 transferring context: 86.41MB 76.8s
+#6 transferring context: 86.90MB 81.8s
+#6 transferring context: 87.27MB 86.8s
+#6 transferring context: 87.83MB 91.9s
+#6 transferring context: 93.93MB 97.1s
+#6 transferring context: 100.06MB 102.1s
+#6 transferring context: 101.54MB 107.3s
+#6 transferring context: 102.10MB 112.4s
+#6 transferring context: 104.90MB 117.4s
+#6 transferring context: 106.86MB 122.5s
+#6 transferring context: 110.12MB 127.5s
+#6 transferring context: 118.12MB 132.6s
+#6 transferring context: 119.16MB 137.7s
+#6 transferring context: 119.98MB 142.7s
+#6 transferring context: 120.47MB 147.8s
+#6 transferring context: 121.59MB 152.8s
+#6 transferring context: 122.58MB 157.9s
+#6 transferring context: 123.84MB 162.9s
+#6 transferring context: 131.31MB 182.9s
+#6 transferring context: 141.73MB 188.0s
+#6 transferring context: 145.21MB 193.0s
+#6 transferring context: 150.49MB 198.1s
+#6 transferring context: 153.34MB 203.1s
+#6 transferring context: 157.01MB 208.2s
+#6 transferring context: 159.37MB 213.2s
+#6 transferring context: 160.63MB 218.2s
+#6 transferring context: 167.76MB 223.3s
+#6 transferring context: 172.20MB 228.3s
+#6 transferring context: 173.89MB 233.5s
+#6 transferring context: 179.29MB 238.6s
+#6 transferring context: 184.22MB 243.6s
+#6 transferring context: 186.63MB 248.7s
+#6 transferring context: 188.21MB 253.7s
+#6 transferring context: 188.35MB 254.1s done
+#6 ERROR: invalid file request node_modules/.bin/acorn
+------
+ > [frontend internal] load build context:
+------
+failed to solve: invalid file request node_modules/.bin/acorn
