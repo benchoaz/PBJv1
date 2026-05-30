@@ -1008,7 +1008,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
       const accWords = acc.name.toLowerCase().split(/[\s/.,()-]+/)
       const keywords = accWords.filter(w => w.length > 2 && !stopWords.includes(w))
 
-      const packNameLower = pack.packName.toLowerCase()
+      const packNameLower = (pack.packName || '').toLowerCase()
       const hasKeywordMatch = keywords.some(kw => packNameLower.includes(kw))
 
       // If we have keyword overlap and the package pagu is valid, it's a match!
@@ -1039,7 +1039,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
       const accWords = acc.name.toLowerCase().split(/[\s/.,()-]+/)
       const keywords = accWords.filter(w => w.length > 2 && !stopWords.includes(w))
 
-      const packNameLower = pack.packName.toLowerCase()
+      const packNameLower = (pack.packName || '').toLowerCase()
       const hasKeywordMatch = keywords.some(kw => packNameLower.includes(kw))
 
       if (hasKeywordMatch && pack.pagu <= acc.pagu) {
@@ -1875,7 +1875,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
             <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
               <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex justify-between items-center">
                 <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Paket RUP LKPP 2026 — {sirupPackages.filter(p => p.packName.toLowerCase().includes(sirupSearchQuery.toLowerCase()) || p.noSirup.includes(sirupSearchQuery)).length} paket
+                  Paket RUP LKPP 2026 — {sirupPackages.filter(p => (p.packName || '').toLowerCase().includes(sirupSearchQuery.toLowerCase()) || (p.noSirup || '').includes(sirupSearchQuery)).length} paket
                 </span>
                 <span className="px-2 py-0.5 text-[9px] rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold">● Live</span>
               </div>
@@ -1893,7 +1893,7 @@ Tulis ulang kalimat tersebut menjadi 1 kalimat formal. HANYA OUTPUT HASIL KALIMA
               ) : (
                 <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-100">
                   {sirupPackages
-                    .filter(p => p.packName.toLowerCase().includes(sirupSearchQuery.toLowerCase()) || p.noSirup.includes(sirupSearchQuery))
+                    .filter(p => (p.packName || '').toLowerCase().includes(sirupSearchQuery.toLowerCase()) || (p.noSirup || '').includes(sirupSearchQuery))
                     .map((p) => (
                       <div key={p.noSirup} className="px-5 py-4 hover:bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-colors">
                         <div className="space-y-1 flex-1 min-w-0">
