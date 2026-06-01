@@ -230,23 +230,63 @@ async function searchItem(page, item, index) {
     let successfulQuery = '';
     let searchFile = path.join(screenshotDir, safeId + '_search.png');
 
-    // ── STEP 1: Multi-Stage Search Loop ───────────────────────────────
-    for (let i = 0; i < attempts.length; i++) {
-      const query = attempts[i];
-      let searchUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(query);
+    let searchScenarios = [];
+    
+    // ── Vendor page scenarios ──
+    if (item.targetVendor) {
+      // Mendukung 3 format input target vendor:
+      // 1. URL penuh: https://katalog.inaproc.id/sultoni-wza2
+      // 2. Slug langsung: sultoni-wza2
+      // 3. Nama biasa: SULTONI → sultoni (mungkin salah, tapi dicoba)
+      let vendorSlug;
+      const rawVendor = item.targetVendor.trim();
+      if (rawVendor.includes('katalog.inaproc.id/')) {
+        // Format URL penuh → ekstrak path pertama
+        const match = rawVendor.match(/katalog\.inaproc\.id\/([^/?&#]+)/);
+        vendorSlug = match ? match[1].toLowerCase() : rawVendor.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+        console.log(`  ℹ️ [VENDOR] URL penuh dideteksi, slug: ${vendorSlug}`);
+      } else if (/^[a-z0-9][a-z0-9-]*[a-z0-9]$/i.test(rawVendor) && rawVendor.includes('-')) {
+        // Sudah berupa slug (mengandung tanda hubung, alfanumerik saja)
+        vendorSlug = rawVendor.toLowerCase();
+        console.log(`  ℹ️ [VENDOR] Slug langsung digunakan: ${vendorSlug}`);
+      } else {
+        // Nama biasa → generate slug sederhana
+        vendorSlug = rawVendor.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        console.log(`  ℹ️ [VENDOR] Nama biasa, slug dibuat: ${vendorSlug} (mungkin perlu URL lengkap jika gagal)`);
+      }
+      item._resolvedVendorSlug = vendorSlug; // Simpan untuk digunakan di isTargetMatch
+      attempts.forEach(q => {
+        searchScenarios.push({
+          url: `https://katalog.inaproc.id/${vendorSlug}?catalogueSearch=${encodeURIComponent(q)}`,
+          query: q,
+          type: 'vendor'
+        });
+      });
+    }
+
+    // ── Global search scenarios ──
+    attempts.forEach(q => {
+      let sUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(q);
       
-      // Tambahkan filter harga +/- toleransi dari pagu (fallbackPrice)
-      if (item.fallbackPrice && item.fallbackPrice > 0) {
+      // ── FIX: Jika ignorePriceLimit=true, JANGAN kirim filter harga ke inaproc sama sekali
+      // (sebelumnya maxPrice tetap terkirim ke URL meski toggle "Abaikan Harga" aktif,
+      //  sehingga inaproc memblokir produk di atas pagu sebelum logika scoring kita melihatnya)
+      if (item.fallbackPrice && item.fallbackPrice > 0 && !item.ignorePriceLimit) {
         const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.025;
-        const minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
+        // Hanya terapkan minPrice jika TIDAK ada target penyedia
+        // (produk vendor target bisa lebih murah dari pagu)
+        if (!item.targetVendor) {
+          const minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
+          sUrl += `&minPrice=${minPrice}`;
+        }
+        // maxPrice = pagu adalah batas ATAS yang tidak boleh dilanggar (saat mode normal)
         const maxPrice = Math.floor(item.fallbackPrice * (1 + tolerance));
-        searchUrl += `&minPrice=${minPrice}&maxPrice=${maxPrice}`;
+        sUrl += `&maxPrice=${maxPrice}`;
       }
       
       if (item.locations && item.locations.length > 0) {
         let rNames = [];
         let rCodes = [];
-        
         item.locations.forEach(loc => {
           let lLower = loc.toLowerCase();
           if (lLower.includes('kota') && lLower.includes('probolinggo')) { 
@@ -259,12 +299,46 @@ async function searchItem(page, item, index) {
             if (!rNames.includes('Kota Surabaya')) { rNames.push('Kota Surabaya'); rCodes.push('35.78'); }
           }
         });
-        
-        if (rNames.length > 0) searchUrl += '&regionNames=' + encodeURIComponent(rNames.join(','));
-        if (rCodes.length > 0) searchUrl += '&regionCode=' + encodeURIComponent(rCodes.join(','));
+        if (rNames.length > 0) sUrl += '&regionNames=' + encodeURIComponent(rNames.join(','));
+        if (rCodes.length > 0) sUrl += '&regionCode=' + encodeURIComponent(rCodes.join(','));
       }
+      searchScenarios.push({ url: sUrl, query: q, type: 'global' });
+    });
+
+    // ── BUG FIX #3: Jika ada targetVendor, tambahkan fallback global tanpa filter harga SAMA SEKALI
+    // Ini memastikan produk murah dari vendor target (misal SULTONI di harga 20rb saat pagu 32rb) tetap bisa muncul
+    if (item.targetVendor) {
+      attempts.forEach(q => {
+        let sFallbackUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(q);
+        if (item.locations && item.locations.length > 0) {
+          let rNames = [];
+          let rCodes = [];
+          item.locations.forEach(loc => {
+            let lLower = loc.toLowerCase();
+            if (lLower.includes('kota') && lLower.includes('probolinggo')) { 
+              if (!rNames.includes('Kota Probolinggo')) { rNames.push('Kota Probolinggo'); rCodes.push('35.74'); }
+            }
+            else if (lLower.includes('probolinggo')) { 
+              if (!rNames.includes('Kab. Probolinggo')) { rNames.push('Kab. Probolinggo'); rCodes.push('35.13'); }
+            }
+            else if (lLower.includes('surabaya')) { 
+              if (!rNames.includes('Kota Surabaya')) { rNames.push('Kota Surabaya'); rCodes.push('35.78'); }
+            }
+          });
+          if (rNames.length > 0) sFallbackUrl += '&regionNames=' + encodeURIComponent(rNames.join(','));
+          if (rCodes.length > 0) sFallbackUrl += '&regionCode=' + encodeURIComponent(rCodes.join(','));
+        }
+        searchScenarios.push({ url: sFallbackUrl, query: q, type: 'global-noprice' });
+      });
+    }
+
+    // ── STEP 1: Multi-Stage Search Loop ───────────────────────────────
+    for (let i = 0; i < searchScenarios.length; i++) {
+      const scenario = searchScenarios[i];
+      const query = scenario.query;
+      let searchUrl = scenario.url;
       
-      console.log(`  → [Mencari #${i + 1}] Membuka: ${searchUrl}`);
+      console.log(`  → [Mencari #${i + 1} - ${scenario.type.toUpperCase()}] Membuka: ${searchUrl}`);
       
       try {
         await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 60000 });
@@ -298,7 +372,7 @@ async function searchItem(page, item, index) {
             if (lines.length < 2) continue;
 
             let title = lines[0];
-            if (title === 'Barang' && lines.length > 1) {
+            if ((title.toLowerCase() === 'barang' || title.toLowerCase() === 'jasa') && lines.length > 1) {
               title = lines[1];
             }
 
@@ -325,13 +399,36 @@ async function searchItem(page, item, index) {
         });
 
         if (candidates && candidates.length > 0) {
+          // ── BUG FIX #4: Untuk fallback global-noprice, hanya lanjutkan jika ada target vendor di hasil
+          // (agar tidak menimpa searchData dengan produk non-vendor yang sudah baik)
+          if (scenario.type === 'global-noprice') {
+            const hasTargetVendor = candidates.some(c => 
+              item.targetVendor && c.vendor.toLowerCase().includes(item.targetVendor.toLowerCase())
+            );
+            if (!hasTargetVendor) {
+              console.log(`    ℹ️ Fallback global (tanpa harga) tidak menemukan produk dari ${item.targetVendor}, dilewati.`);
+              continue;
+            }
+            // Jika searchData sudah terisi, gabungkan — jangan ganti
+            if (searchData.length > 0) {
+              const newVendorProducts = candidates.filter(c => 
+                item.targetVendor && c.vendor.toLowerCase().includes(item.targetVendor.toLowerCase())
+              );
+              searchData = [...searchData, ...newVendorProducts.filter(nc => 
+                !searchData.some(sd => sd.productHref === nc.productHref)
+              )];
+              console.log(`    ✅ Menggabungkan ${newVendorProducts.length} produk ${item.targetVendor} dari fallback ke searchData.`);
+              break;
+            }
+          }
+          
           searchData = candidates;
           successfulQuery = query;
           // Simpan screenshot pencarian yang sukses
           await injectWatermark(page);
           await page.screenshot({ path: searchFile, fullPage: false });
           console.log(`    ✅ Berhasil menemukan ${candidates.length} produk dengan query: "${query}"`);
-          break;
+          if (scenario.type !== 'global-noprice') break; // Untuk tipe normal, berhenti di sini
         } else {
           console.log(`    ⚠️ Query "${query}" tidak menghasilkan produk.`);
         }
@@ -346,18 +443,28 @@ async function searchItem(page, item, index) {
 
     if (searchData.length > 0) {
       console.log(`  → Menghitung skor kemiripan untuk ${searchData.length} kandidat...`);
+      // Tentukan kata kunci pencocokan vendor: gunakan bagian pertama dari slug (sebelum '-')
+      // Contoh: slug 'sultoni-wza2' → kata kunci 'sultoni'
+      // Ini memastikan vendor 'SULTONI WZA2' tetap cocok jika user ketik 'SULTONI'
+      const vendorMatchKeyword = (() => {
+        if (!item.targetVendor) return null;
+        const slug = item._resolvedVendorSlug || item.targetVendor;
+        // Ambil bagian pertama sebelum tanda hubung (misal 'sultoni' dari 'sultoni-wza2')
+        const firstPart = slug.split('-')[0];
+        return firstPart.length >= 3 ? firstPart : slug;
+      })();
       searchData.forEach(cand => {
-        // [BARU] HUKUM BATAS PAGU (PRICE CEILING)
-        // Pengecualian: Jika kandidat cocok dengan target penyedia yang diarahkan (targetVendor), jangan ditolak agar bisa masuk tahap negosiasi
-        const isTargetMatch = item.targetVendor && cand.vendor.toLowerCase().includes(item.targetVendor.toLowerCase());
-        if (!isTargetMatch && item.fallbackPrice && cand.price && cand.price > item.fallbackPrice) {
+        // HUKUM BATAS PAGU (PRICE CEILING) — berlaku mutlak
+        const isTargetMatch = vendorMatchKeyword && cand.vendor.toLowerCase().includes(vendorMatchKeyword.toLowerCase());
+        
+        if (!item.ignorePriceLimit && item.fallbackPrice && cand.price && cand.price > item.fallbackPrice) {
           console.log(`    🚫 [TOLAK] Harga Rp ${cand.price} melampaui PAGU DPA (Rp ${item.fallbackPrice}): ${cand.title}`);
-          return; // Lompati kandidat ini, jangan dinilai
+          return; // Lompati kandidat ini
         }
 
         let score = getSimilarityScore(searchTarget, cand.title);
         
-        // 🛡️ PENGAWAL HUKUM (LEGAL SHIELD): Boost skor jika sesuai target penyedia
+        // 🛡️ LEGAL SHIELD: Boost skor jika sesuai target penyedia
         if (isTargetMatch) {
           score += 10.0;
           console.log(`    ⭐ [TARGET MATCH] Vendor ${cand.vendor} mendapat prioritas mutlak!`);
@@ -369,12 +476,32 @@ async function searchItem(page, item, index) {
           highestScore = score;
           bestCandidate = cand;
         } else if (Math.abs(score - highestScore) < 0.001 && bestCandidate) {
-          // TIE-BREAKER: Prioritaskan harga yang lebih murah!
-          if (cand.price && bestCandidate.price && cand.price < bestCandidate.price) {
-            console.log(`    ⚖️ [TIE-BREAKER] Memilih harga lebih murah: Rp ${cand.price} vs Rp ${bestCandidate.price}`);
+          // ── BUG FIX #5: TIE-BREAKER yang lebih cerdas
+          // Jika keduanya dari target vendor → pilih yang lebih murah (hemat anggaran)
+          // Jika hanya salah satu dari target vendor → target vendor menang tanpa syarat
+          const candIsTarget = vendorMatchKeyword && cand.vendor.toLowerCase().includes(vendorMatchKeyword.toLowerCase());
+          const bestIsTarget = vendorMatchKeyword && bestCandidate.vendor.toLowerCase().includes(vendorMatchKeyword.toLowerCase());
+          
+          if (candIsTarget && bestIsTarget) {
+            // Keduanya target vendor → pilih lebih murah
+            if (cand.price && bestCandidate.price && cand.price < bestCandidate.price) {
+              console.log(`    ⚖️ [TIE-BREAKER TARGET] Keduanya SULTONI, pilih lebih murah: Rp ${cand.price}`);
+              bestCandidate = cand;
+            }
+          } else if (candIsTarget && !bestIsTarget) {
+            // Kandidat baru dari target vendor → menang
+            console.log(`    ⚖️ [TIE-BREAKER TARGET] ${cand.vendor} adalah target vendor, menang atas ${bestCandidate.vendor}`);
             highestScore = score;
             bestCandidate = cand;
+          } else if (!candIsTarget && !bestIsTarget) {
+            // Tidak ada yang target vendor → pilih lebih murah
+            if (cand.price && bestCandidate.price && cand.price < bestCandidate.price) {
+              console.log(`    ⚖️ [TIE-BREAKER HARGA] Memilih harga lebih murah: Rp ${cand.price} vs Rp ${bestCandidate.price}`);
+              highestScore = score;
+              bestCandidate = cand;
+            }
           }
+          // (candIsTarget=false && bestIsTarget=true) → bestCandidate tetap menang, tidak perlu action
         }
       });
     }
@@ -514,9 +641,14 @@ app.post('/api/survey/run', async (req, res) => {
   const items = req.body.items || [];
   if (!items.length) return res.status(400).json({ error: 'No items provided' });
 
-  // Pasangkan wilayah pencarian ke tiap barang
+  const ignorePriceLimit = req.body.ignorePriceLimit === true;
+  const autoComparator = req.body.autoComparator === true;
+
+  // Pasangkan wilayah pencarian dan opsi ke tiap barang
   items.forEach(item => {
     if (!item.locations) item.locations = globalLocations;
+    item.ignorePriceLimit = ignorePriceLimit;
+    item.autoComparator = autoComparator;
   });
 
   // Tambahkan job ke antrean Redis

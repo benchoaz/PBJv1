@@ -15,8 +15,8 @@ export default function ProcurementPanel() {
   }, [user, navigate])
 
   const [activeTab, setActiveTab] = useState('incoming')
+  const [showDppModal, setShowDppModal] = useState(false)
 
-  // Load dynamically from localStorage or fallback
   const [submittedPack, setSubmittedPack] = useState(() => {
     const saved = localStorage.getItem('pbj_submitted_package')
     if (!saved) return null
@@ -26,6 +26,44 @@ export default function ProcurementPanel() {
       return null
     }
   })
+
+  // Sinkronisasi dengan database backend untuk melihat paket yang "Terkirim ke PP"
+  useEffect(() => {
+    fetch('/api/projects')
+      .then(res => res.json())
+      .then(data => {
+        const projects = Array.isArray(data) ? data : (data?.data || []);
+        const incomingPack = projects.find(p => p.status === 'Terkirim ke PP');
+        if (incomingPack) {
+          let parsedData = {};
+          try {
+            parsedData = JSON.parse(incomingPack.description || '{}');
+          } catch(e) {}
+          
+          const convertedPack = {
+            id: incomingPack.id,
+            packName: incomingPack.name || parsedData?.selectedPack?.packName || 'Paket Pengadaan',
+            pagu: incomingPack.budget || parsedData?.selectedPack?.pagu || 0,
+            mak: parsedData?.selectedPack?.mak || '',
+            noSirup: parsedData?.selectedPack?.noSirup || '',
+            volume: parsedData?.packageMetadata?.volume || '1 Paket',
+            spesifikasi: parsedData?.packageMetadata?.spesifikasi || '',
+            hpsValue: parsedData?.hpsValue || incomingPack.budget || '',
+            techSpecs: parsedData?.techSpecs || '',
+            dpaName: parsedData?.dpaName || 'DPA_Document.pdf',
+            senderName: parsedData?.currentUser?.name || incomingPack.created_by || 'PPK',
+            senderNip: parsedData?.currentUser?.nip || '',
+            senderDepartment: parsedData?.currentUser?.department || 'Instansi Terkait',
+            sentDate: new Date(incomingPack.updated_at || incomingPack.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+            items: parsedData?.dppSpecs || []
+          };
+          
+          setSubmittedPack(convertedPack);
+          localStorage.setItem('pbj_submitted_package', JSON.stringify(convertedPack));
+        }
+      })
+      .catch(err => console.error('Gagal mengambil data dari database:', err));
+  }, []);
  
   // State for checkboxes to select which items PP wants to process (default all checked)
   const [checkedItems, setCheckedItems] = useState(() => {
@@ -389,8 +427,7 @@ export default function ProcurementPanel() {
     } else if (packNameLower.includes('cetak') || packNameLower.includes('banner') || packNameLower.includes('spanduk')) {
       items.push({ no: 1, name: 'Cetak Banner Flexy 340gr (Outdoor)', qty: 15, unit: 'Meter Persegi', price: Math.round(pack.pagu / 15) })
     } else {
-      items.push({ no: 1, name: `${pack.packName} Tipe Utama`, qty: 1, unit: 'Paket', price: Math.round(pack.pagu * 0.60) })
-      items.push({ no: 2, name: `${pack.packName} Layanan Pendukung`, qty: 1, unit: 'Paket', price: Math.round(pack.pagu * 0.40) })
+      items.push({ no: 1, name: `${pack.packName}`, qty: 1, unit: pack.volume || 'Paket', price: pack.pagu })
     }
     
     // Adjust first item price so sum matches pack.pagu exactly
@@ -511,6 +548,45 @@ export default function ProcurementPanel() {
   const [docRealScreenshot, setDocRealScreenshot] = useState(null)
   const [docNegotiatedPrice, setDocNegotiatedPrice] = useState('')
   const [docNegotiatedOngkir, setDocNegotiatedOngkir] = useState('')
+
+  // ── BAHP Validation State (Seksi D, E, F) ──────────────────────────────────
+  const [priceChecklist, setPriceChecklist] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pbj_price_checklist') || '{}') } catch { return {} }
+  })
+  const [specEqual, setSpecEqual] = useState(() => localStorage.getItem('pbj_spec_equal') || '')
+  const [specEqualNote, setSpecEqualNote] = useState(() => localStorage.getItem('pbj_spec_equal_note') || '')
+  const [hasDiscount, setHasDiscount] = useState(() => localStorage.getItem('pbj_has_discount') === 'true')
+  const [discountPrice, setDiscountPrice] = useState(() => localStorage.getItem('pbj_discount_price') || '')
+  const [discountLink, setDiscountLink] = useState(() => localStorage.getItem('pbj_discount_link') || '')
+  const [discountNote, setDiscountNote] = useState(() => localStorage.getItem('pbj_discount_note') || '')
+  const [chatCaptures, setChatCaptures] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pbj_chat_captures') || '[]') } catch { return [] }
+  })
+  const [chatNotes, setChatNotes] = useState(() => localStorage.getItem('pbj_chat_notes') || '')
+  const [deliveryAgreement, setDeliveryAgreement] = useState(() => localStorage.getItem('pbj_delivery_agreement') || '')
+  const [warrantyAgreement, setWarrantyAgreement] = useState(() => localStorage.getItem('pbj_warranty_agreement') || '')
+  const [paymentTerms, setPaymentTerms] = useState(() => localStorage.getItem('pbj_payment_terms') || 'Lunas setelah serah terima barang')
+  const [vendorRating, setVendorRating] = useState(() => parseInt(localStorage.getItem('pbj_vendor_rating') || '0'))
+  const [vendorRatingNote, setVendorRatingNote] = useState(() => localStorage.getItem('pbj_vendor_rating_note') || '')
+  const [vendorRatingStatus, setVendorRatingStatus] = useState(() => localStorage.getItem('pbj_vendor_rating_status') || '')
+
+  const saveBAHPField = (key, value) => {
+    localStorage.setItem(key, typeof value === 'object' ? JSON.stringify(value) : String(value))
+  }
+  const handleChatUpload = (e) => {
+    const files = Array.from(e.target.files)
+    files.forEach(file => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setChatCaptures(prev => {
+          const next = [...prev, { name: file.name, data: reader.result }]
+          saveBAHPField('pbj_chat_captures', next)
+          return next
+        })
+      }
+      reader.readAsDataURL(file)
+    })
+  }
 
   const handleOpenDocModal = (type, product) => {
     setDocModalType(type)
@@ -640,6 +716,30 @@ export default function ProcurementPanel() {
                 <p className="text-xs text-slate-500 mt-1">
                   Pengirim: <span className="font-semibold text-slate-700">{submittedPack.senderName}</span> (NIP: {submittedPack.senderNip}) | Satker: <span className="font-semibold text-slate-700">{submittedPack.senderDepartment}</span>
                 </p>
+
+                {/* Ringkasan Eksekutif DPP */}
+                <div className="mt-5 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100/50 rounded-xl p-5 shadow-sm">
+                  <h4 className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    Ringkasan Eksekutif DPP
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-[10px] font-semibold text-indigo-400 mb-0.5">Nomor RUP / SIRUP</div>
+                      <div className="text-xs font-medium text-slate-700">{submittedPack.noSirup || 'Belum Terhubung SIRUP'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-semibold text-indigo-400 mb-0.5">Kode Rekening / MAK</div>
+                      <div className="text-xs font-medium text-slate-700">{submittedPack.mak || '-'}</div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <div className="text-[10px] font-semibold text-indigo-400 mb-0.5">Spesifikasi Teknis / KAK Singkat</div>
+                      <div className="text-xs font-medium text-slate-700 bg-white/60 p-2.5 rounded border border-indigo-100/30">
+                        {submittedPack.spesifikasi || 'Mencakup pengadaan barang/jasa untuk paket ini secara keseluruhan sesuai HPS.'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 
                 {/* DPA Detailed Rincian Table */}
                 <div className="mt-6 bg-slate-50/50 border border-slate-200 rounded-xl p-5 w-full">
@@ -707,7 +807,7 @@ export default function ProcurementPanel() {
                     </button>
                   )}
                   <button 
-                    onClick={() => alert(`Membuka Dokumen Persiapan Pengadaan (DPP) Lengkap.`)}
+                    onClick={() => setShowDppModal(true)}
                     className="text-[11px] text-slate-700 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-300 transition-all font-bold flex items-center gap-1.5"
                   >
                     <span>📁</span> Dokumen DPP PPK
@@ -715,23 +815,97 @@ export default function ProcurementPanel() {
                 </div>
               </div>
               
+              {showDppModal && submittedPack && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+                  <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative animate-scale-up">
+                    <div className="sticky top-0 bg-white border-b border-slate-200 p-4 flex justify-between items-center z-10 rounded-t-xl">
+                      <h3 className="font-bold text-slate-800">Pratinjau Dokumen Persiapan Pengadaan (DPP)</h3>
+                      <button onClick={() => setShowDppModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors">✕</button>
+                    </div>
+                    <div className="p-8 pb-16 bg-white font-serif text-slate-800 leading-relaxed text-[12pt]" style={{fontFamily: "'Times New Roman', Times, serif"}}>
+                      <h4 className="text-center font-bold mb-6 text-lg uppercase">Dokumen Persiapan Pengadaan (DPP)</h4>
+                      
+                      <div className="mb-4">
+                        <table className="w-full">
+                          <tbody>
+                            <tr><td className="w-48 py-1">Nama Paket Pekerjaan</td><td className="w-4 py-1">:</td><td>{submittedPack.packName}</td></tr>
+                            <tr><td className="py-1">Nilai HPS</td><td className="py-1">:</td><td>Rp {(parseFloat(submittedPack.hpsValue)||0).toLocaleString('id-ID')}</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      
+                      <h5 className="font-bold mt-6 mb-2">BAB I. SPESIFIKASI TEKNIS PEKERJAAN (KAK)</h5>
+                      
+                      <h6 className="font-bold mt-4 mb-1">A. Latar Belakang Pekerjaan</h6>
+                      <div className="text-justify whitespace-pre-wrap pl-4">{submittedPack.dppSpecs?.latarBelakang || submittedPack.techSpecs || '-'}</div>
+                      
+                      <h6 className="font-bold mt-4 mb-1">B. Maksud dan Tujuan</h6>
+                      <div className="text-justify whitespace-pre-wrap pl-4">{submittedPack.dppSpecs?.maksudTujuan || '-'}</div>
+                      
+                      <h6 className="font-bold mt-4 mb-2">C. Spesifikasi Jenis, Jumlah, dan Mutu Barang</h6>
+                      <table className="w-full border-collapse border border-slate-800 text-sm mt-2">
+                        <thead>
+                          <tr>
+                            <th className="border border-slate-800 p-2 text-center w-12">No</th>
+                            <th className="border border-slate-800 p-2 text-center">Nama Barang (Katalog)</th>
+                            <th className="border border-slate-800 p-2 text-center w-24">Jumlah</th>
+                            <th className="border border-slate-800 p-2 text-center">Spesifikasi Mutu</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.isArray(submittedPack.items) ? submittedPack.items.map((item, idx) => (
+                            <tr key={idx}>
+                              <td className="border border-slate-800 p-2 text-center">{idx + 1}</td>
+                              <td className="border border-slate-800 p-2">{item.name}</td>
+                              <td className="border border-slate-800 p-2 text-center font-bold">{item.qty} {item.unit || 'Paket'}</td>
+                              <td className="border border-slate-800 p-2 whitespace-pre-wrap">{submittedPack.dppSpecs?.itemSpecs?.[item.id] || item.spesifikasi || '-'}</td>
+                            </tr>
+                          )) : <tr><td colSpan="4" className="border border-slate-800 p-2 text-center">Data barang tidak tersedia</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex flex-col items-end gap-3 w-full border-t border-slate-100 pt-5 mt-2">
                 <div className="flex justify-between w-full md:w-80 items-center bg-slate-50 p-3 rounded-lg border border-slate-100">
                   <span className="text-xs text-slate-500 font-bold">Total HPS Diproses:</span>
                   <span className="text-lg font-black text-slate-800 font-mono">Rp {getDynamicTotalPagu().toLocaleString('id-ID')}</span>
                 </div>
-                <button 
-                  onClick={() => {
-                    if (Object.values(checkedItems).every(v => !v)) {
-                      alert('Silakan centang minimal satu barang yang ingin Anda proses terlebih dahulu!')
-                      return
-                    }
-                    setActiveTab('search')
-                  }} 
-                  className="bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 shadow-sm w-full md:w-80 text-[11px] py-2.5 px-6 rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
-                >
-                  🚀 Buka Pencarian & Komparasi Inaproc
-                </button>
+                <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                  <button 
+                    onClick={() => {
+                      if (confirm('Tolak dokumen dan kembalikan ke PPK untuk direvisi?')) {
+                        localStorage.removeItem('pbj_submitted_package');
+                        setSubmittedPack(null);
+                        // Also update status in backend if available
+                        if (submittedPack.id) {
+                          fetch(`/api/projects/${submittedPack.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: 'Draft' })
+                          }).catch(e => console.error(e));
+                        }
+                      }
+                    }} 
+                    className="bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 shadow-sm w-full md:w-auto text-[11px] py-2.5 px-6 rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
+                  >
+                    ❌ Tolak (Revisi PPK)
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (Object.values(checkedItems).every(v => !v)) {
+                        alert('Silakan centang minimal satu barang yang ingin Anda proses terlebih dahulu!')
+                        return
+                      }
+                      setActiveTab('search')
+                    }} 
+                    className="bg-indigo-600 hover:bg-indigo-700 border border-indigo-700 text-white shadow-sm w-full md:w-80 text-[11px] py-2.5 px-6 rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
+                  >
+                    ✅ Terima & Lanjutkan Pencarian
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -1324,9 +1498,44 @@ export default function ProcurementPanel() {
                        ((checkedItems[2] && savedDocs.printer.selectedProduct) || !checkedItems[2]) &&
                        (checkedItems[1] || checkedItems[2]) && (
                         <button 
-                          onClick={() => {
-                            setActiveTab('docs')
-                            alert('Berita Acara Hasil Pemilihan (BAHP) Pengadaan Langsung secara e-Purchasing berhasil dibuat otomatis berdasarkan bukti audit trail Anda.')
+                          onClick={async () => {
+                            if (!submittedPack || !submittedPack.id) {
+                              setActiveTab('docs');
+                              alert('Berita Acara Hasil Pemilihan (BAHP) Pengadaan Langsung secara e-Purchasing berhasil dibuat (Mode Simulasi Lokal).');
+                              return;
+                            }
+                            
+                            try {
+                              const vendor1 = savedDocs.laptop.selectedProduct?.vendor || '';
+                              const vendor2 = savedDocs.printer.selectedProduct?.vendor || '';
+                              const finalVendor = vendor1 || vendor2 || 'Penyedia e-Katalog';
+                              
+                              const data = {
+                                document_number: `027 / ${Math.floor(Math.random() * 100) + 10} / PP / 437.82 / 2026`,
+                                vendor_name: finalVendor,
+                                vendor_address: 'Alamat terverifikasi e-Katalog LKPP',
+                                catalog_url: savedDocs.laptop.url || savedDocs.printer.url || '',
+                                initial_price: parseFloat(savedDocs.laptop.selectedProduct?.price || 0) + parseFloat(savedDocs.printer.selectedProduct?.price || 0),
+                                negotiated_price: parseFloat(savedDocs.laptop.negotiatedPrice || 0) + parseFloat(savedDocs.printer.negotiatedPrice || 0),
+                                shipping_cost: parseFloat(savedDocs.laptop.negotiatedOngkir || 0) + parseFloat(savedDocs.printer.negotiatedOngkir || 0),
+                                screenshot_url: savedDocs.laptop.screenshot || savedDocs.printer.screenshot || '',
+                              };
+                              
+                              const res = await fetch(`/api/projects/${submittedPack.id}/bahp`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(data)
+                              });
+                              
+                              if (!res.ok) throw new Error('Gagal menyimpan BAHP ke database');
+                              
+                              setActiveTab('docs');
+                              alert('Berita Acara Hasil Pemilihan (BAHP) Pengadaan Langsung secara e-Purchasing berhasil dibuat otomatis dan disimpan ke database secara permanen!');
+                            } catch (err) {
+                              console.error(err);
+                              setActiveTab('docs');
+                              alert('Berita Acara Hasil Pemilihan (BAHP) dibuat di panel, tapi peringatan: ' + err.message);
+                            }
                           }}
                           className="w-full btn-primary text-xs py-2.5 mt-2 animate-bounce"
                         >
@@ -1763,25 +1972,323 @@ export default function ProcurementPanel() {
                   )}
                 </div>
 
-                <p className="mt-6 font-sans text-[10px] text-slate-500 italic">
+                {/* ═══════════════════════════════════════════════════════════ */}
+                {/* SEKSI D: VALIDASI KEWAJARAN HARGA OLEH PP                  */}
+                {/* ═══════════════════════════════════════════════════════════ */}
+                <div className="font-bold text-[11px] uppercase tracking-wide border-b border-slate-300 pb-1 mt-8 font-sans text-indigo-850">D. Validasi Kewajaran Harga oleh Pejabat Pengadaan (PP)</div>
+                <p className="font-sans text-[10px] text-slate-600 mb-3">Sesuai <strong>Perpres No. 12 Tahun 2021 Pasal 50</strong> dan <strong>Peraturan LKPP No. 9 Tahun 2021</strong>, PP wajib melakukan verifikasi kewajaran harga sebelum menerbitkan Surat Pesanan (SP). Proses verifikasi meliputi kesesuaian spesifikasi, kelengkapan komponen harga, serta kewajaran nilai negosiasi yang tidak melebihi HPS yang telah ditetapkan PPK:</p>
+
+                {/* Checklist Spesifikasi */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3 font-sans print:border-slate-300">
+                  <div className="text-[10px] font-bold text-slate-700 mb-2 uppercase tracking-wide">D.1 Verifikasi Kesetaraan Spesifikasi Barang</div>
+                  <div className="flex gap-6 mb-2">
+                    {['Ya, spesifikasi setara', 'Tidak, ada perbedaan spesifikasi'].map(opt => (
+                      <label key={opt} className="flex items-center gap-2 text-[11px] cursor-pointer select-none">
+                        <input type="radio" name="spec_equal" value={opt}
+                          checked={specEqual === opt}
+                          onChange={e => { setSpecEqual(e.target.value); saveBAHPField('pbj_spec_equal', e.target.value) }}
+                          className="w-3.5 h-3.5 accent-indigo-600"
+                        />
+                        <span className={specEqual === opt ? 'font-bold text-indigo-700' : 'text-slate-600'}>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {specEqual === 'Tidak, ada perbedaan spesifikasi' && (
+                    <textarea
+                      value={specEqualNote}
+                      onChange={e => { setSpecEqualNote(e.target.value); saveBAHPField('pbj_spec_equal_note', e.target.value) }}
+                      placeholder="Uraikan perbedaan spesifikasi yang ditemukan PP..."
+                      className="w-full border border-amber-300 rounded-lg px-3 py-2 text-[11px] bg-amber-50 focus:outline-none focus:ring-1 focus:ring-amber-400 mt-1 print:border-slate-400"
+                      rows={2}
+                    />
+                  )}
+                  {specEqual === 'Ya, spesifikasi setara' && specEqualNote && (
+                    <div className="text-[10px] text-slate-500 italic mt-1">Catatan PP: {specEqualNote}</div>
+                  )}
+                </div>
+
+                {/* Checklist Komponen Harga */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3 font-sans print:border-slate-300">
+                  <div className="text-[10px] font-bold text-slate-700 mb-2 uppercase tracking-wide">D.2 Verifikasi Kelengkapan Komponen Harga (Wajib Dicentang)</div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    {[
+                      { key: 'ppn', label: '✅ Harga sudah termasuk PPN 12% (UU HPP No.7/2021 berlaku 2025)' },
+                      { key: 'ongkir', label: '🚚 Harga sudah termasuk Ongkos Kirim ke lokasi tujuan' },
+                      { key: 'instalasi', label: '🔧 Biaya Instalasi / Set-up sudah termasuk atau dikecualikan (jika tidak relevan)' },
+                      { key: 'garansi', label: '🛡️ Masa dan Jenis Garansi telah dikonfirmasi sesuai Spesifikasi KAK/DPP' },
+                      { key: 'stock', label: '📦 Ketersediaan Stok (Ready) telah dikonfirmasi langsung dari Penyedia' },
+                      { key: 'e_purchasing', label: '🔗 Harga tercantum resmi di e-Katalog LKPP (Inaproc), bukan harga di luar sistem' },
+                    ].map(item => (
+                      <label key={item.key} className="flex items-start gap-2 text-[11px] cursor-pointer select-none bg-white border border-slate-200 rounded-lg p-2.5 hover:border-indigo-300 transition-all print:border-slate-300">
+                        <input type="checkbox"
+                          checked={!!priceChecklist[item.key]}
+                          onChange={e => {
+                            const next = { ...priceChecklist, [item.key]: e.target.checked }
+                            setPriceChecklist(next)
+                            saveBAHPField('pbj_price_checklist', next)
+                          }}
+                          className="w-3.5 h-3.5 mt-0.5 accent-emerald-600 flex-shrink-0"
+                        />
+                        <span className={priceChecklist[item.key] ? 'text-emerald-700 font-semibold' : 'text-slate-500'}>{item.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Temuan Harga Lebih Murah / Diskon */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3 font-sans print:border-slate-300">
+                  <div className="text-[10px] font-bold text-slate-700 mb-2 uppercase tracking-wide">D.3 Temuan Negosiasi Harga oleh PP</div>
+                  <p className="text-[10px] text-slate-500 mb-2 italic">Sesuai <strong>Perpres 12/2021 Pasal 50 Ayat (4)</strong>: PP berwenang melakukan <u>negosiasi harga langsung</u> dengan Penyedia agar diperoleh harga yang lebih murah dari harga yang tercantum di e-Katalog, tanpa perlu mengembalikan dokumen ke PPK selama nilai hasil negosiasi tidak melebihi HPS yang telah ditetapkan.</p>
+                  <div className="flex items-center gap-4 mb-2">
+                    <span className="text-[11px] text-slate-600">Apakah PP melakukan negosiasi harga dengan Penyedia (mendapat harga lebih murah dari e-Katalog)?</span>
+                    {['Ya', 'Tidak'].map(opt => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="has_discount" value={opt}
+                          checked={hasDiscount === (opt === 'Ya')}
+                          onChange={() => { setHasDiscount(opt === 'Ya'); saveBAHPField('pbj_has_discount', opt === 'Ya') }}
+                          className="accent-indigo-600"
+                        />
+                        <span className={`text-[11px] font-semibold ${opt === 'Ya' ? 'text-amber-700' : 'text-slate-600'}`}>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {hasDiscount && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                      <div>
+                        <label className="block text-[10px] font-bold text-amber-800 mb-1">Harga Temuan PP (Rp)</label>
+                        <input type="number" value={discountPrice}
+                          onChange={e => { setDiscountPrice(e.target.value); saveBAHPField('pbj_discount_price', e.target.value) }}
+                          placeholder="Contoh: 8500000"
+                          className="w-full border border-amber-300 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-amber-800 mb-1">Link e-Katalog Pembanding Baru</label>
+                        <input type="url" value={discountLink}
+                          onChange={e => { setDiscountLink(e.target.value); saveBAHPField('pbj_discount_link', e.target.value) }}
+                          placeholder="https://katalog.inaproc.id/..."
+                          className="w-full border border-amber-300 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-[10px] font-bold text-amber-800 mb-1">Justifikasi / Alasan Temuan PP</label>
+                        <textarea value={discountNote}
+                          onChange={e => { setDiscountNote(e.target.value); saveBAHPField('pbj_discount_note', e.target.value) }}
+                          placeholder="Uraikan alasan mengapa harga ini lebih wajar / ada potensi penghematan..."
+                          className="w-full border border-amber-300 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                          rows={2}
+                        />
+                      </div>
+                      {discountPrice && getDynamicTotalPagu() > 0 && (
+                        <div className="md:col-span-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[11px]">
+                          <span className="font-bold text-emerald-800">💰 Estimasi Penghematan Negara: </span>
+                          <span className="font-mono font-bold text-emerald-700">
+                            Rp {Math.max(0, getDynamicTotalPagu() - parseFloat(discountPrice || 0)).toLocaleString('id-ID')}
+                          </span>
+                          <span className="text-slate-500 ml-1">(dari Pagu HPS yang diproses)</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* ═══════════════════════════════════════════════════════════ */}
+                {/* SEKSI E: DOKUMENTASI NEGOSIASI & KOMUNIKASI PIHAK KETIGA  */}
+                {/* ═══════════════════════════════════════════════════════════ */}
+                <div className="font-bold text-[11px] uppercase tracking-wide border-b border-slate-300 pb-1 mt-8 font-sans text-indigo-850">E. Dokumentasi Negosiasi & Kesepakatan Teknis</div>
+                <p className="font-sans text-[10px] text-slate-600 mb-3">Rekaman proses komunikasi dan negosiasi antara Pejabat Pengadaan dengan Penyedia/vendor melalui media komunikasi resmi. Dokumentasi ini merupakan bukti pelaksanaan kewajiban PP sebagaimana diatur dalam <strong>Peraturan LKPP No. 9 Tahun 2021 tentang Tata Cara Pengadaan Barang/Jasa melalui Penyedia</strong>:</p>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3 font-sans print:border-slate-300">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-1">Waktu Pengiriman Disepakati</label>
+                      <input type="text" value={deliveryAgreement}
+                        onChange={e => { setDeliveryAgreement(e.target.value); saveBAHPField('pbj_delivery_agreement', e.target.value) }}
+                        placeholder="Contoh: 14 hari kalender sejak SP diterbitkan"
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-1">Masa Garansi Disepakati</label>
+                      <input type="text" value={warrantyAgreement}
+                        onChange={e => { setWarrantyAgreement(e.target.value); saveBAHPField('pbj_warranty_agreement', e.target.value) }}
+                        placeholder="Contoh: 1 Tahun Garansi Resmi Pabrik"
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-1">Ketentuan Pembayaran</label>
+                      <select value={paymentTerms}
+                        onChange={e => { setPaymentTerms(e.target.value); saveBAHPField('pbj_payment_terms', e.target.value) }}
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                      >
+                        <option>Lunas setelah serah terima barang</option>
+                        <option>Termin: 50% DP, 50% setelah BAST</option>
+                        <option>Termin: 30% DP, 70% setelah BAST</option>
+                        <option>Lunas setelah cek kualitas dan BAST</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Upload Capture Chat */}
+                  <div className="border-t border-slate-200 pt-3">
+                    <div className="text-[10px] font-bold text-slate-700 mb-2">📱 Bukti Komunikasi / Chat Negosiasi (Opsional)</div>
+                    <p className="text-[10px] text-slate-500 mb-2">Unggah tangkapan layar percakapan WhatsApp/Email/SMS dengan penyedia terkait negosiasi harga, spesifikasi, atau konfirmasi stok.</p>
+                    <label className="flex items-center gap-2 cursor-pointer bg-white border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-xl p-3 transition-all group print:hidden">
+                      <span className="text-2xl">📤</span>
+                      <div>
+                        <span className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-700">Klik untuk unggah gambar bukti chat</span>
+                        <span className="text-[9px] text-slate-400 block">Format: JPG, PNG, WEBP (bisa pilih beberapa sekaligus)</span>
+                      </div>
+                      <input type="file" accept="image/*" multiple onChange={handleChatUpload} className="hidden" />
+                    </label>
+
+                    {chatCaptures.length > 0 && (
+                      <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {chatCaptures.map((cap, idx) => (
+                          <div key={idx} className="relative group/cap border border-slate-200 rounded-lg overflow-hidden bg-white">
+                            <img src={cap.data} alt={cap.name} className="w-full h-24 object-cover" />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/cap:opacity-100 flex items-center justify-center transition-opacity print:hidden">
+                              <button onClick={() => {
+                                const next = chatCaptures.filter((_, i) => i !== idx)
+                                setChatCaptures(next)
+                                saveBAHPField('pbj_chat_captures', next)
+                              }} className="text-white text-[9px] font-bold bg-rose-600/90 px-2 py-1 rounded">✕ Hapus</button>
+                            </div>
+                            <div className="text-[7px] text-slate-500 truncate px-1 py-0.5 bg-slate-50">{cap.name}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Chat captures shown in print */}
+                    {chatCaptures.length > 0 && (
+                      <div className="mt-3 hidden print:grid grid-cols-2 gap-2">
+                        {chatCaptures.map((cap, idx) => (
+                          <img key={idx} src={cap.data} alt={`Bukti Chat ${idx+1}`} className="w-full max-h-48 object-contain border border-slate-300 rounded" />
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="mt-3">
+                      <label className="block text-[10px] font-bold text-slate-600 mb-1">Catatan Hasil Negosiasi (Ringkasan)</label>
+                      <textarea value={chatNotes}
+                        onChange={e => { setChatNotes(e.target.value); saveBAHPField('pbj_chat_notes', e.target.value) }}
+                        placeholder="Contoh: Penyedia (Bapak Dedi - 0812xxx) via WA menyepakati harga Rp 8.500.000 per unit sudah termasuk ongkir dan instalasi. Garansi 1 tahun on-site dikonfirmasi..."
+                        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* ═══════════════════════════════════════════════════════════ */}
+                {/* SEKSI F: PENILAIAN KINERJA LAYANAN PENYEDIA               */}
+                {/* ═══════════════════════════════════════════════════════════ */}
+                <div className="font-bold text-[11px] uppercase tracking-wide border-b border-slate-300 pb-1 mt-8 font-sans text-indigo-850">F. Penilaian Kinerja Layanan Penyedia</div>
+                <p className="font-sans text-[10px] text-slate-600 mb-3">Penilaian diberikan oleh Pejabat Pengadaan (PP) atas responsivitas dan profesionalisme Penyedia selama proses klarifikasi dan negosiasi e-Purchasing. Hasil penilaian ini selanjutnya dilaporkan melalui <strong>SIKAP (Sistem Informasi Kinerja Penyedia) LKPP</strong> sesuai <strong>Pasal 88 Perpres 12/2021</strong> sebagai rekam jejak kinerja penyedia secara nasional:</p>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 font-sans print:border-slate-300">
+                  <div className="flex flex-col md:flex-row gap-6">
+                    {/* Rating Bintang */}
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-700 mb-2">Nilai Responsivitas Penyedia</div>
+                      <div className="flex gap-1">
+                        {[1,2,3,4,5].map(star => (
+                          <button key={star}
+                            onClick={() => { setVendorRating(star); saveBAHPField('pbj_vendor_rating', star) }}
+                            className={`text-2xl transition-all hover:scale-110 print:cursor-default ${vendorRating >= star ? 'text-amber-400' : 'text-slate-300'}`}
+                          >★</button>
+                        ))}
+                      </div>
+                      {vendorRating > 0 && (
+                        <div className="text-[10px] mt-1 font-semibold text-amber-600">
+                          {vendorRating === 5 ? 'Sangat Baik - Sangat Responsif' :
+                           vendorRating === 4 ? 'Baik - Responsif & Kooperatif' :
+                           vendorRating === 3 ? 'Cukup - Respon Normal' :
+                           vendorRating === 2 ? 'Kurang - Lambat Merespon' :
+                           'Buruk - Tidak Kooperatif'}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Status Penilaian */}
+                    <div className="flex-1">
+                      <div className="text-[10px] font-bold text-slate-700 mb-2">Status Penilaian Keseluruhan</div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { val: 'Sangat Baik', color: 'emerald' },
+                          { val: 'Baik', color: 'indigo' },
+                          { val: 'Cukup', color: 'amber' },
+                          { val: 'Kurang Baik', color: 'rose' },
+                        ].map(opt => (
+                          <button key={opt.val}
+                            onClick={() => { setVendorRatingStatus(opt.val); saveBAHPField('pbj_vendor_rating_status', opt.val) }}
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
+                              vendorRatingStatus === opt.val
+                                ? `bg-${opt.color}-100 border-${opt.color}-400 text-${opt.color}-800`
+                                : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                            }`}
+                          >{opt.val}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Catatan Evaluasi Kinerja Penyedia</label>
+                    <textarea value={vendorRatingNote}
+                      onChange={e => { setVendorRatingNote(e.target.value); saveBAHPField('pbj_vendor_rating_note', e.target.value) }}
+                      placeholder="Contoh: Penyedia merespons pertanyaan dalam waktu &lt;1 jam. Konfirmasi stok dan ketersediaan pengiriman sangat cepat. Direkomendasikan untuk pengadaan berikutnya."
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                      rows={3}
+                    />
+                  </div>
+
+                  {/* Summary badge for print */}
+                  {vendorRating > 0 && vendorRatingStatus && (
+                    <div className="mt-3 flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-3">
+                      <div className="text-2xl">{'★'.repeat(vendorRating)}{'☆'.repeat(5-vendorRating)}</div>
+                      <div>
+                        <div className="text-[11px] font-bold text-slate-800">Status: {vendorRatingStatus}</div>
+                        <div className="text-[10px] text-slate-500">{vendorRatingNote || 'Tidak ada catatan tambahan.'}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <p className="mt-8 font-sans text-[10px] text-slate-500 italic">
                   Demikian Berita Acara Hasil Pemilihan (BAHP) ini dibuat secara elektronik oleh Pejabat Pengadaan untuk menjadi dokumen pertanggungjawaban dalam audit belanja dinas e-Purchasing.
                 </p>
               </div>
 
               {/* Tanda Tangan PP */}
-              <div className="flex justify-end mt-8 pt-4 border-t border-slate-200 font-sans">
-                <div className="w-56 text-center space-y-3">
-                  <div className="text-[11px] text-slate-650">Dibuat & Disahkan Oleh:</div>
-                  <div className="text-[11px] font-bold uppercase text-slate-800">Pejabat Pengadaan (PP)</div>
-                  
-                  {/* Visual Signature Box */}
-                  <div className="border border-indigo-200 bg-indigo-50/50 rounded-xl p-3 inline-block w-full">
-                    <div className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest animate-pulse">✓ TTE Terverifikasi</div>
-                    <div className="text-[8px] text-slate-500 font-mono mt-0.5">ID: {user?.username || 'handik'} - LKPP Portal</div>
-                    <div className="text-[9px] text-slate-700 font-bold mt-1.5">{user?.name || 'Handika Wijaya, S.STP'}</div>
+              {(() => {
+                const docSettingsStr = localStorage.getItem('pbj_doc_settings');
+                const docSettings = docSettingsStr ? JSON.parse(docSettingsStr) : {};
+                return (
+                  <div className="flex justify-end mt-8 pt-4 border-t border-slate-200 font-sans">
+                    <div className="w-56 text-center space-y-3">
+                      <div className="text-[11px] text-slate-650">Dibuat & Disahkan Oleh:</div>
+                      <div className="text-[11px] font-bold uppercase text-slate-800">Pejabat Pengadaan (PP)</div>
+                      
+                      {docSettings.ttdPp ? (
+                        <div className="flex justify-center items-center my-2">
+                          <img src={docSettings.ttdPp} alt="TTD PP" style={{ maxHeight: '80px', objectFit: 'contain', mixBlendMode: 'multiply' }} />
+                        </div>
+                      ) : (
+                        <div className="border border-indigo-200 bg-indigo-50/50 rounded-xl p-3 inline-block w-full">
+                          <div className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest animate-pulse">✓ TTE Terverifikasi</div>
+                          <div className="text-[8px] text-slate-500 font-mono mt-0.5">ID: {user?.username || 'handik'} - LKPP Portal</div>
+                          <div className="text-[9px] text-slate-700 font-bold mt-1.5">{user?.name || 'Handika Wijaya, S.STP'}</div>
+                        </div>
+                      )}
+                      
+                      {docSettings.ttdPp && <div className="text-[10px] text-slate-800 font-bold mt-1.5 underline uppercase">{user?.name || 'Handika Wijaya, S.STP'}</div>}
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           </div>
         </div>

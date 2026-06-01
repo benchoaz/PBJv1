@@ -69,9 +69,24 @@ export default function Login() {
     }
   ]
 
+  const [kopLogo, setKopLogo] = useState('/img/logo-kab.png')
+
   useEffect(() => {
     if (user) {
       navigate('/')
+    }
+    
+    // Sync logo with Kop Surat settings
+    const settingsStr = localStorage.getItem('pbj_doc_settings');
+    if (settingsStr) {
+      try {
+        const settings = JSON.parse(settingsStr);
+        if (settings.customLogo) {
+          setKopLogo(settings.customLogo);
+        } else if (settings.logoType === 'garuda') {
+          setKopLogo('https://upload.wikimedia.org/wikipedia/commons/2/29/Garuda_Pancasila_Coat_of_Arms_of_Indonesia.svg');
+        }
+      } catch(e) {}
     }
   }, [user, navigate])
 
@@ -109,7 +124,7 @@ export default function Login() {
     <div 
       className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-cover bg-center overflow-y-auto font-sans relative"
       style={{ 
-        backgroundImage: "url('https://images.unsplash.com/photo-1602181539291-5de156c4293f?q=80&w=1920&auto=format&fit=crop')",
+        backgroundImage: "url('/bromo-bg2.jpg')",
         backgroundAttachment: 'fixed'
       }}
     >
@@ -161,7 +176,7 @@ export default function Login() {
         {/* Government Emblem */}
         <div className="flex justify-center mb-3">
           <img 
-            src="https://upload.wikimedia.org/wikipedia/commons/2/25/Lambang_Kabupaten_Probolinggo.png" 
+            src={kopLogo}
             alt="Logo Kabupaten Probolinggo" 
             className="h-16 w-auto object-contain drop-shadow-md"
           />

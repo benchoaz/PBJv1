@@ -64,8 +64,13 @@ func main() {
 	}
 
 	projectRepo := repository.NewProjectRepository(sqlDB)
+	bahpRepo := repository.NewBahpRepository(sqlDB)
+	if err := bahpRepo.Initialize(); err != nil {
+		log.Fatalf("Failed to initialize BAHP repository: %v", err)
+	}
 
 	projectHandler := handlers.NewProjectHandler(projectRepo)
+	bahpHandler := handlers.NewBahpHandler(bahpRepo, projectRepo)
 	authHandler := handlers.NewAuthHandler()
 	pbjHandler := handlers.NewPBJHandler(gormDB)
 	userHandler := handlers.NewUserHandler(gormDB)
@@ -96,6 +101,10 @@ func main() {
 	mux.HandleFunc("PUT /api/projects/{id}", projectHandler.Update)
 	mux.HandleFunc("DELETE /api/projects/{id}", projectHandler.Delete)
 	mux.HandleFunc("GET /api/projects/stats", projectHandler.Stats)
+	
+	// BAHP Routes
+	mux.HandleFunc("POST /api/projects/{id}/bahp", bahpHandler.Create)
+	mux.HandleFunc("GET /api/projects/{id}/bahp", bahpHandler.GetByProject)
 
 	// DPA Parser endpoints - proxy to Python PyMuPDF microservice
 	mux.HandleFunc("POST /api/dpa/parse", handlers.ParseDPA)

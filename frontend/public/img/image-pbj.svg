@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="148" height="120" viewBox="0 0 148 120">
+
+  <!-- P — merah, kiri atas -->
+  <rect x="6"  y="6"  width="50" height="50" rx="10" fill="#E53935"/>
+  <text x="31" y="31" text-anchor="middle" dominant-baseline="central"
+        font-family="'Segoe UI',system-ui,Arial,sans-serif"
+        font-weight="900" font-size="28" fill="rgba(0,0,0,0.45)">P</text>
+
+  <!-- B — biru, kanan atas -->
+  <rect x="64" y="6"  width="50" height="50" rx="10" fill="#1E88E5"/>
+  <text x="89" y="31" text-anchor="middle" dominant-baseline="central"
+        font-family="'Segoe UI',system-ui,Arial,sans-serif"
+        font-weight="900" font-size="28" fill="rgba(0,0,0,0.45)">B</text>
+
+  <!-- J — kuning, kiri bawah -->
+  <rect x="6"  y="64" width="50" height="50" rx="10" fill="#FDD835"/>
+  <text x="31" y="89" text-anchor="middle" dominant-baseline="central"
+        font-family="'Segoe UI',system-ui,Arial,sans-serif"
+        font-weight="900" font-size="28" fill="rgba(0,0,0,0.45)">J</text>
+
+  <!-- kosong — hijau, kanan bawah -->
+  <rect x="64" y="64" width="50" height="50" rx="10" fill="#2E7D32"/>
+
+  <!-- garis tipis vertikal, jarak 20px dari icon -->
+  <line x1="135" y1="18" x2="135" y2="102"
+        stroke="rgba(13,30,53,0.18)" stroke-width="1.5" stroke-linecap="round"/>
+
+</svg>

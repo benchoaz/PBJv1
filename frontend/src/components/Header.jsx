@@ -103,10 +103,8 @@ export default function Header() {
     <aside className="w-64 min-h-screen bg-white border-r border-slate-100 sticky top-0 flex flex-col justify-between py-6 px-4 shadow-[1px_0_20px_rgba(0,0,0,0.04)] shrink-0 print:hidden">
       <div className="space-y-7">
         {/* Brand Logo */}
-        <Link to="/" className="flex items-center gap-3 px-3 py-1">
-          <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-black text-sm shadow-lg shadow-indigo-500/30">
-            P
-          </span>
+        <Link to="/" className="flex items-center gap-3 px-3 py-1 mb-2">
+          <img src="/img/image-pbj.svg" alt="Logo PBJ" className="w-14 h-14 drop-shadow-md" />
           <div>
             <div className="text-[13px] font-bold text-slate-800 leading-tight tracking-tight">PBJ System</div>
             <div className="text-[9px] text-slate-400 font-medium tracking-widest uppercase">e-Procurement</div>

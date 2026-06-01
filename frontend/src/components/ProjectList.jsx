@@ -17,6 +17,7 @@ export default function ProjectList() {
   const [search, setSearch]       = useState('')
   const [filterStatus, setFilterStatus] = useState('Semua')
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [view, setView]           = useState('table') // 'table' | 'card'
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -42,12 +43,53 @@ export default function ProjectList() {
         body: JSON.stringify({ status: 'Terkirim ke PP' })
       })
       if (!res.ok) throw new Error('Gagal mengirim ke PP')
+      
+      // Sinkronisasi ke localStorage untuk backward compatibility dengan PP Panel
+      const targetPack = projects.find(p => p.id === projectId);
+      if (targetPack) {
+        let parsedData = {};
+        try { parsedData = JSON.parse(targetPack.description || '{}'); } catch(e) {}
+        
+        const convertedPack = {
+          id: targetPack.id,
+          packName: targetPack.name || parsedData?.selectedPack?.packName || 'Paket Pengadaan',
+          pagu: targetPack.budget || parsedData?.selectedPack?.pagu || 0,
+          mak: parsedData?.selectedPack?.mak || '',
+          noSirup: parsedData?.selectedPack?.noSirup || '',
+          volume: parsedData?.packageMetadata?.volume || '1 Paket',
+          spesifikasi: parsedData?.packageMetadata?.spesifikasi || '',
+          hpsValue: parsedData?.hpsValue || targetPack.budget || '',
+          techSpecs: parsedData?.techSpecs || '',
+          dpaName: parsedData?.dpaName || 'DPA_Document.pdf',
+          senderName: parsedData?.currentUser?.name || targetPack.created_by || 'PPK',
+          senderNip: parsedData?.currentUser?.nip || '',
+          senderDepartment: parsedData?.currentUser?.department || 'Instansi Terkait',
+          sentDate: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+          items: parsedData?.dppSpecs || []
+        };
+        localStorage.setItem('pbj_submitted_package', JSON.stringify(convertedPack));
+      }
+      
       alert('Paket berhasil dikirim!')
       fetchProjects()
     } catch (err) {
       alert('Kesalahan: ' + err.message)
     } finally {
       setIsUpdating(false)
+    }
+  }
+
+  const handleHapus = async (projectId, projectName) => {
+    if (!confirm(`Anda yakin ingin MENGHAPUS paket "${projectName}"?\n\nTindakan ini TIDAK DAPAT dibatalkan dan semua data DPP pada paket ini akan hilang permanen.`)) return
+    setIsDeleting(true)
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' })
+      if (!res.ok && res.status !== 204) throw new Error('Gagal menghapus paket')
+      fetchProjects()
+    } catch (err) {
+      alert('Kesalahan: ' + err.message)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -59,7 +101,47 @@ export default function ProjectList() {
     return matchStatus && matchSearch
   })
 
-  const totalPagu = projects.reduce((s, p) => s + (p.budget || 0), 0)
+  let totalPagu = 0;
+  let processedRups = new Set();
+  const rupUtilization = {};
+
+  projects.forEach(p => {
+    let parsedData = {};
+    try { parsedData = JSON.parse(p.description || '{}'); } catch(e) {}
+    const noSirup = parsedData?.selectedPack?.noSirup;
+    
+    if (noSirup) {
+      if (!rupUtilization[noSirup]) {
+        rupUtilization[noSirup] = { pagu: p.budget || 0, used: 0 };
+      }
+      const hps = parseFloat(parsedData.hpsValue || 0);
+      rupUtilization[noSirup].used += (isNaN(hps) ? 0 : hps);
+
+      if (!processedRups.has(noSirup)) {
+        totalPagu += (p.budget || 0);
+        processedRups.add(noSirup);
+      }
+    } else {
+      totalPagu += (p.budget || 0);
+    }
+  });
+  
+  let filteredPaguUnik = 0;
+  let processedFilteredRups = new Set();
+  filtered.forEach(p => {
+    let parsedData = {};
+    try { parsedData = JSON.parse(p.description || '{}'); } catch(e) {}
+    const noSirup = parsedData?.selectedPack?.noSirup;
+    if (noSirup) {
+       if (!processedFilteredRups.has(noSirup)) {
+          filteredPaguUnik += (p.budget || 0);
+          processedFilteredRups.add(noSirup);
+       }
+    } else {
+       filteredPaguUnik += (p.budget || 0);
+    }
+  });
+
   const totalDraft = projects.filter(p => p.status === 'Draft').length
   const totalKirim = projects.filter(p => p.status === 'Terkirim ke PP').length
 
@@ -249,8 +331,32 @@ export default function ProjectList() {
                           <div className="text-[10px] text-slate-400 mt-0.5 font-mono">RUP: {parsedData.selectedPack.noSirup}</div>
                         )}
                       </td>
-                      <td className="px-4 py-4 text-right font-mono text-sm font-semibold text-slate-700 whitespace-nowrap">
-                        {fmt(project.budget)}
+                      <td className="px-4 py-4 text-right whitespace-nowrap align-top">
+                        <div className="flex justify-between items-center mb-1 gap-4">
+                          <span className="text-[10px] text-slate-400 font-semibold uppercase">Pagu DPA</span>
+                          <span className="font-mono text-[13px] font-bold text-slate-700">{fmt(project.budget)}</span>
+                        </div>
+                        {parsedData?.selectedPack?.noSirup && rupUtilization[parsedData.selectedPack.noSirup] && (() => {
+                          const hpsPaketIni = parseFloat(parsedData.hpsValue || 0) || 0;
+                          const util = rupUtilization[parsedData.selectedPack.noSirup];
+                          const sisa = util.pagu - util.used;
+                          return (
+                            <div className="text-[10px] mt-2 text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200 shadow-sm text-left">
+                              <div className="flex justify-between items-center mb-1">
+                                <span>HPS Paket Ini:</span>
+                                <span className="font-mono font-medium text-slate-700">{fmt(hpsPaketIni)}</span>
+                              </div>
+                              <div className="flex justify-between items-center mb-1 text-slate-500 border-b border-slate-200 pb-1 border-dashed">
+                                <span>HPS Semua Paket (di RUP ini):</span>
+                                <span className="font-mono">{fmt(util.used)}</span>
+                              </div>
+                              <div className="flex justify-between items-center pt-0.5">
+                                <span className="font-semibold text-slate-600">Sisa Pagu RUP:</span>
+                                <span className={`font-mono font-bold ${sisa < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{fmt(sisa)}</span>
+                              </div>
+                            </div>
+                          )
+                        })()}
                       </td>
                       <td className="px-4 py-4 text-center">
                         <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full font-medium">
@@ -282,12 +388,23 @@ export default function ProjectList() {
                           {!isLocked && (
                             <button
                               onClick={() => handleKirimPP(project.id)}
-                              disabled={isUpdating}
+                              disabled={isUpdating || isDeleting}
                               title="Kirim ke PP"
                               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition-colors border border-indigo-200 disabled:opacity-40"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
                               Kirim
+                            </button>
+                          )}
+                          {!isLocked && (
+                            <button
+                              onClick={() => handleHapus(project.id, project.name)}
+                              disabled={isDeleting || isUpdating}
+                              title="Hapus Paket"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors border border-rose-200 disabled:opacity-40"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                              Hapus
                             </button>
                           )}
                         </div>
@@ -301,8 +418,11 @@ export default function ProjectList() {
                   <td colSpan={2} className="px-5 py-3 text-xs text-slate-500 font-semibold">
                     Menampilkan {filtered.length} dari {projects.length} paket
                   </td>
-                  <td className="px-4 py-3 text-right text-xs font-bold text-slate-700 font-mono">
-                    {fmt(filtered.reduce((s, p) => s + (p.budget || 0), 0))}
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs font-bold text-slate-700 font-mono">{fmt(filteredPaguUnik)}</span>
+                      <span className="text-[9px] text-slate-400 font-normal uppercase tracking-wider mt-0.5">Total Pagu (RUP Unik)</span>
+                    </div>
                   </td>
                   <td colSpan={4}></td>
                 </tr>

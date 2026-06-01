@@ -174,25 +174,8 @@ Nama   : {{nama_ppk}}
 Selaku : Pejabat Pembuat Komitmen (PPK) pada {{nama_satker}}
 
 Pada hari ini, tanggal {{tanggal_dpp}}, menetapkan Dokumen Persiapan Pengadaan (DPP) sebagai berikut:
-1. Nama Paket : {{nama_pekerjaan}}
-2. Kode RUP   : {{kode_rup}}
 
-Spesifikasi Teknis, Pagu Anggaran, dan Rancangan Kontrak sebagai berikut:
 
-Perangkat Daerah       : {{nama_satker}}
-Program                : {{program}}
-Kegiatan               : {{kegiatan}}
-Sub Kegiatan           : {{sub_kegiatan}}
-Pengadaan/Pekerjaan    : {{nama_pekerjaan}}
-Lokasi Pekerjaan       : {{lokasi_pekerjaan}}
-Volume Pekerjaan       : {{volume_pekerjaan}}
-Uraian Pekerjaan       : {{uraian_pekerjaan}}
-Produk Dalam Negeri    : {{pdn}}
-Usaha Kecil            : {{usaha_kecil}}
-Pra DIPA/DPA           : {{pra_dipa}}
-Sumber Dana            : {{sumber_dana}}
-Mata Anggaran Kegiatan : {{mak}}
-Pagu Anggaran          : {{nilai_pagu}}
 
 {{komponen_dinamis_dpp}}
 
@@ -219,25 +202,8 @@ Nama   : {{nama_ppk}}
 Selaku : Pejabat Pembuat Komitmen (PPK) pada {{nama_satker}}
 
 Pada hari ini, tanggal {{tanggal_dpp}}, menetapkan Dokumen Persiapan Pengadaan (DPP) sebagai berikut:
-1. Nama Paket : {{nama_pekerjaan}}
-2. Kode RUP   : {{kode_rup}}
 
-Spesifikasi Teknis, Pagu Anggaran, dan Rancangan Kontrak sebagai berikut:
 
-Perangkat Daerah       : {{nama_satker}}
-Program                : {{program}}
-Kegiatan               : {{kegiatan}}
-Sub Kegiatan           : {{sub_kegiatan}}
-Pengadaan/Pekerjaan    : {{nama_pekerjaan}}
-Lokasi Pekerjaan       : {{lokasi_pekerjaan}}
-Volume Pekerjaan       : {{volume_pekerjaan}}
-Uraian Pekerjaan       : {{uraian_pekerjaan}}
-Produk Dalam Negeri    : {{pdn}}
-Usaha Kecil            : {{usaha_kecil}}
-Pra DIPA/DPA           : {{pra_dipa}}
-Sumber Dana            : {{sumber_dana}}
-Mata Anggaran Kegiatan : {{mak}}
-Pagu Anggaran          : {{nilai_pagu}}
 
 {{komponen_dinamis_dpp}}
 
@@ -264,25 +230,8 @@ Nama   : {{nama_ppk}}
 Selaku : Pejabat Pembuat Komitmen (PPK) pada {{nama_satker}}
 
 Pada hari ini, tanggal {{tanggal_dpp}}, menetapkan Dokumen Persiapan Pengadaan (DPP) sebagai berikut:
-1. Nama Paket : {{nama_pekerjaan}}
-2. Kode RUP   : {{kode_rup}}
 
-Spesifikasi Teknis, Pagu Anggaran, dan Rancangan Kontrak sebagai berikut:
 
-Perangkat Daerah       : {{nama_satker}}
-Program                : {{program}}
-Kegiatan               : {{kegiatan}}
-Sub Kegiatan           : {{sub_kegiatan}}
-Pengadaan/Pekerjaan    : {{nama_pekerjaan}}
-Lokasi Pekerjaan       : {{lokasi_pekerjaan}}
-Volume Pekerjaan       : {{volume_pekerjaan}}
-Uraian Pekerjaan       : {{uraian_pekerjaan}}
-Produk Dalam Negeri    : {{pdn}}
-Usaha Kecil            : {{usaha_kecil}}
-Pra DIPA/DPA           : {{pra_dipa}}
-Sumber Dana            : {{sumber_dana}}
-Mata Anggaran Kegiatan : {{mak}}
-Pagu Anggaran          : {{nilai_pagu}}
 
 {{komponen_dinamis_dpp}}
 
@@ -309,25 +258,8 @@ Nama   : {{nama_ppk}}
 Selaku : Pejabat Pembuat Komitmen (PPK) pada {{nama_satker}}
 
 Pada hari ini, tanggal {{tanggal_dpp}}, menetapkan Dokumen Persiapan Pengadaan (DPP) sebagai berikut:
-1. Nama Paket : {{nama_pekerjaan}}
-2. Kode RUP   : {{kode_rup}}
 
-Spesifikasi Teknis, Pagu Anggaran, dan Rancangan Kontrak sebagai berikut:
 
-Perangkat Daerah       : {{nama_satker}}
-Program                : {{program}}
-Kegiatan               : {{kegiatan}}
-Sub Kegiatan           : {{sub_kegiatan}}
-Pengadaan/Pekerjaan    : {{nama_pekerjaan}}
-Lokasi Pekerjaan       : {{lokasi_pekerjaan}}
-Volume Pekerjaan       : {{volume_pekerjaan}}
-Uraian Pekerjaan       : {{uraian_pekerjaan}}
-Produk Dalam Negeri    : {{pdn}}
-Usaha Kecil            : {{usaha_kecil}}
-Pra DIPA/DPA           : {{pra_dipa}}
-Sumber Dana            : {{sumber_dana}}
-Mata Anggaran Kegiatan : {{mak}}
-Pagu Anggaran          : {{nilai_pagu}}
 
 {{komponen_dinamis_dpp}}
 
@@ -354,25 +286,8 @@ Nama   : {{nama_ppk}}
 Selaku : Pejabat Pembuat Komitmen (PPK) pada {{nama_satker}}
 
 Pada hari ini, tanggal {{tanggal_dpp}}, menetapkan Dokumen Persiapan Pengadaan (DPP) sebagai berikut:
-1. Nama Paket : {{nama_pekerjaan}}
-2. Kode RUP   : {{kode_rup}}
 
-Spesifikasi Teknis, Pagu Anggaran, dan Rancangan Kontrak sebagai berikut:
 
-Perangkat Daerah       : {{nama_satker}}
-Program                : {{program}}
-Kegiatan               : {{kegiatan}}
-Sub Kegiatan           : {{sub_kegiatan}}
-Pengadaan/Pekerjaan    : {{nama_pekerjaan}}
-Lokasi Pekerjaan       : {{lokasi_pekerjaan}}
-Volume Pekerjaan       : {{volume_pekerjaan}}
-Uraian Pekerjaan       : {{uraian_pekerjaan}}
-Produk Dalam Negeri    : {{pdn}}
-Usaha Kecil            : {{usaha_kecil}}
-Pra DIPA/DPA           : {{pra_dipa}}
-Sumber Dana            : {{sumber_dana}}
-Mata Anggaran Kegiatan : {{mak}}
-Pagu Anggaran          : {{nilai_pagu}}
 
 {{komponen_dinamis_dpp}}
 
@@ -447,13 +362,21 @@ export default function TemplateSuratManager() {
     if (saved) {
       try { 
         let parsed = JSON.parse(saved);
-        // Migration: If the old templates don't have the new split DPP templates, merge them
+        // Force update TPL-006 templates to new structure
+        parsed = parsed.map(pt => {
+          if (pt.id && pt.id.startsWith('TPL-006')) {
+            const dt = DEFAULT_TEMPLATES.find(d => d.id === pt.id);
+            if (dt) return dt;
+          }
+          return pt;
+        });
+        
         const hasNewTemplate = parsed.some(t => t.id === 'TPL-006A');
         if (!hasNewTemplate) {
           const newDefaults = DEFAULT_TEMPLATES.filter(dt => !parsed.some(pt => pt.id === dt.id));
           parsed = [...parsed, ...newDefaults];
-          localStorage.setItem('pbj_templates', JSON.stringify(parsed));
         }
+        localStorage.setItem('pbj_templates', JSON.stringify(parsed));
         return parsed; 
       } catch (e) { return DEFAULT_TEMPLATES; }
     }
