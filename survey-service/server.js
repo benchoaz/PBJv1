@@ -399,8 +399,6 @@ async function searchItem(page, item, index) {
         });
 
         if (candidates && candidates.length > 0) {
-          // ── BUG FIX #4: Untuk fallback global-noprice, hanya lanjutkan jika ada target vendor di hasil
-          // (agar tidak menimpa searchData dengan produk non-vendor yang sudah baik)
           if (scenario.type === 'global-noprice') {
             const hasTargetVendor = candidates.some(c => 
               item.targetVendor && c.vendor.toLowerCase().includes(item.targetVendor.toLowerCase())
@@ -409,7 +407,6 @@ async function searchItem(page, item, index) {
               console.log(`    ℹ️ Fallback global (tanpa harga) tidak menemukan produk dari ${item.targetVendor}, dilewati.`);
               continue;
             }
-            // Jika searchData sudah terisi, gabungkan — jangan ganti
             if (searchData.length > 0) {
               const newVendorProducts = candidates.filter(c => 
                 item.targetVendor && c.vendor.toLowerCase().includes(item.targetVendor.toLowerCase())
@@ -420,15 +417,27 @@ async function searchItem(page, item, index) {
               console.log(`    ✅ Menggabungkan ${newVendorProducts.length} produk ${item.targetVendor} dari fallback ke searchData.`);
               break;
             }
+            searchData = candidates;
+            successfulQuery = query;
+            await injectWatermark(page);
+            await page.screenshot({ path: searchFile, fullPage: false });
+          } else {
+            // Merge results to ensure we have enough data for autoComparator
+            searchData = [...searchData, ...candidates.filter(nc => 
+              !searchData.some(sd => sd.productHref === nc.productHref)
+            )];
+            successfulQuery = query;
+            await injectWatermark(page);
+            await page.screenshot({ path: searchFile, fullPage: false });
+            console.log(`    ✅ Berhasil menemukan ${candidates.length} produk dengan query: "${query}"`);
+            
+            // Break if we don't need comparator or if it's already a global search
+            if (!item.autoComparator || scenario.type === 'global') {
+              break;
+            } else {
+               console.log(`    ℹ️ Auto Comparator aktif, lanjut mencari referensi global...`);
+            }
           }
-          
-          searchData = candidates;
-          successfulQuery = query;
-          // Simpan screenshot pencarian yang sukses
-          await injectWatermark(page);
-          await page.screenshot({ path: searchFile, fullPage: false });
-          console.log(`    ✅ Berhasil menemukan ${candidates.length} produk dengan query: "${query}"`);
-          if (scenario.type !== 'global-noprice') break; // Untuk tipe normal, berhenti di sini
         } else {
           console.log(`    ⚠️ Query "${query}" tidak menghasilkan produk.`);
         }
