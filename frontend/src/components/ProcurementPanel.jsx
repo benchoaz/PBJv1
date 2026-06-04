@@ -2238,9 +2238,18 @@ export default function ProcurementPanel() {
 
       {activeTab === 'docs' && (
         <div className="glass-panel p-6 animate-slide-up bg-white border border-slate-200 rounded-2xl shadow-sm">
-          {/* Inject Dynamic Print Media CSS to isolate and clean up the printable BAHP document */}
           <style>{`
             @media print {
+              /* Reset body, html, and react root layout to avoid extra space displacement */
+              html, body, #root, #root > div {
+                margin: 0 !important;
+                padding: 0 !important;
+                height: auto !important;
+                min-height: 0 !important;
+                display: block !important;
+                position: static !important;
+                overflow: visible !important;
+              }
               @page {
                 size: ${docSettings.paperSize || 'A4'};
                 margin: ${docSettings.marginTop !== undefined ? docSettings.marginTop : 20}mm ${docSettings.marginRight !== undefined ? docSettings.marginRight : 20}mm ${docSettings.marginBottom !== undefined ? docSettings.marginBottom : 25}mm ${docSettings.marginLeft !== undefined ? docSettings.marginLeft : 30}mm;
