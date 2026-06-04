@@ -313,12 +313,7 @@ export default function BahpDocument({
           <div key={item.no} className="mb-5 ">
             <div className="text-[0.95em] font-bold mb-1">
               {itemIdx + 1}. {templateId === 'konstruksi' ? 'Evaluasi Penyedia' : 'Komparasi'}:{' '}
-              <span className="font-normal italic">{item.name}</span>
-              {autoComps.length === 0 && (
-                <span className="font-normal text-slate-400 ml-1">
-                  — (Jalankan "Cari + Pembanding" untuk mengisi data pembanding secara otomatis)
-                </span>
-              )}
+              {item.name}
             </div>
             <table className="w-full border-collapse">
               <thead>
@@ -475,7 +470,7 @@ export default function BahpDocument({
                     </div>
                   </div>
                 ) : (
-                  <div className="border border-dashed border-slate-300 rounded p-4 text-center text-slate-450 italic text-[0.85em] mb-4 bg-slate-50">
+                  <div className="border border-dashed border-slate-300 rounded p-4 text-center text-slate-400 italic text-[0.85em] mb-4 bg-slate-50 print:hidden">
                     Tangkapan layar untuk produk terpilih belum diambil (Jalankan "Cari + Pembanding" untuk mengambil screenshot otomatis)
                   </div>
                 )}
