@@ -112,9 +112,9 @@ export default function ProcurementPanel() {
             hpsValue: parsedData?.hpsValue || incomingPack.budget || '',
             techSpecs: parsedData?.techSpecs || '',
             dpaName: parsedData?.dpaName || 'DPA_Document.pdf',
-            senderName: parsedData?.currentUser?.name || incomingPack.created_by || 'PPK',
-            senderNip: parsedData?.currentUser?.nip || '',
-            senderDepartment: parsedData?.currentUser?.department || 'Instansi Terkait',
+            senderName: parsedData?.senderName || parsedData?.currentUser?.name || incomingPack.created_by || 'PPK',
+            senderNip: parsedData?.senderNip || parsedData?.currentUser?.nip || '197909102002121004',
+            senderDepartment: parsedData?.senderDepartment || parsedData?.currentUser?.department || 'Kecamatan Besuk',
             sentDate: new Date(incomingPack.updated_at || incomingPack.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
             items: mappedItems,
             dppTemplateId: parsedData?.selectedTplId || ''
@@ -909,7 +909,9 @@ export default function ProcurementPanel() {
           tplMap = 'modal';
         } else if (dppTpl === 'TPL-006D') {
           tplMap = 'jasa';
-        } else if (dppTpl === 'TPL-006E' || dppTpl === 'TPL-006D_konstruksi') {
+        } else if (dppTpl === 'TPL-006F') {
+          tplMap = 'pemeliharaan';
+        } else if (dppTpl === 'TPL-006G' || dppTpl === 'TPL-006E') {
           tplMap = 'konstruksi';
         }
         setBahpTemplateId(tplMap);
@@ -2271,7 +2273,9 @@ export default function ProcurementPanel() {
                 ) || (
                   submittedPack.dppTemplateId === 'TPL-006D' && tpl.id !== 'jasa'
                 ) || (
-                  submittedPack.dppTemplateId === 'TPL-006E' && tpl.id !== 'konstruksi'
+                  submittedPack.dppTemplateId === 'TPL-006F' && tpl.id !== 'pemeliharaan'
+                ) || (
+                  (submittedPack.dppTemplateId === 'TPL-006G' || submittedPack.dppTemplateId === 'TPL-006E') && tpl.id !== 'konstruksi'
                 ));
 
                 return (

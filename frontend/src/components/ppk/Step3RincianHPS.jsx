@@ -1974,6 +1974,8 @@ export default function Step3RincianHPS() {
                         const isMamin = newTplId === 'TPL-006B';
                         const isAtk = newTplId === 'TPL-006A';
                         const isModal = newTplId === 'TPL-006C';
+                        const isPemeliharaan = newTplId === 'TPL-006F';
+                        const isKonstruksi = newTplId === 'TPL-006G';
                         
                         let autoLatarBelakang = dppSpecs?.latarBelakang || '';
                         let autoMaksudTujuan = dppSpecs?.maksudTujuan || '';
@@ -1992,6 +1994,14 @@ export default function Step3RincianHPS() {
                           autoLatarBelakang = `Seiring dengan tuntutan kebutuhan modernisasi, digitalisasi, dan upaya peningkatan kinerja aparatur di lingkungan ${satkerName}, diperlukan dukungan penyediaan peralatan/aset/teknologi yang handal dan memadai untuk operasional kerja pada kegiatan ${packageMetadata.sub_kegiatan || selectedPack?.packName || 'tersebut'}.`;
                           autoMaksudTujuan = `1. Meningkatkan efisiensi kerja dan kinerja pegawai melalui dukungan peralatan teknologi modern.\n2. Memenuhi standar kelayakan sarana dan prasarana minimal perangkat daerah pada ${satkerName}.`;
                           autoWaktu = '30 (Tiga puluh) hari kalender';
+                        } else if (isPemeliharaan) {
+                          autoLatarBelakang = `Dalam rangka menjaga keandalan, keawetan, dan kinerja optimal dari aset/sarana/prasarana di lingkungan ${satkerName}, sangat diperlukan pelaksanaan pemeliharaan secara rutin dan berkala guna mendukung kelancaran operasional pada kegiatan ${packageMetadata.sub_kegiatan || selectedPack?.packName || 'tersebut'}.`;
+                          autoMaksudTujuan = `1. Memastikan seluruh sarana dan prasarana kantor selalu dalam kondisi siap pakai.\n2. Mencegah kerusakan fatal (breakdown) serta memperpanjang usia pakai aset milik ${satkerName}.`;
+                          autoWaktu = '365 (Tiga ratus enam puluh lima) hari kalender';
+                        } else if (isKonstruksi) {
+                          autoLatarBelakang = `Untuk memenuhi kebutuhan prasarana fisik, rehabilitasi bangunan, dan/atau peningkatan kapasitas fasilitas kerja yang representatif di lingkungan ${satkerName}, diperlukan pekerjaan pelaksanaan konstruksi fisik yang memenuhi standar teknis, kekuatan, dan keselamatan pada kegiatan ${packageMetadata.sub_kegiatan || selectedPack?.packName || 'tersebut'}.`;
+                          autoMaksudTujuan = `1. Mewujudkan bangunan/fasilitas fisik yang kokoh, aman, dan fungsional sesuai gambar rencana.\n2. Menyediakan sarana kerja fisik yang memadai guna menunjang pelayanan publik di lingkungan ${satkerName}.`;
+                          autoWaktu = '90 (Sembilan puluh) hari kalender';
                         }
                         
                         setDppSpecs({

@@ -249,7 +249,7 @@ NIP. {{nip_ppk}}`,
   {
     id: 'TPL-006D',
     category: 'Tahap Persiapan',
-    name: 'Dokumen Persiapan Pengadaan (Jasa Lainnya / Konstruksi)',
+    name: 'Dokumen Persiapan Pengadaan (Jasa Lainnya)',
     content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
 Nomor : {{nomor_dpp}}
 
@@ -278,6 +278,62 @@ NIP. {{nip_ppk}}`,
     id: 'TPL-006E',
     category: 'Tahap Persiapan',
     name: 'Dokumen Persiapan Pengadaan (Konsolidasi Sektoral)',
+    content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
+Nomor : {{nomor_dpp}}
+
+Yang bertanda tangan di bawah ini:
+Nama   : {{nama_ppk}}
+Selaku : Pejabat Pembuat Komitmen (PPK) pada {{nama_satker}}
+
+Pada hari ini, tanggal {{tanggal_dpp}}, menetapkan Dokumen Persiapan Pengadaan (DPP) sebagai berikut:
+
+
+
+{{komponen_dinamis_dpp}}
+
+Demikian Dokumen Persiapan Pengadaan ini ditetapkan untuk dipergunakan sebagai dasar pelaksanaan proses pengadaan melalui metode E-Purchasing.
+
+Ditetapkan di: {{tempat_penetapan}}
+
+Pejabat Pembuat Komitmen,
+
+
+{{nama_ppk}}
+NIP. {{nip_ppk}}`,
+    isDefault: true
+  },
+  {
+    id: 'TPL-006F',
+    category: 'Tahap Persiapan',
+    name: 'Dokumen Persiapan Pengadaan (Jasa Pemeliharaan)',
+    content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
+Nomor : {{nomor_dpp}}
+
+Yang bertanda tangan di bawah ini:
+Nama   : {{nama_ppk}}
+Selaku : Pejabat Pembuat Komitmen (PPK) pada {{nama_satker}}
+
+Pada hari ini, tanggal {{tanggal_dpp}}, menetapkan Dokumen Persiapan Pengadaan (DPP) sebagai berikut:
+
+
+
+{{komponen_dinamis_dpp}}
+
+Demikian Dokumen Persiapan Pengadaan ini ditetapkan untuk dipergunakan sebagai dasar pelaksanaan proses pengadaan melalui metode E-Purchasing.
+
+Ditetapkan di: {{tempat_penetapan}}
+
+Pejabat Pembuat Komitmen,
+
+
+{{nama_ppk}}
+NIP. {{nip_ppk}}`,
+    isDefault: true
+  },
+  {
+    id: 'TPL-006G',
+    category: 'Tahap Persiapan',
+    name: 'Dokumen Persiapan Pengadaan (Pekerjaan Konstruksi)',
     content: `DOKUMEN PERSIAPAN PENGADAAN (DPP)
 Nomor : {{nomor_dpp}}
 
@@ -371,10 +427,9 @@ export default function TemplateSuratManager() {
           return pt;
         });
         
-        const hasNewTemplate = parsed.some(t => t.id === 'TPL-006A');
-        if (!hasNewTemplate) {
-          const newDefaults = DEFAULT_TEMPLATES.filter(dt => !parsed.some(pt => pt.id === dt.id));
-          parsed = [...parsed, ...newDefaults];
+        const missingDefaults = DEFAULT_TEMPLATES.filter(dt => !parsed.some(pt => pt.id === dt.id));
+        if (missingDefaults.length > 0) {
+          parsed = [...parsed, ...missingDefaults];
         }
         localStorage.setItem('pbj_templates', JSON.stringify(parsed));
         return parsed; 
