@@ -213,6 +213,21 @@ export default function ProcurementPanel() {
     setDocSettings(next);
     localStorage.setItem('pbj_doc_settings', JSON.stringify(next));
   };
+
+  // Re-sync docSettings whenever tab switches to BAHP tab (to catch updates from Admin/Template panel)
+  useEffect(() => {
+    if (activeTab === 'docs') {
+      try {
+        const saved = localStorage.getItem('pbj_doc_settings');
+        if (saved) {
+          setDocSettings(JSON.parse(saved));
+        }
+      } catch (e) {
+        console.error('Failed to sync docSettings in PP Panel:', e);
+      }
+    }
+  }, [activeTab]);
+
   const handleToggleSearchRow = (itemNo, initialData) => {
     setExpandedSearchRows(prev => ({ ...prev, [itemNo]: !prev[itemNo] }));
     if (!searchParams[itemNo]) {
@@ -2273,7 +2288,7 @@ export default function ProcurementPanel() {
                 visibility: visible !important;
               }
 
-              #print-bahp-document {
+              #print-bahp-document, #print-bahp-document > div {
                 position: absolute !important;
                 left: 0 !important;
                 top: 0 !important;
@@ -2313,8 +2328,8 @@ export default function ProcurementPanel() {
               }
               
               @page {
-                size: ${docSettings.paperSize === 'F4' ? '215mm 330mm' : 'A4'};
-                margin: 0 !important;
+                size: ${docSettings.paperSize === 'F4' ? '215mm 330mm' : 'A4'} portrait;
+                margin: ${docSettings.marginTop !== undefined ? docSettings.marginTop : 20}mm ${docSettings.marginRight !== undefined ? docSettings.marginRight : 20}mm ${docSettings.marginBottom !== undefined ? docSettings.marginBottom : 25}mm ${docSettings.marginLeft !== undefined ? docSettings.marginLeft : 30}mm !important;
               }
             }
           `}</style>
