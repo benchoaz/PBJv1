@@ -73,11 +73,13 @@ export default function BahpDocument({
       {/* ╔══════════════════════════════════════════════╗
           ║ KOP SURAT                                    ║
           ╚══════════════════════════════════════════════╝ */}
-      <div className="text-center border-b-4 border-double border-slate-900 pb-3 mb-4 font-sans">
-        <div className="text-[12px] font-bold tracking-wider uppercase">PEMERINTAH KABUPATEN PROBOLINGGO</div>
-        <div className="text-[13px] font-bold tracking-widest uppercase mt-0.5">{ukpbj}</div>
-        <div className="text-[8.5px] mt-0.5 text-slate-600">{alamat}</div>
-      </div>
+      {docSettings.showKop !== false && (
+        <div className="text-center border-b-4 border-double border-slate-900 pb-3 mb-4 font-sans">
+          <div className="text-[12px] font-bold tracking-wider uppercase">PEMERINTAH KABUPATEN PROBOLINGGO</div>
+          <div className="text-[13px] font-bold tracking-widest uppercase mt-0.5">{ukpbj}</div>
+          <div className="text-[8.5px] mt-0.5 text-slate-600">{alamat}</div>
+        </div>
+      )}
 
       {/* ╔══════════════════════════════════════════════╗
           ║ JUDUL DOKUMEN                                ║

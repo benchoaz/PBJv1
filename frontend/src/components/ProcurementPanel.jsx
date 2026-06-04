@@ -199,7 +199,20 @@ export default function ProcurementPanel() {
   const [exceptionAdvice, setExceptionAdvice] = useState('');
   const [isRefiningChatNotes, setIsRefiningChatNotes] = useState(false);
   const [isRefiningVendorNote, setIsRefiningVendorNote] = useState(false);
+  const [docSettings, setDocSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pbj_doc_settings');
+      return saved ? JSON.parse(saved) : { showKop: true };
+    } catch {
+      return { showKop: true };
+    }
+  });
 
+  const toggleKopSurat = () => {
+    const next = { ...docSettings, showKop: !docSettings.showKop };
+    setDocSettings(next);
+    localStorage.setItem('pbj_doc_settings', JSON.stringify(next));
+  };
   const handleToggleSearchRow = (itemNo, initialData) => {
     setExpandedSearchRows(prev => ({ ...prev, [itemNo]: !prev[itemNo] }));
     if (!searchParams[itemNo]) {
@@ -2225,6 +2238,36 @@ export default function ProcurementPanel() {
 
       {activeTab === 'docs' && (
         <div className="glass-panel p-6 animate-slide-up bg-white border border-slate-200 rounded-2xl shadow-sm">
+          {/* Inject Dynamic Print Media CSS to isolate and clean up the printable BAHP document */}
+          <style>{`
+            @media print {
+              /* Hide all page content by default */
+              body * {
+                visibility: hidden;
+              }
+              /* Reveal only the BAHP document and its descendants */
+              #print-bahp-document, #print-bahp-document * {
+                visibility: visible;
+              }
+              #print-bahp-document {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0 !important;
+                background: white !important;
+                box-shadow: none !important;
+                border: none !important;
+              }
+              /* Ensure the design looks highly official, crisp black, print-optimized */
+              #print-bahp-document * {
+                color: #000 !important;
+                border-color: #000 !important;
+                background-color: transparent !important;
+              }
+            }
+          `}</style>
 
           {/* ── Toolbar BAHP ── */}
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
@@ -2232,7 +2275,17 @@ export default function ProcurementPanel() {
               <h2 className="text-lg font-bold text-slate-800">Arsip Berita Acara & Dokumen Penetapan</h2>
               <p className="text-xs text-slate-400 mt-0.5">Pilih jenis pengadaan untuk menyesuaikan template BAHP secara otomatis</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
+              {/* Kop Surat On/Off Toggle */}
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 hover:bg-slate-100 transition-all">
+                <input
+                  type="checkbox"
+                  checked={docSettings.showKop !== false}
+                  onChange={toggleKopSurat}
+                  className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
+                />
+                <span>Tampilkan Kop Surat</span>
+              </label>
               <button
                 onClick={handleRefineBahp}
                 disabled={isRefiningBahp}
@@ -2308,13 +2361,13 @@ export default function ProcurementPanel() {
           </div>
 
           {/* ── Dokumen BAHP (komponen terpisah, berbeda per template) ── */}
-          <div className="border border-slate-200 rounded-xl p-8 max-w-4xl mx-auto shadow-sm bg-white print:shadow-none print:border-none print:p-0 print:max-w-none">
+          <div id="print-bahp-document" className="border border-slate-200 rounded-xl p-8 max-w-4xl mx-auto shadow-sm bg-white print:shadow-none print:border-none print:p-0 print:max-w-none">
             <BahpDocument
               templateId={bahpTemplateId}
               submittedPack={submittedPack}
               negotiatedItems={negotiatedItems}
               checkedItems={checkedItems}
-              docSettings={(() => { try { return JSON.parse(localStorage.getItem('pbj_doc_settings') || '{}'); } catch { return {}; } })()}
+              docSettings={docSettings}
               user={user}
               refinedBahpIntro={refinedBahpIntro}
               refinedBahpConclusion={refinedBahpConclusion}
