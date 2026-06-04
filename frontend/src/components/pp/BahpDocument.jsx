@@ -53,7 +53,7 @@ export default function BahpDocument({
 
   // ── Style shortcuts ───────────────────────────────────────────────────────
   const B  = 'border border-slate-800';
-  const TD = `${B} p-1.5 text-[8.5px]`;
+  const TD = `${B} p-1.5 text-[0.85em]`;
   const TH = `${TD} bg-slate-100 font-bold text-center`;
 
   // ── Seksi A: kolom tambahan khas tiap template ────────────────────────────
@@ -82,7 +82,7 @@ export default function BahpDocument({
           ║ KOP SURAT                                    ║
           ╚══════════════════════════════════════════════╝ */}
       {docSettings.showKop !== false && (
-        <div className="border-b-4 border-double border-slate-900 pb-3 mb-5 font-sans">
+        <div className="border-b-4 border-double border-slate-900 pb-3 mb-5 ">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
               <tr>
@@ -139,20 +139,20 @@ export default function BahpDocument({
       {/* ╔══════════════════════════════════════════════╗
           ║ JUDUL DOKUMEN                                ║
           ╚══════════════════════════════════════════════╝ */}
-      <div className="text-center font-bold uppercase underline text-[11.5px] tracking-wide mb-0.5 font-sans">
+      <div className="text-center font-bold uppercase underline text-[1.25em] tracking-wide mb-0.5 ">
         BERITA ACARA HASIL PEMILIHAN (BAHP) E-PURCHASING
       </div>
-      <div className="text-center text-[8.5px] font-sans mb-0.5">
+      <div className="text-center text-[0.85em] mb-0.5">
         Jenis Pengadaan: <strong>{tpl.label.toUpperCase()}</strong> — Metode: {tpl.metodePemilihan}
       </div>
-      <div className="text-center font-bold text-[9.5px] font-sans mb-4">
+      <div className="text-center font-bold text-[1.05em] mb-4">
         NOMOR: {nomorBahp}
       </div>
 
       {/* ╔══════════════════════════════════════════════╗
           ║ PEMBUKA                                      ║
           ╚══════════════════════════════════════════════╝ */}
-      <div className="text-justify mb-3 font-sans">
+      <div className="text-justify mb-3 ">
         {refinedBahpIntro ? (
           <span className="whitespace-pre-wrap">{refinedBahpIntro}</span>
         ) : (
@@ -168,7 +168,7 @@ export default function BahpDocument({
       </div>
 
       {/* ── Identitas Paket ── */}
-      <table className="w-full text-[9px] font-sans border-collapse mb-4">
+      <table className="w-full text-[0.95em] border-collapse mb-4">
         <tbody>
           {[
             ['Satuan Kerja',          instansi],
@@ -193,7 +193,7 @@ export default function BahpDocument({
           ║ DASAR HUKUM                                  ║
           ╚══════════════════════════════════════════════╝ */}
       <SectionTitle>Dasar Hukum</SectionTitle>
-      <ol className="list-decimal list-inside text-[9px] font-sans space-y-0.5 mb-4 ml-3">
+      <ol className="list-decimal list-inside text-[0.95em] space-y-0.5 mb-4 ml-3">
         {dasarHukum.map((d, i) => <li key={i} className="leading-relaxed">{d}</li>)}
       </ol>
 
@@ -203,7 +203,7 @@ export default function BahpDocument({
       <SectionTitle letter="A">
         Hasil Rincian Penetapan {tpl.jenisPengadaan} melalui e-Purchasing
       </SectionTitle>
-      <table className="w-full border-collapse font-sans mb-4">
+      <table className="w-full border-collapse mb-4">
         <thead>
           <tr>
             <td className={`${TH} w-5`}>No</td>
@@ -251,7 +251,7 @@ export default function BahpDocument({
             );
           })}
           {activeItems.length > 0 && (
-            <tr className="bg-slate-100 font-bold font-sans">
+            <tr className="bg-slate-100 font-bold ">
               <td colSpan={7 + extraCols.length} className={`${TD} text-right`}>TOTAL NILAI NEGOSIASI</td>
               <td className={`${TD} text-right font-mono`}>Rp {grandTotal.toLocaleString('id-ID')}</td>
               <td className={TD}></td>
@@ -266,7 +266,7 @@ export default function BahpDocument({
       {klausul && (
         <>
           <SectionTitle letter="B">{klausul.judul}</SectionTitle>
-          <p className="font-sans text-[9px] text-justify leading-relaxed whitespace-pre-line mb-4">
+          <p className=" text-[0.95em] text-justify leading-relaxed whitespace-pre-line mb-4">
             {klausul.isi}
           </p>
         </>
@@ -281,7 +281,7 @@ export default function BahpDocument({
         {templateId === 'modal'      && ' (Evaluasi Teknis, Garansi & Harga)'}
         {templateId === 'jasa'       && ' (Evaluasi Kualifikasi & Harga)'}
       </SectionTitle>
-      <p className="font-sans text-[9px] mb-3 leading-relaxed">
+      <p className=" text-[0.95em] mb-3 leading-relaxed">
         {templateId === 'atk'         && 'Pejabat Pengadaan telah membandingkan harga satuan dari minimal 2 (dua) penyedia yang berbeda di e-Katalog LKPP sebagai dasar penetapan harga wajar:'}
         {templateId === 'mamin'       && 'Pejabat Pengadaan telah membandingkan penawaran dari beberapa penyedia katering/makanan yang terdaftar di e-Katalog, dengan mempertimbangkan aspek harga, kualitas menu, dan kepatuhan halal:'}
         {templateId === 'jasa'        && 'Pejabat Pengadaan telah membandingkan kualifikasi dan harga penawaran dari beberapa penyedia jasa, sesuai prosedur pengadaan langsung Jasa Lainnya:'}
@@ -310,8 +310,8 @@ export default function BahpDocument({
         const allCols   = [selCol, ...compCols];
 
         return (
-          <div key={item.no} className="mb-5 font-sans">
-            <div className="text-[9px] font-bold mb-1">
+          <div key={item.no} className="mb-5 ">
+            <div className="text-[0.95em] font-bold mb-1">
               {itemIdx + 1}. {templateId === 'konstruksi' ? 'Evaluasi Penyedia' : 'Komparasi'}:{' '}
               <span className="font-normal italic">{item.name}</span>
               {autoComps.length === 0 && (
@@ -327,8 +327,8 @@ export default function BahpDocument({
                   {allCols.map((col, ci) => (
                     <td key={ci} className={`${TH} ${ci === 0 ? 'bg-indigo-50' : ''}`}>
                       {col.name.length > 30 ? col.name.slice(0, 30) + '…' : col.name}
-                      {ci === 0 && <div className="text-[7px] font-bold text-indigo-700 mt-0.5">(TERPILIH)</div>}
-                      {ci > 0 && <div className="text-[7px] font-normal text-slate-400 mt-0.5">(Pembanding {ci})</div>}
+                      {ci === 0 && <div className="text-[0.75em] font-bold text-indigo-700 mt-0.5">(TERPILIH)</div>}
+                      {ci > 0 && <div className="text-[0.75em] font-normal text-slate-400 mt-0.5">(Pembanding {ci})</div>}
                     </td>
                   ))}
                 </tr>
@@ -358,7 +358,7 @@ export default function BahpDocument({
           ║ CATATAN KHUSUS KONSTRUKSI                    ║
           ╚══════════════════════════════════════════════╝ */}
       {templateId === 'konstruksi' && (
-        <div className="font-sans border border-slate-300 rounded p-3 mb-4 text-[9px]">
+        <div className=" border border-slate-300 rounded p-3 mb-4 text-[0.95em]">
           <div className="font-bold mb-1 uppercase text-slate-700">Catatan K3 Konstruksi (SMKK)</div>
           <p className="leading-relaxed text-justify">
             Seluruh pekerjaan konstruksi wajib dilaksanakan dengan menerapkan Sistem Manajemen
@@ -374,10 +374,10 @@ export default function BahpDocument({
           ║ SEKSI D — KESIMPULAN & PENETAPAN             ║
           ╚══════════════════════════════════════════════╝ */}
       <SectionTitle letter="D">Kesimpulan dan Penetapan Penyedia</SectionTitle>
-      <p className="font-sans text-[9px] text-justify leading-relaxed whitespace-pre-line mb-3">
+      <p className=" text-[0.95em] text-justify leading-relaxed whitespace-pre-line mb-3">
         {refinedBahpConclusion || penutup}
       </p>
-      <p className="font-sans text-[9px] text-justify leading-relaxed mb-6">
+      <p className=" text-[0.95em] text-justify leading-relaxed mb-6">
         Demikian Berita Acara Hasil Pemilihan (BAHP) e-Purchasing ini dibuat dengan sebenarnya,
         untuk dipergunakan sebagaimana mestinya sebagai dokumen pertanggungjawaban pelaksanaan
         pengadaan barang/jasa pemerintah sesuai ketentuan peraturan perundang-undangan yang berlaku.
@@ -386,14 +386,14 @@ export default function BahpDocument({
       {/* ╔══════════════════════════════════════════════╗
           ║ TANDA TANGAN                                 ║
           ╚══════════════════════════════════════════════╝ */}
-      <div className="flex justify-end mt-8 font-sans">
+      <div className="flex justify-end mt-8 ">
         <div className="w-64 text-center">
-          <div className="text-[9px] text-slate-800 mb-0.5">{instansi}, {tglShort}</div>
-          <div className="text-[9px] text-slate-800 mb-14">
+          <div className="text-[0.95em] text-slate-800 mb-0.5">{instansi}, {tglShort}</div>
+          <div className="text-[0.95em] text-slate-800 mb-14">
             Pejabat Pengadaan (PP)<br />{instansi}
           </div>
-          <div className="text-[9.5px] font-bold text-slate-900 underline">{user?.name || '-'}</div>
-          <div className="text-[9px] text-slate-700">NIP. {user?.nip || '-'}</div>
+          <div className="text-[1.05em] font-bold text-slate-900 underline">{user?.name || '-'}</div>
+          <div className="text-[0.95em] text-slate-700">NIP. {user?.nip || '-'}</div>
         </div>
       </div>
 
@@ -401,10 +401,10 @@ export default function BahpDocument({
           ║ LAMPIRAN II: BUKTI SCREENSHOT & TAUTAN       ║
           ╚══════════════════════════════════════════════╝ */}
       <div className="mt-10 pt-8 border-t-2 border-dashed border-slate-350 print:break-before-page">
-        <div className="text-center font-bold uppercase underline text-[10.5px] tracking-wide mb-4 font-sans">
+        <div className="text-center font-bold uppercase underline text-[1.1em] tracking-wide mb-4 ">
           LAMPIRAN II: BUKTI TANGKAPAN LAYAR (SCREENSHOT) & TAUTAN RESMI E-KATALOG LKPP
         </div>
-        <p className="font-sans text-[8.5px] text-slate-600 mb-4 text-justify">
+        <p className=" text-[0.85em] text-slate-600 mb-4 text-justify">
           Sebagai bukti dukung kewajaran harga dan transparansi proses e-Purchasing, berikut dilampirkan bukti fisik berupa tautan (URL) produk aktif dan tangkapan layar (screenshot) dari portal katalog elektronik nasional (e-Katalog Inaproc LKPP) untuk produk terpilih serta produk pembanding:
         </p>
 
@@ -419,14 +419,14 @@ export default function BahpDocument({
 
             return (
               <div key={item.no} className="border border-slate-200 rounded p-3 bg-white">
-                <div className="font-bold text-[9px] border-b border-slate-200 pb-1 mb-3">
+                <div className="font-bold text-[0.95em] border-b border-slate-200 pb-1 mb-3">
                   {idx + 1}. Bukti Audit Produk Terpilih: <span className="font-normal italic">{item.name}</span>
                 </div>
 
                 {/* Selected Product Info & Link */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                   <div>
-                    <table className="w-full text-[8.5px]">
+                    <table className="w-full text-[0.85em]">
                       <tbody>
                         <tr>
                           <td className="w-24 font-semibold py-0.5">Nama Produk Terpilih</td>
@@ -447,12 +447,12 @@ export default function BahpDocument({
                     </table>
                   </div>
                   <div>
-                    <div className="text-[8.5px] font-semibold text-slate-700 mb-0.5">Tautan Resmi (E-Katalog):</div>
+                    <div className="text-[0.85em] font-semibold text-slate-700 mb-0.5">Tautan Resmi (E-Katalog):</div>
                     <a 
                       href={selectedUrl} 
                       target="_blank" 
                       rel="noopener noreferrer" 
-                      className="text-blue-700 hover:underline break-all font-mono text-[8px]"
+                      className="text-blue-700 hover:underline break-all font-mono text-[0.85em]"
                     >
                       {selectedUrl}
                     </a>
@@ -462,9 +462,9 @@ export default function BahpDocument({
                 {/* Selected Product Screenshot */}
                 {selectedScreenshot ? (
                   <div className="border border-slate-350 rounded overflow-hidden mb-4 bg-slate-50">
-                    <div className="bg-slate-100 border-b border-slate-200 px-3 py-1 flex items-center justify-between text-[7.5px] font-mono text-slate-600">
+                    <div className="bg-slate-100 border-b border-slate-200 px-3 py-1 flex items-center justify-between text-[0.8em] font-mono text-slate-600">
                       <span>{selectedUrl}</span>
-                      <span className="font-sans">Tangkapan Layar Terpilih</span>
+                      <span className="">Tangkapan Layar Terpilih</span>
                     </div>
                     <div className="p-2 flex justify-center bg-white">
                       <img 
@@ -475,7 +475,7 @@ export default function BahpDocument({
                     </div>
                   </div>
                 ) : (
-                  <div className="border border-dashed border-slate-300 rounded p-4 text-center text-slate-450 italic text-[8.5px] mb-4 bg-slate-50">
+                  <div className="border border-dashed border-slate-300 rounded p-4 text-center text-slate-450 italic text-[0.85em] mb-4 bg-slate-50">
                     Tangkapan layar untuk produk terpilih belum diambil (Jalankan "Cari + Pembanding" untuk mengambil screenshot otomatis)
                   </div>
                 )}
@@ -483,7 +483,7 @@ export default function BahpDocument({
                 {/* Comparators */}
                 {autoComps.length > 0 && (
                   <div className="mt-3 pl-3 border-l-2 border-slate-300">
-                    <div className="font-bold text-[8.5px] text-slate-700 mb-2">Produk Pembanding:</div>
+                    <div className="font-bold text-[0.85em] text-slate-700 mb-2">Produk Pembanding:</div>
                     <div className="space-y-4">
                       {autoComps.map((comp, ci) => {
                         const compUrl = comp.link || comp.url || "https://e-katalog.lkpp.go.id";
@@ -493,7 +493,7 @@ export default function BahpDocument({
                           <div key={ci} className="bg-slate-50/50 p-2 rounded border border-slate-200">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
                               <div>
-                                <table className="w-full text-[8px]">
+                                <table className="w-full text-[0.85em]">
                                   <tbody>
                                     <tr>
                                       <td className="w-24 font-semibold py-0.5">Pembanding {ci + 1}</td>
@@ -514,12 +514,12 @@ export default function BahpDocument({
                                 </table>
                               </div>
                               <div>
-                                <div className="text-[8px] font-semibold text-slate-700 mb-0.5">Tautan Pembanding:</div>
+                                <div className="text-[0.85em] font-semibold text-slate-700 mb-0.5">Tautan Pembanding:</div>
                                 <a 
                                   href={compUrl} 
                                   target="_blank" 
                                   rel="noopener noreferrer" 
-                                  className="text-blue-700 hover:underline break-all font-mono text-[7.5px]"
+                                  className="text-blue-700 hover:underline break-all font-mono text-[0.8em]"
                                 >
                                   {compUrl}
                                 </a>
@@ -528,9 +528,9 @@ export default function BahpDocument({
 
                             {compScreenshot && (
                               <div className="border border-slate-300 rounded overflow-hidden bg-white mt-2">
-                                <div className="bg-slate-100 border-b border-slate-200 px-3 py-1 flex items-center justify-between text-[7px] font-mono text-slate-600">
+                                <div className="bg-slate-100 border-b border-slate-200 px-3 py-1 flex items-center justify-between text-[0.75em] font-mono text-slate-600">
                                   <span>{compUrl}</span>
-                                  <span className="font-sans">Tangkapan Layar Pembanding {ci + 1}</span>
+                                  <span className="">Tangkapan Layar Pembanding {ci + 1}</span>
                                 </div>
                                 <div className="p-2 flex justify-center">
                                   <img 
@@ -559,7 +559,7 @@ export default function BahpDocument({
 // ── Sub-komponen helper ─────────────────────────────────────────────────────
 function SectionTitle({ letter, children }) {
   return (
-    <div className="font-bold text-[9.5px] uppercase font-sans border-b border-slate-400 pb-0.5 mb-2 mt-5 tracking-wide">
+    <div className="font-bold text-[1.05em] uppercase border-b border-slate-400 pb-0.5 mb-2 mt-5 tracking-wide">
       {letter ? `${letter}. ` : ''}{children}
     </div>
   );
