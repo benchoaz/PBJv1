@@ -32,7 +32,7 @@ export default function Step3RincianHPS() {
     activeDocPreview, setActiveDocPreview,
     resetAll, handleSimpanPaket, currentUser,
     dppSpecs, setDppSpecs,
-    tanggalSurat, setTanggalSurat
+    tanggalSurat, setTanggalSurat, getPackageItems
   } = usePPK();
   const [isAiEditorOpen, setIsAiEditorOpen] = useState(true);
   const [aiLoadingField, setAiLoadingField] = useState(null);
@@ -76,8 +76,9 @@ export default function Step3RincianHPS() {
   const [surveyProgress, setSurveyProgress] = useState('');
   const [surveyProgressPercent, setSurveyProgressPercent] = useState(0);
 
-  const [customPrices, setCustomPrices] = useState({});
-  const [customKeywords, setCustomKeywords] = useState({});
+  const [customTargets, setCustomTargets] = useState({});
+  const [customMinPrices, setCustomMinPrices] = useState({});
+  const [customMaxPrices, setCustomMaxPrices] = useState({});
   const [loadingProductIndex, setLoadingProductIndex] = useState(null);
   const [expandedEditCardIndex, setExpandedEditCardIndex] = useState(null);
   const [expandedSurveyRows, setExpandedSurveyRows] = useState({});
@@ -87,7 +88,7 @@ export default function Step3RincianHPS() {
   const [globalPriceTolerance, setGlobalPriceTolerance] = useState(8);
   const [globalTargetVendor, setGlobalTargetVendor] = useState('SULTONI');
   const [searchLocations, setSearchLocations] = useState('Kab.Probolinggo');
-  const [customTargets, setCustomTargets] = useState({});
+  const [customKeywords, setCustomKeywords] = useState({});
   
   const [ignorePriceLimit, setIgnorePriceLimit] = useState(false);
   const [autoComparator, setAutoComparator] = useState(false);
@@ -169,6 +170,26 @@ export default function Step3RincianHPS() {
     }));
   }, [selectedTplId]); 
 
+  // Auto-fill MAK and Tahun Anggaran from selectedPack if they are empty
+  useEffect(() => {
+    if (selectedPack) {
+      setPackageMetadata(prev => {
+        let updated = false;
+        const next = { ...prev };
+        if (!next.mak && selectedPack.mak) {
+          next.mak = selectedPack.mak;
+          updated = true;
+        }
+        if (!next.tahun_anggaran) {
+          next.tahun_anggaran = selectedPack.tahun || '2026';
+          updated = true;
+        }
+        return updated ? next : prev;
+      });
+    }
+  }, [selectedPack, setPackageMetadata]);
+
+
 
 
 
@@ -218,7 +239,7 @@ export default function Step3RincianHPS() {
       if (paguDifference < 1000) return true
 
       // 2. Dynamic Keyword Matching
-      const accWords = acc.name.toLowerCase().split(/[\s/.,()-]+/)
+      const accWords = (acc.name || '').toLowerCase().split(/[\s/.,()-]+/)
       const keywords = accWords.filter(w => w.length > 2 && !stopWords.includes(w))
 
       const packNameLower = (pack.packName || '').toLowerCase()
@@ -249,7 +270,7 @@ export default function Step3RincianHPS() {
       if (paguDifference < 1000) return true
 
       // 2. Dynamic Keyword Matching
-      const accWords = acc.name.toLowerCase().split(/[\s/.,()-]+/)
+      const accWords = (acc.name || '').toLowerCase().split(/[\s/.,()-]+/)
       const keywords = accWords.filter(w => w.length > 2 && !stopWords.includes(w))
 
       const packNameLower = (pack.packName || '').toLowerCase()
@@ -268,40 +289,6 @@ export default function Step3RincianHPS() {
    * Prioritas: (1) dpaRincian[kode_rekening cocok], (2) dpaRincian['manual_nosirup_xxx'],
    * (3) item placeholder agar tabel tidak kosong.
    */
-  const getPackageItems = (pack) => {
-    if (!pack) return []
-
-    // Cari kode rekening DPA yang cocok dengan paket ini (by pagu atau keyword)
-    const matchedAcc = getMatchingDpaAccount(pack)
-    const kodeRekening = matchedAcc?.account
-
-    // 1. Ambil rincian dari DPA Ground Truth berdasarkan kode rekening
-    if (kodeRekening && dpaRincian[kodeRekening] && dpaRincian[kodeRekening].length > 0) {
-      return dpaRincian[kodeRekening].map((r, i) => ({
-        no: i + 1,
-        name: r.nama,
-        qty: r.volume,
-        unit: r.satuan,
-        price: r.harga_satuan,
-      }))
-    }
-
-    // 2. Coba kunci noSirup langsung
-    const keyNoSirup = `nosirup_${pack.noSirup}`
-    if (dpaRincian[keyNoSirup] && dpaRincian[keyNoSirup].length > 0) {
-      return dpaRincian[keyNoSirup].map((r, i) => ({
-        no: i + 1, name: r.nama, qty: r.volume, unit: r.satuan, price: r.harga_satuan,
-      }))
-    }
-
-    // 3. Placeholder — PPK perlu isi manual rincian
-    return [
-      { no: 1, name: '⚠️ Rincian belum tersedia — klik "Edit Rincian" pada tabel DPA di atas', qty: 1, unit: 'Paket', price: pack.pagu }
-    ]
-  }
-
-
-
   const autoCleanKeyword = (name) => {
     if (!name) return '';
     let clean = name;
@@ -347,7 +334,9 @@ export default function Step3RincianHPS() {
         return {
           name: item.name,
           query: rawQuery,
-          fallbackPrice: customPrices[idx] ? parseInt(customPrices[idx].toString().replace(/\D/g, ''), 10) : item.price,
+          fallbackPrice: item.price,
+          explicitMinPrice: customMinPrices[idx] ? parseInt(customMinPrices[idx].toString().replace(/\D/g, ''), 10) : null,
+          explicitMaxPrice: customMaxPrices[idx] ? parseInt(customMaxPrices[idx].toString().replace(/\D/g, ''), 10) : null,
           priceTolerance: globalPriceTolerance,
           targetVendor: customTargets[idx] || globalTargetVendor || '',
           targetUrl: (customTargets[idx] && customTargets[idx].startsWith('http')) ? customTargets[idx] : ''
@@ -403,9 +392,12 @@ export default function Step3RincianHPS() {
           break;
         } else if (statusData.status === 'failed') {
           throw new Error('Gagal memproses data: ' + statusData.error);
+        } else if (statusData.status === 'waiting' && statusData.progress === 0) {
+          // Masih mengantre, belum diambil worker — tetap tampilkan progress awal
+          setSurveyProgress(`Mengantre di Worker (Job ID: ${runRes.jobId})...`);
         } else {
-          // Hanya update jika progress bertambah agar tidak mundur
-          if (statusData.progress > 5) {
+          // Sedang diproses — update progress langsung tanpa threshold
+          if (statusData.progress > 0) {
             setSurveyProgressPercent(statusData.progress);
             setSurveyProgress(`Sistem sedang mencari harga di E-Katalog (${statusData.progress}% selesai)...`);
           }
@@ -426,13 +418,30 @@ export default function Step3RincianHPS() {
         totalHpsEstimate += (res.price * qty);
         
         // Auto-Comparator Capture
-        if (autoComparator && res.comparator) {
+        if (autoComparator && res.comparators && res.comparators.length > 0) {
+          const comp = res.comparators[0];
           newComparisons['ITEM-' + index] = {
-            vendor: res.comparator.vendor,
-            name: res.comparator.name,
-            price: res.comparator.price,
-            status: res.comparator.status
+            vendor: comp.vendor,
+            name: comp.name,
+            price: comp.price,
+            status: comp.status,
+            link: comp.link,
+            alasan: comp.alasan,
+            isAuto: true
           };
+          
+          if (res.comparators.length > 1) {
+            const comp2 = res.comparators[1];
+            newComparisons['ITEM-' + index + '-2'] = {
+              vendor: comp2.vendor,
+              name: comp2.name,
+              price: comp2.price,
+              status: comp2.status,
+              link: comp2.link,
+              alasan: comp2.alasan,
+              isAuto: true
+            };
+          }
         }
       });
       setComparisons(newComparisons);
@@ -492,7 +501,9 @@ export default function Step3RincianHPS() {
     const requestItems = [{
       name: targetItem.name,
       query: customQuery,
-      fallbackPrice: customPrices[productIndex] ? parseInt(customPrices[productIndex].toString().replace(/\D/g, ''), 10) : targetItem.price,
+      fallbackPrice: targetItem.price,
+      explicitMinPrice: customMinPrices[productIndex] ? parseInt(customMinPrices[productIndex].toString().replace(/\D/g, ''), 10) : null,
+      explicitMaxPrice: customMaxPrices[productIndex] ? parseInt(customMaxPrices[productIndex].toString().replace(/\D/g, ''), 10) : null,
       priceTolerance: globalPriceTolerance,
       targetVendor: customTargets[productIndex] || globalTargetVendor || '',
       targetUrl: (customTargets[productIndex] && customTargets[productIndex].startsWith('http')) ? customTargets[productIndex] : ''
@@ -547,11 +558,18 @@ export default function Step3RincianHPS() {
         };
         const updatedData = { ...surveyData, products: updatedProducts };
         setSurveyData(updatedData);
-        // Update di konteks global
+        // Update di konteks global (jika ingin disimpan permanen)
+        const matchedAcc = getMatchingDpaAccount(selectedPack);
+        const kodeRekening = matchedAcc?.account || `nosirup_${selectedPack?.noSirup}`;
         const rincianItems = { ...dpaRincian };
-        if (rincianItems[surveyData.category]) {
-            rincianItems[surveyData.category] = updatedData;
-            setDpaRincian(rincianItems);
+        // Menyimpan status survey ke dpaRincian tidak sepenuhnya didukung struktur saat ini
+        // Kita hanya akan mengandalkan surveyData global.
+        
+        if (singleRes.success) {
+          setHpsPrices(prev => ({
+            ...prev,
+            [targetItem.name]: singleRes.price
+          }));
         }
         
         if (singleRes.success) {
@@ -634,7 +652,9 @@ export default function Step3RincianHPS() {
         requestItems.push({
           name: items[idx].name,
           query: customKeywords[idx].trim(),
-          fallbackPrice: customPrices[idx] ? parseInt(customPrices[idx].toString().replace(/\D/g, ''), 10) : (items[idx].price || items[idx].paguDpa),
+          fallbackPrice: items[idx].price || items[idx].paguDpa,
+          explicitMinPrice: customMinPrices[idx] ? parseInt(customMinPrices[idx].toString().replace(/\D/g, ''), 10) : null,
+          explicitMaxPrice: customMaxPrices[idx] ? parseInt(customMaxPrices[idx].toString().replace(/\D/g, ''), 10) : null,
           priceTolerance: globalPriceTolerance,
           targetVendor: customTargets[idx] || globalTargetVendor || '',
           targetUrl: (customTargets[idx] && customTargets[idx].startsWith('http')) ? customTargets[idx] : ''
@@ -700,7 +720,6 @@ export default function Step3RincianHPS() {
       results.forEach((res, i) => {
         const originalIndex = indicesToSearch[i];
         const targetItem = items[originalIndex];
-        const customQuery = requestItems[i].query;
 
         updatedProducts[originalIndex] = {
           ...updatedProducts[originalIndex],
@@ -717,14 +736,18 @@ export default function Step3RincianHPS() {
         newHpsPrices[targetItem.name] = res.price;
 
         // Auto-Comparator Capture
-        if (autoComparator && res.comparator) {
+        if (autoComparator && res.comparators && res.comparators.length > 0) {
+          const comp = res.comparators[0];
           setComparisons(prev => ({
             ...prev,
             ['ITEM-' + originalIndex]: {
-              vendor: res.comparator.vendor,
-              name: res.comparator.name,
-              price: res.comparator.price,
-              status: res.comparator.status
+              vendor: comp.vendor,
+              name: comp.name,
+              price: comp.price,
+              status: comp.status,
+              link: comp.link,
+              alasan: comp.alasan,
+              isAuto: true
             }
           }));
         }
@@ -789,8 +812,8 @@ export default function Step3RincianHPS() {
 
             {selectedPack && (() => {
               const isPaguExempt = selectedPack.pagu <= 10000000;
-              const isEPurchasing = selectedPack.method && selectedPack.method.toLowerCase().includes('e-purchasing');
-              const isDirectProcurement = selectedPack.method && selectedPack.method.toLowerCase().includes('pengadaan langsung');
+              const isEPurchasing = selectedPack.method && (selectedPack.method || '').toLowerCase().includes('e-purchasing');
+              const isDirectProcurement = selectedPack.method && (selectedPack.method || '').toLowerCase().includes('pengadaan langsung');
               const isExempt = isPaguExempt || isEPurchasing || isDirectProcurement;
 
               if (!isExempt) return null;
@@ -854,32 +877,22 @@ export default function Step3RincianHPS() {
 
             <div className="space-y-4">
               {/* Asisten AI Survei */}
-              <div className="mb-6 bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">Asisten Survei HPS &amp; Referensi e-Katalog</h4>
-                  <p className="text-xs text-slate-500 mt-1 max-w-lg mb-3">Gunakan AI untuk mencari referensi harga pasar dari e-Katalog secara otomatis. Bukti URL &amp; Screenshot akan dilampirkan di DPP.</p>
-                  {surveyData && (
-                    <button
-                      onClick={() => {
-                        if (window.confirm('Apakah Anda yakin ingin mereset hasil survei ini? Semua referensi harga dan link e-Katalog yang tersimpan akan dihapus.')) {
-                          setSurveyData(null);
-                          setSurveyLogs([]);
-                          setCustomPrices({});
-                          setHpsPrices({});
-                        }
-                      }}
-                      disabled={isSurveying}
-                      className="bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-200 text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-sm transition-all flex items-center gap-1.5 active:scale-95 inline-flex w-fit"
-                      title="Reset Survei"
-                    >
-                      🔄 Reset Survei
-                    </button>
-                  )}
+              <div className="mb-6 bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
+                {/* Row 1: Title + Reset button */}
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">Asisten Survei HPS &amp; Referensi e-Katalog</h4>
+                    <p className="text-xs text-slate-500 mt-1 max-w-lg">Gunakan AI untuk mencari referensi harga pasar dari e-Katalog secara otomatis. Bukti URL &amp; Screenshot akan dilampirkan di DPP.</p>
+                  </div>
                 </div>
 
+                {/* Row 2: Loading bar (full width, only when surveying) */}
                 {isSurveying && (
-                  <div className="mb-4 bg-emerald-50 border border-emerald-100 p-4 rounded-xl shadow-sm flex items-center gap-4 animate-in fade-in zoom-in duration-300">
-                    <img src="/img/pbj-loader-flip.svg" alt="Loading Survei" className="w-20 h-20 shrink-0" />
+                  <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl shadow-sm flex items-center gap-4 animate-in fade-in zoom-in duration-300">
+                    {/* wrapper overflow-hidden + scale untuk crop tepian kosong SVG */}
+                    <div className="w-16 h-16 shrink-0 overflow-hidden flex items-center justify-center">
+                      <img src="/img/pbj-loader-flip.svg?v=1" alt="Loading Survei" className="w-full h-full scale-[2]" />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between text-[11px] font-bold text-emerald-800 mb-2 px-1">
                         <span className="truncate pr-2">{surveyProgress}</span>
@@ -897,7 +910,8 @@ export default function Step3RincianHPS() {
                   </div>
                 )}
 
-                <div className="flex flex-col sm:flex-row items-center gap-4 w-full">
+                {/* Row 3: Controls (toggles left, buttons right) */}
+                <div className="flex flex-col sm:flex-row items-start gap-4">
                   <div className="flex-1 space-y-3">
                     {/* Switch AI */}
                     <div className="flex items-center gap-2">
@@ -972,30 +986,56 @@ export default function Step3RincianHPS() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-2.5 w-full sm:w-auto mt-2 sm:mt-0">
+                  <div className="flex flex-col gap-2.5 w-full sm:w-48">
                     {isSurveying ? (
                       <button
                         onClick={cancelSurvey}
-                        className="bg-red-500 hover:bg-red-600 text-white text-xs font-bold px-6 py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-md shadow-red-500/20 active:scale-95 animate-pulse w-full sm:w-48"
+                        className="bg-red-500 hover:bg-red-600 text-white text-xs font-bold px-6 py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-md shadow-red-500/20 active:scale-95 animate-pulse w-full"
                       >
                         <span className="text-sm">⏹</span> Hentikan Survei
                       </button>
                     ) : (
                       <button
                         onClick={runAiSurvey}
-                        className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold px-6 py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-md shadow-indigo-500/20 active:scale-95 w-full sm:w-48"
+                        className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold px-6 py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-md shadow-indigo-500/20 active:scale-95 w-full"
                       >
                         Mulai Survei Otomatis
                       </button>
                     )}
+                    <button
+                      onClick={handleBatchCustomSearch}
+                      disabled={isSurveying || !surveyData}
+                      className={`text-xs font-bold px-6 py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 w-full ${
+                        surveyData && !isSurveying
+                          ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                          : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                      }`}
+                      title="Cari ulang semua barang yang sudah Anda ketikkan kata kunci barunya sekaligus"
+                    >
+                      🔍 Cari Ulang
+                    </button>
                     {surveyData && (
                       <button
-                        onClick={handleBatchCustomSearch}
+                        onClick={() => {
+                          if (window.confirm('Apakah Anda yakin ingin mereset hasil survei ini? Semua referensi harga dan link e-Katalog yang tersimpan akan dihapus.')) {
+                            setSurveyData(null);
+                            setSurveyLogs([]);
+                            setCustomMinPrices({});
+                            setCustomMaxPrices({});
+                            setHpsPrices({});
+                            setComparisons({});
+                            setScreenshotStatus({});
+                            setExpandedSurveyRows({});
+                            // Hapus juga dari localStorage agar tidak kembali saat direfresh
+                            localStorage.removeItem('pbj_survey_data');
+                            localStorage.removeItem('pbj_hps_prices');
+                          }
+                        }}
                         disabled={isSurveying}
-                        className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-bold px-6 py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 w-full sm:w-48"
-                        title="Cari ulang semua barang yang sudah Anda ketikkan kata kunci barunya sekaligus (Sesuai Filter Wilayah)"
+                        className="text-[11px] font-bold px-6 py-2 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 transition-all flex items-center justify-center gap-1.5 active:scale-95 w-full"
+                        title="Hapus semua hasil survei dan mulai ulang"
                       >
-                        🔍 Cari Ulang
+                        🔄 Reset Survei
                       </button>
                     )}
                   </div>
@@ -1095,6 +1135,9 @@ export default function Step3RincianHPS() {
                                     <div className="flex flex-col gap-0.5">
                                       <span className="text-[10px] font-bold text-slate-700 truncate max-w-[150px]" title={surveyItem.vendor}>🏪 {surveyItem.vendor}</span>
                                       <a href={surveyItem.link} target="_blank" rel="noopener noreferrer" className="text-[9px] text-indigo-600 hover:text-indigo-800 underline">Tautan Produk</a>
+                                      {surveyItem.isFallbackScreenshot && (
+                                        <span className="text-[8px] font-bold text-amber-600 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 w-fit mt-0.5" title="Menggunakan screenshot hasil pencarian karena halaman detail error/diblokir">⚠️ Mode Pencarian</span>
+                                      )}
                                     </div>
                                   ) : (
                                     <span className="text-[9px] text-slate-400 italic bg-slate-100 px-1.5 py-0.5 rounded">Belum disurvei</span>
@@ -1249,7 +1292,7 @@ export default function Step3RincianHPS() {
                                                 ) : (
                                                   <button
                                                     onClick={() => captureScreenshot(p)}
-                                                    className="text-[10px] font-bold text-white bg-slate-800 hover:bg-slate-900 px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5"
+                                                    className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5"
                                                   >
                                                     📸 Sepakati & Ambil Screenshot
                                                   </button>
@@ -1299,16 +1342,29 @@ export default function Step3RincianHPS() {
                                                     disabled={isLoading}
                                                   />
                                                 </div>
-                                                <div>
-                                                  <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Harga Maks. (Opsional)</label>
-                                                  <input
-                                                    type="number"
-                                                    value={customPrices[idx] || ''}
-                                                    onChange={(e) => setCustomPrices({ ...customPrices, [idx]: e.target.value })}
-                                                    placeholder={`< ${p.price || p.paguDpa}`}
-                                                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] focus:ring-1 focus:ring-indigo-500"
-                                                    disabled={isLoading}
-                                                  />
+                                                <div className="flex gap-2">
+                                                  <div className="flex-1">
+                                                    <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Harga Minimal (Opsional)</label>
+                                                    <input
+                                                      type="number"
+                                                      value={customMinPrices[idx] || ''}
+                                                      onChange={(e) => setCustomMinPrices({ ...customMinPrices, [idx]: e.target.value })}
+                                                      placeholder={`> ${(p.price || p.paguDpa) * 0.5}`}
+                                                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] focus:ring-1 focus:ring-indigo-500"
+                                                      disabled={isLoading}
+                                                    />
+                                                  </div>
+                                                  <div className="flex-1">
+                                                    <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Harga Maksimal (Opsional)</label>
+                                                    <input
+                                                      type="number"
+                                                      value={customMaxPrices[idx] || ''}
+                                                      onChange={(e) => setCustomMaxPrices({ ...customMaxPrices, [idx]: e.target.value })}
+                                                      placeholder={`< ${p.price || p.paguDpa}`}
+                                                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] focus:ring-1 focus:ring-indigo-500"
+                                                      disabled={isLoading}
+                                                    />
+                                                  </div>
                                                 </div>
                                               </div>
                                               
@@ -1353,6 +1409,35 @@ export default function Step3RincianHPS() {
                                                     <option value="Toko Daring">Toko Daring</option>
                                                     <option value="E-Katalog">E-Katalog</option>
                                                   </select>
+                                                </div>
+                                              </div>
+                                              <div className="mt-3 pt-3 border-t border-slate-100">
+                                                <h5 className="text-[9px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Atribut Evaluasi Tambahan (Tampil di Cetak)</h5>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                  <input 
+                                                    type="text" placeholder="Lokasi Dapur/Toko" 
+                                                    value={(comparisons[p.id] && comparisons[p.id].lokasi) || ''}
+                                                    onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), lokasi: e.target.value}})}
+                                                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[9px]"
+                                                  />
+                                                  <input 
+                                                    type="text" placeholder="Jarak & Waktu Tempuh" 
+                                                    value={(comparisons[p.id] && comparisons[p.id].jarak) || ''}
+                                                    onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), jarak: e.target.value}})}
+                                                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[9px]"
+                                                  />
+                                                  <input 
+                                                    type="text" placeholder="Status TKDN" 
+                                                    value={(comparisons[p.id] && comparisons[p.id].tkdn) || ''}
+                                                    onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), tkdn: e.target.value}})}
+                                                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[9px]"
+                                                  />
+                                                  <input 
+                                                    type="text" placeholder="Spesifikasi / Link" 
+                                                    value={(comparisons[p.id] && comparisons[p.id].spesifikasi) || ''}
+                                                    onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), spesifikasi: e.target.value}})}
+                                                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[9px]"
+                                                  />
                                                 </div>
                                               </div>
                                             </div>
@@ -1497,7 +1582,7 @@ export default function Step3RincianHPS() {
                                     ) : (
                                       <button
                                         onClick={() => captureScreenshot(p)}
-                                        className="text-[9px] font-bold text-white bg-slate-800 hover:bg-slate-900 px-2.5 py-1.5 rounded transition-colors flex items-center gap-1 w-full justify-center"
+                                        className="text-[9px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1.5 rounded transition-colors flex items-center gap-1 w-full justify-center"
                                       >
                                         📸 Sepakati & Ambil Screenshot
                                       </button>
@@ -1543,13 +1628,24 @@ export default function Step3RincianHPS() {
                                 />
                               </div>
                               <div>
-                                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Batas Harga Maksimal (Opsional)</label>
+                                <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Harga Minimal (Opsional)</label>
                                 <input
                                   type="number"
-                                  value={customPrices[idx] || ''}
-                                  onChange={(e) => setCustomPrices({ ...customPrices, [idx]: e.target.value })}
-                                  placeholder={`Standar: ${p.price || p.paguDpa}`}
-                                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                  value={customMinPrices[idx] || ''}
+                                  onChange={(e) => setCustomMinPrices({ ...customMinPrices, [idx]: e.target.value })}
+                                  placeholder={`> ${(p.price || p.paguDpa) * 0.5}`}
+                                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] focus:ring-1 focus:ring-indigo-500"
+                                  disabled={isLoading}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Harga Maksimal (Opsional)</label>
+                                <input
+                                  type="number"
+                                  value={customMaxPrices[idx] || ''}
+                                  onChange={(e) => setCustomMaxPrices({ ...customMaxPrices, [idx]: e.target.value })}
+                                  placeholder={`< ${p.price || p.paguDpa}`}
+                                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] focus:ring-1 focus:ring-indigo-500"
                                   disabled={isLoading}
                                 />
                               </div>
@@ -1649,6 +1745,34 @@ export default function Step3RincianHPS() {
                                       className="w-20 px-2 py-1 bg-white border border-slate-200 rounded text-[9px]"
                                     />
                                   </div>
+                                  <div className="mt-2 pt-2 border-t border-slate-200/50">
+                                    <div className="grid grid-cols-2 gap-1.5">
+                                      <input 
+                                        type="text" placeholder="Lokasi Dapur/Toko" 
+                                        value={(comparisons[p.id] && comparisons[p.id].lokasi) || ''}
+                                        onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), lokasi: e.target.value}})}
+                                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-[9px]"
+                                      />
+                                      <input 
+                                        type="text" placeholder="Jarak & Waktu Tempuh" 
+                                        value={(comparisons[p.id] && comparisons[p.id].jarak) || ''}
+                                        onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), jarak: e.target.value}})}
+                                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-[9px]"
+                                      />
+                                      <input 
+                                        type="text" placeholder="Status TKDN" 
+                                        value={(comparisons[p.id] && comparisons[p.id].tkdn) || ''}
+                                        onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), tkdn: e.target.value}})}
+                                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-[9px]"
+                                      />
+                                      <input 
+                                        type="text" placeholder="Spesifikasi Fisik" 
+                                        value={(comparisons[p.id] && comparisons[p.id].spesifikasi) || ''}
+                                        onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), spesifikasi: e.target.value}})}
+                                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-[9px]"
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1747,11 +1871,16 @@ export default function Step3RincianHPS() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Sub Kegiatan</label>
-                      <input type="text" value={packageMetadata.sub_kegiatan} onChange={(e) => setPackageMetadata({...packageMetadata, sub_kegiatan: e.target.value})} placeholder="Nama Sub Kegiatan" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                      <input type="text" value={packageMetadata.sub_kegiatan || ''} onChange={(e) => setPackageMetadata({...packageMetadata, sub_kegiatan: e.target.value})} placeholder="Nama Sub Kegiatan" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
                     </div>
-                    
-                    
-                    
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">MAK / Kode Rekening</label>
+                      <input type="text" value={packageMetadata.mak || ''} onChange={(e) => setPackageMetadata({...packageMetadata, mak: e.target.value})} placeholder="Misal: 5.1.02.01.01.0026" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tahun Anggaran</label>
+                      <input type="text" value={packageMetadata.tahun_anggaran || ''} onChange={(e) => setPackageMetadata({...packageMetadata, tahun_anggaran: e.target.value})} placeholder="Misal: 2026" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
                   </div>
 
                   
@@ -1789,8 +1918,8 @@ export default function Step3RincianHPS() {
                         }
 
                         const ndTemplates = templates.filter(t => 
-                          t.name.toLowerCase().includes('nota dinas') || 
-                          t.name.toLowerCase().includes('usulan pengadaan')
+                          (t.name || '').toLowerCase().includes('nota dinas') || 
+                          (t.name || '').toLowerCase().includes('usulan pengadaan')
                         );
                         
                         const otherTemplates = templates.filter(t => !ndTemplates.includes(t));
@@ -1876,8 +2005,8 @@ export default function Step3RincianHPS() {
                         const dppTemplates = templates.filter(t => 
                           t.category === 'Tahap Persiapan' || 
                           t.id.startsWith('TPL-006') || 
-                          t.name.toLowerCase().includes('persiapan') || 
-                          t.name.toLowerCase().includes('dpp')
+                          (t.name || '').toLowerCase().includes('persiapan') || 
+                          (t.name || '').toLowerCase().includes('dpp')
                         );
                         
                         const otherTemplates = templates.filter(t => !dppTemplates.includes(t));
@@ -2072,9 +2201,9 @@ export default function Step3RincianHPS() {
           {/* Action Buttons */}
           <div className="flex justify-end gap-4 pt-4">
             <button
-              onClick={handleSimpanPaket}
+              onClick={() => handleSimpanPaket(false)}
               disabled={isUpdating}
-              className="bg-slate-800 hover:bg-slate-900 text-white px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-50 pointer-events-auto"
+              className="bg-white border-2 border-slate-200 hover:border-indigo-500 text-slate-700 hover:text-indigo-600 px-6 py-2.5 rounded-xl font-bold transition-all disabled:opacity-50 pointer-events-auto shadow-sm"
             >
               💾 Simpan Paket
             </button>
@@ -2117,6 +2246,7 @@ export default function Step3RincianHPS() {
             isHpsExemptSelected={isHpsExemptSelected} 
             comparisons={comparisons}
             justifications={justifications}
+            autoComparator={autoComparator}
           />
     </>
   );

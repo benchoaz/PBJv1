@@ -58,8 +58,9 @@ export default function UserManagement() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [showForm, setShowForm] = useState(false)
   const [currentEditUser, setCurrentEditUser] = useState(null)
+  const [searchSatker, setSearchSatker] = useState('')
   
   // Form states
   const [name, setName] = useState('')
@@ -102,7 +103,8 @@ export default function UserManagement() {
     setIdSatker('')
     setPassword('')
     setShowPassword(false)
-    setIsModalOpen(true)
+    setSearchSatker('')
+    setShowForm(true)
   }
 
   // Open modal for Editing
@@ -116,7 +118,8 @@ export default function UserManagement() {
     setIdSatker(user.idSatker || '')
     setPassword('') // Leave blank for edit by default
     setShowPassword(false)
-    setIsModalOpen(true)
+    setSearchSatker('')
+    setShowForm(true)
   }
 
   // Handle Satker Datalist selection & autofill ID
@@ -189,7 +192,7 @@ export default function UserManagement() {
           alert('Gagal menambahkan pengguna baru')
         }
       }
-      setIsModalOpen(false)
+      setShowForm(false)
     } catch (err) {
       console.error(err)
       alert('Terjadi kesalahan jaringan')
@@ -221,12 +224,14 @@ export default function UserManagement() {
           <h1 className="text-3xl font-bold text-white tracking-tight">User Management</h1>
           <p className="text-slate-400 mt-1">Kelola hak akses pengguna (PPK, PP, KPA, Admin) untuk otorisasi dokumen pengadaan.</p>
         </div>
-        <button onClick={handleAddClick} className="btn-primary text-sm flex items-center gap-2">
-          <span>➕</span> Tambah Pengguna
-        </button>
+        {!showForm && (
+          <button onClick={handleAddClick} className="btn-primary text-sm flex items-center gap-2">
+            <span>➕</span> Tambah Pengguna
+          </button>
+        )}
       </div>
 
-      {/* Users Table */}
+      {!showForm ? (
       <div className="glass-panel overflow-hidden animate-slide-up">
         <table className="min-w-full divide-y divide-white/10">
           <thead className="bg-white/5">
@@ -284,23 +289,20 @@ export default function UserManagement() {
           </tbody>
         </table>
       </div>
-
-      {/* Add / Edit Glassmorphic Modal Overlay */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in">
-          <div className="glass-panel p-8 max-w-md w-full mx-4 animate-slide-up border border-white/20 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+      ) : (
+        <div className="glass-panel p-8 w-full animate-slide-up border border-white/20 shadow-xl relative mt-4">
             <button 
-              onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors text-lg"
+              onClick={() => setShowForm(false)}
+              className="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors text-sm flex items-center gap-2 font-medium bg-white/5 px-3 py-1.5 rounded-lg hover:bg-white/10 border border-white/10"
             >
-              ✕
+              <span>← Kembali ke Daftar</span>
             </button>
             
             <h2 className="text-2xl font-bold text-white mb-6">
               {currentEditUser ? '📝 Edit Data Pengguna' : '👤 Tambah Pengguna Baru'}
             </h2>
             
-            <form onSubmit={handleSave} className="space-y-5" autoComplete="off">
+            <form onSubmit={handleSave} className="space-y-6" autoComplete="off">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Nama Lengkap</label>
                 <input 
@@ -352,41 +354,105 @@ export default function UserManagement() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Instansi / Satuan Kerja (Dinas)</label>
-                <input 
-                  type="text"
-                  list="satker-list"
-                  className="glass-input" 
-                  value={department} 
-                  onChange={e => handleSatkerChange(e.target.value)} 
-                  placeholder="Pilih atau cari Satuan Kerja (Contoh: Kecamatan Besuk)"
-                  required
-                />
-                <datalist id="satker-list">
-                  {PROBOLINGGO_SATKERS.map((s, idx) => (
-                    <option key={idx} value={s.name} />
-                  ))}
-                </datalist>
-              </div>
+              {role === 'PP' ? (
+                <div className="col-span-1 md:col-span-2">
+                  <label className="block text-xs font-semibold text-amber-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <span>🏢 Penugasan Multi-Satker (Khusus PP)</span>
+                  </label>
+                  <div className="text-[10px] text-slate-400 mb-3 font-medium italic">
+                    Centang instansi mana saja yang akan ditangani oleh Pejabat Pengadaan ini. Anda juga bisa mencari menggunakan kotak pencarian di bawah.
+                  </div>
+                  
+                  <div className="mb-3 relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-slate-500">🔍</span>
+                    </div>
+                    <input 
+                      type="text" 
+                      className="glass-input pl-10 text-sm py-2" 
+                      placeholder="Cari nama satker/instansi..." 
+                      value={searchSatker}
+                      onChange={e => setSearchSatker(e.target.value)}
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-amber-300 uppercase tracking-wider mb-2 flex items-center gap-2">
-                  <span>🎯 ID Satker SIRUP Asli</span>
-                </label>
-                <input 
-                  type="text"
-                  className="glass-input font-mono text-amber-200 bg-amber-900/20 border-amber-500/30" 
-                  value={idSatker} 
-                  onChange={e => setIdSatker(e.target.value)} 
-                  placeholder="Masukkan ID angka dari SIRUP (Contoh: 308386)"
-                  autoComplete="off"
-                  required
-                />
-                <div className="text-[10px] text-slate-400 mt-1.5 font-medium italic">
-                  *Sistem akan menggunakan ID ini untuk menarik data paket dari portal SIRUP secara langsung.
+                  <div className="glass-input p-0 max-h-64 overflow-y-auto overflow-x-hidden border border-white/10 custom-scrollbar">
+                    {PROBOLINGGO_SATKERS.filter(s => s.name.toLowerCase().includes(searchSatker.toLowerCase())).map((s, idx) => {
+                      const isChecked = department.split(',').map(d => d.trim()).includes(s.name)
+                      return (
+                        <label key={idx} className="flex items-start gap-3 p-3 hover:bg-white/5 cursor-pointer border-b border-white/5 last:border-0 transition-colors">
+                          <input 
+                            type="checkbox" 
+                            className="mt-0.5 rounded border-slate-500 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              let currentNames = department.split(',').map(str => str.trim()).filter(Boolean)
+                              let currentIds = idSatker.split(',').map(str => str.trim()).filter(Boolean)
+                              
+                              if (e.target.checked) {
+                                if (!currentNames.includes(s.name)) {
+                                  currentNames.push(s.name)
+                                  currentIds.push(s.idSatker)
+                                }
+                              } else {
+                                const index = currentNames.indexOf(s.name)
+                                if (index > -1) {
+                                  currentNames.splice(index, 1)
+                                  currentIds.splice(index, 1)
+                                }
+                              }
+                              setDepartment(currentNames.join(', '))
+                              setIdSatker(currentIds.join(','))
+                            }}
+                          />
+                          <div className="flex flex-col">
+                            <span className={`text-sm font-medium ${isChecked ? 'text-indigo-300' : 'text-slate-300'}`}>{s.name}</span>
+                            <span className="text-[10px] text-slate-500 font-mono">ID: {s.idSatker}</span>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Instansi / Satuan Kerja (Dinas)</label>
+                    <input 
+                      type="text"
+                      list="satker-list"
+                      className="glass-input" 
+                      value={department} 
+                      onChange={e => handleSatkerChange(e.target.value)} 
+                      placeholder="Pilih atau cari Satuan Kerja (Contoh: Kecamatan Besuk)"
+                      required
+                    />
+                    <datalist id="satker-list">
+                      {PROBOLINGGO_SATKERS.map((s, idx) => (
+                        <option key={idx} value={s.name} />
+                      ))}
+                    </datalist>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-amber-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                      <span>🎯 ID Satker SIRUP Asli</span>
+                    </label>
+                    <input 
+                      type="text"
+                      className="glass-input font-mono text-amber-200 bg-amber-900/20 border-amber-500/30" 
+                      value={idSatker} 
+                      onChange={e => setIdSatker(e.target.value)} 
+                      placeholder="Masukkan ID angka dari SIRUP (Contoh: 308386)"
+                      autoComplete="off"
+                      required
+                    />
+                    <div className="text-[10px] text-slate-400 mt-1.5 font-medium italic">
+                      *Sistem akan menggunakan ID ini untuk menarik data paket dari portal SIRUP secara langsung.
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
@@ -426,23 +492,22 @@ export default function UserManagement() {
                 )}
               </div>
 
-              <div className="flex gap-4 pt-4 border-t border-white/10">
+              <div className="flex justify-end gap-4 pt-6 border-t border-white/10 mt-8">
                 <button 
                   type="button" 
-                  onClick={() => setIsModalOpen(false)}
-                  className="btn-secondary w-full py-2.5"
+                  onClick={() => setShowForm(false)}
+                  className="btn-secondary px-6 py-2.5"
                 >
                   Batal
                 </button>
                 <button 
                   type="submit" 
-                  className="btn-primary w-full py-2.5"
+                  className="btn-primary px-8 py-2.5"
                 >
                   {currentEditUser ? 'Simpan Perubahan' : 'Tambah Pengguna'}
                 </button>
               </div>
             </form>
-          </div>
         </div>
       )}
     </div>

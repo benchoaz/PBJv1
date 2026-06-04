@@ -83,8 +83,8 @@ export default function Step2UploadDPA() {
   const fetchSirupPackages = async (targetSatkerId) => {
     setIsFetchingSirup(true);
     try {
-      const target = targetSatkerId || satkerId || '67081';
-      const response = await fetch(`/api/sirup/satker/${target}?tahun=2026`);
+      const target = targetSatkerId || satkerId;
+      const response = await fetch(`/api/sirup/satker/${target}?tahun=${new Date().getFullYear()}`);
       if (!response.ok) throw new Error(`Server returned error: ${response.status}`);
       const data = await response.json();
       const pkgs = data.packages || data.data || (Array.isArray(data) ? data : null);
@@ -985,9 +985,9 @@ export default function Step2UploadDPA() {
                                 pagu: best.pagu,
                                 method: best.method || 'Pengadaan Langsung',
                                 sumberDana: best.sumberDana || 'APBD',
-                                tahun: best.tahun || '2026',
-                                klpd: 'Kab. Probolinggo',
-                                satker: 'Kecamatan Besuk',
+                                tahun: best.tahun || new Date().getFullYear().toString(),
+                                klpd: currentUser?.perangkatDaerah || '',
+                                satker: currentUser?.department || '',
                                 volume: '1 Paket',
                                 uraian: best.packName,
                                 spesifikasi: 'Spesifikasi Sesuai Rincian DPA',
@@ -1256,9 +1256,9 @@ function SirupInputRow({ acc, onLink, sirupPackages = [], onFetchSirup, selected
  pagu: pack.pagu,
  method: pack.method || 'Pengadaan Langsung',
  sumberDana: pack.sumberDana || 'APBD',
- tahun: pack.tahun || '2026',
- klpd: 'Kab. Probolinggo',
- satker: 'Kecamatan Besuk',
+ tahun: pack.tahun || new Date().getFullYear().toString(),
+ klpd: currentUser?.perangkatDaerah || '',
+ satker: currentUser?.department || '',
  volume: '1 Paket',
  uraian: pack.packName,
  spesifikasi: 'Spesifikasi Sesuai Rincian DPA',

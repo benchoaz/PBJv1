@@ -271,17 +271,26 @@ async function searchItem(page, item, index) {
       // ── FIX: Jika ignorePriceLimit=true, JANGAN kirim filter harga ke inaproc sama sekali
       // (sebelumnya maxPrice tetap terkirim ke URL meski toggle "Abaikan Harga" aktif,
       //  sehingga inaproc memblokir produk di atas pagu sebelum logika scoring kita melihatnya)
-      if (item.fallbackPrice && item.fallbackPrice > 0 && !item.ignorePriceLimit) {
-        const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.025;
-        // Hanya terapkan minPrice jika TIDAK ada target penyedia
-        // (produk vendor target bisa lebih murah dari pagu)
-        if (!item.targetVendor) {
-          const minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
+      if (!item.ignorePriceLimit) {
+        let minPrice = item.explicitMinPrice;
+        let maxPrice = item.explicitMaxPrice;
+        
+        if (item.fallbackPrice && item.fallbackPrice > 0) {
+          const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.025;
+          if (minPrice === undefined || minPrice === null) {
+            minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
+          }
+          if (maxPrice === undefined || maxPrice === null) {
+            maxPrice = Math.floor(item.fallbackPrice * (1 + tolerance));
+          }
+        }
+        
+        if (minPrice !== undefined && minPrice !== null) {
           sUrl += `&minPrice=${minPrice}`;
         }
-        // maxPrice = pagu adalah batas ATAS yang tidak boleh dilanggar (saat mode normal)
-        const maxPrice = Math.floor(item.fallbackPrice * (1 + tolerance));
-        sUrl += `&maxPrice=${maxPrice}`;
+        if (maxPrice !== undefined && maxPrice !== null) {
+          sUrl += `&maxPrice=${maxPrice}`;
+        }
       }
       
       if (item.locations && item.locations.length > 0) {
@@ -329,6 +338,24 @@ async function searchItem(page, item, index) {
           if (rCodes.length > 0) sFallbackUrl += '&regionCode=' + encodeURIComponent(rCodes.join(','));
         }
         searchScenarios.push({ url: sFallbackUrl, query: q, type: 'global-noprice' });
+      });
+    }
+
+    // ── FALLBACK NASIONAL ──
+    // Jika user menginput lokasi, tapi di lokasi tersebut kosong, kita fallback cari secara nasional (tanpa region)
+    if (item.locations && item.locations.length > 0) {
+      attempts.forEach(q => {
+        let sNasionalUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(q);
+        if (!item.ignorePriceLimit && item.fallbackPrice && item.fallbackPrice > 0) {
+          let minPrice = item.explicitMinPrice;
+          let maxPrice = item.explicitMaxPrice;
+          const tolerance = 0.3;
+          if (minPrice === undefined || minPrice === null) minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
+          if (maxPrice === undefined || maxPrice === null) maxPrice = Math.floor(item.fallbackPrice * (1 + tolerance));
+          if (minPrice !== undefined && minPrice !== null) sNasionalUrl += `&minPrice=${minPrice}`;
+          if (maxPrice !== undefined && maxPrice !== null) sNasionalUrl += `&maxPrice=${maxPrice}`;
+        }
+        searchScenarios.push({ url: sNasionalUrl, query: q, type: 'fallback-nasional' });
       });
     }
 
@@ -466,9 +493,24 @@ async function searchItem(page, item, index) {
         // HUKUM BATAS PAGU (PRICE CEILING) — berlaku mutlak
         const isTargetMatch = vendorMatchKeyword && cand.vendor.toLowerCase().includes(vendorMatchKeyword.toLowerCase());
         
-        if (!item.ignorePriceLimit && item.fallbackPrice && cand.price && cand.price > item.fallbackPrice) {
-          console.log(`    🚫 [TOLAK] Harga Rp ${cand.price} melampaui PAGU DPA (Rp ${item.fallbackPrice}): ${cand.title}`);
-          return; // Lompati kandidat ini
+        if (!item.ignorePriceLimit) {
+          let minPrice = item.explicitMinPrice;
+          let maxPrice = item.explicitMaxPrice;
+          
+          if (item.fallbackPrice && item.fallbackPrice > 0) {
+            const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.025;
+            if (minPrice === undefined || minPrice === null) minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
+            if (maxPrice === undefined || maxPrice === null) maxPrice = Math.floor(item.fallbackPrice * (1 + tolerance));
+          }
+          
+          if (minPrice !== undefined && minPrice !== null && cand.price < minPrice) {
+            console.log(`    🚫 [TOLAK] Harga Rp ${cand.price} terlalu murah (di bawah batas Rp ${minPrice}): ${cand.title}`);
+            return;
+          }
+          if (maxPrice !== undefined && maxPrice !== null && cand.price > maxPrice) {
+            console.log(`    🚫 [TOLAK] Harga Rp ${cand.price} melampaui batas atas (Rp ${maxPrice}): ${cand.title}`);
+            return;
+          }
         }
 
         let score = getSimilarityScore(searchTarget, cand.title);
@@ -515,24 +557,44 @@ async function searchItem(page, item, index) {
       });
     }
 
-    let autoComparator = null;
+    let comparators = [];
     const isValidMatch = bestCandidate && highestScore >= 0.01;
     if (isValidMatch) {
       console.log(`  🌟 Produk Terpilih: "${bestCandidate.title}" dengan skor ${highestScore.toFixed(3)}`);
       
       // AUTO-COMPARATOR LOGIC
-      const otherCandidates = searchData.filter(c => c !== bestCandidate && c.price && c.price > bestCandidate.price);
+      // Aturan ketat: Penyedia pembanding TIDAK BOLEH sama dengan penyedia target.
+      const otherCandidates = searchData.filter(c => 
+        c !== bestCandidate && 
+        c.price && 
+        c.price > bestCandidate.price &&
+        c.vendor !== bestCandidate.vendor
+      );
+      
       if (otherCandidates.length > 0) {
         otherCandidates.sort((a, b) => a.price - b.price);
-        let diffVendor = otherCandidates.find(c => c.vendor !== bestCandidate.vendor);
-        let chosenComp = diffVendor || otherCandidates[0];
-        autoComparator = {
-          name: chosenComp.title,
-          vendor: chosenComp.vendor,
-          price: chosenComp.price,
+        
+        comparators.push({
+          name: otherCandidates[0].title,
+          vendor: otherCandidates[0].vendor,
+          price: otherCandidates[0].price,
+          link: 'https://katalog.inaproc.id' + otherCandidates[0].productHref,
+          alasan: 'Harga e-Katalog lebih efisien dari harga pembanding',
           status: 'Dalam Katalog'
-        };
-        console.log(`  ⚖️ Auto-Comparator Ditemukan: ${autoComparator.vendor} - Rp ${autoComparator.price}`);
+        });
+        console.log(`  ⚖️ Auto-Comparator 1 Ditemukan: ${comparators[0].vendor} - Rp ${comparators[0].price}`);
+
+        if (otherCandidates.length > 1) {
+          comparators.push({
+            name: otherCandidates[1].title,
+            vendor: otherCandidates[1].vendor,
+            price: otherCandidates[1].price,
+            link: 'https://katalog.inaproc.id' + otherCandidates[1].productHref,
+            alasan: 'Alternatif pembanding e-Katalog dengan harga lebih tinggi',
+            status: 'Dalam Katalog'
+          });
+          console.log(`  ⚖️ Auto-Comparator 2 Ditemukan: ${comparators[1].vendor} - Rp ${comparators[1].price}`);
+        }
       }
     } else {
       if (bestCandidate) {
@@ -543,11 +605,17 @@ async function searchItem(page, item, index) {
 
     // ── STEP 3: Navigate to product detail (Direct clean link) ─────────
     let detailUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(successfulQuery || searchTarget);
-    if (item.fallbackPrice && item.fallbackPrice > 0) {
-      const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.025;
-      const minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
-      const maxPrice = Math.floor(item.fallbackPrice * (1 + tolerance));
-      detailUrl += `&minPrice=${minPrice}&maxPrice=${maxPrice}`;
+    if (!item.ignorePriceLimit) {
+      let minPrice = item.explicitMinPrice;
+      let maxPrice = item.explicitMaxPrice;
+      
+      if (item.fallbackPrice && item.fallbackPrice > 0) {
+        const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.025;
+        if (minPrice === undefined || minPrice === null) minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
+        if (maxPrice === undefined || maxPrice === null) maxPrice = Math.floor(item.fallbackPrice * (1 + tolerance));
+      }
+      if (minPrice !== undefined && minPrice !== null) detailUrl += `&minPrice=${minPrice}`;
+      if (maxPrice !== undefined && maxPrice !== null) detailUrl += `&maxPrice=${maxPrice}`;
     }
     if (item.locations && item.locations.length > 0) {
         let rNames = [];
@@ -570,6 +638,7 @@ async function searchItem(page, item, index) {
     let detailFile = searchFile; // fallback to search screenshot
     let finalVendor = 'PENYEDIA INAPROC';
     let finalPrice = item.fallbackPrice;
+    const originalSearchUrl = detailUrl;
 
     if (isValidMatch) {
       // Tautan langsung produk format bersih: https://katalog.inaproc.id/{nama-lapak}/{nama-produk}
@@ -582,6 +651,20 @@ async function searchItem(page, item, index) {
         console.log(`  → Membuka halaman detail produk terpilih: ${directUrl}`);
         await page.goto(directUrl, { waitUntil: 'networkidle2', timeout: 45000 });
         await new Promise(r => setTimeout(r, 4000));
+
+        // --- SMART VALIDATION (Deteksi Soft 404) ---
+        const isSoft404 = await page.evaluate(() => {
+          const bodyText = document.body.innerText || '';
+          if (bodyText.includes('Produk Tidak Ditemukan') || bodyText.includes('Page Not Found') || !bodyText.includes('Rp')) {
+            return true;
+          }
+          return false;
+        });
+
+        if (isSoft404) {
+          throw new Error('Halaman detail kosong atau produk tidak ditemukan (Soft 404)');
+        }
+        // -------------------------------------------
 
         // Ambil screenshot detail asli
         detailFile = path.join(screenshotDir, safeId + '_detail.png');
@@ -613,6 +696,61 @@ async function searchItem(page, item, index) {
 
       } catch (err) {
         console.log(`  ⚠️ Gagal buka detail (${err.message}), menggunakan data hasil pencarian`);
+        detailUrl = originalSearchUrl; // Revert link to match the fallback search screenshot
+        
+        // --- VISUAL HIGHLIGHT FALLBACK ---
+        console.log(`  → Menyuntikkan KOTAK MERAH pada hasil pencarian global...`);
+        try {
+           await page.goto(originalSearchUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+           await new Promise(r => setTimeout(r, 4000));
+           
+           await page.evaluate((targetTitle) => {
+              const anchors = Array.from(document.querySelectorAll('a[href]'));
+              let targetElement = null;
+              
+              // Cari kartu yang mengandung judul target
+              for (const a of anchors) {
+                const text = a.innerText || '';
+                // Abaikan link header/footer
+                if (!a.getAttribute('href').startsWith('/') || a.getAttribute('href') === '/' || a.getAttribute('href') === '/search') continue;
+                
+                if (text.toLowerCase().includes(targetTitle.toLowerCase())) {
+                   targetElement = a;
+                   break;
+                }
+              }
+              
+              if (targetElement) {
+                // Beri efek blur pada semua kartu lain agar auditor fokus ke target
+                anchors.forEach(card => {
+                  if (card.getAttribute('href') && card.getAttribute('href').startsWith('/') && card.getAttribute('href') !== '/' && card.getAttribute('href') !== '/search') {
+                    card.style.opacity = '0.35';
+                    card.style.filter = 'blur(1px)';
+                    card.style.transition = 'all 0.3s';
+                  }
+                });
+                
+                // Highlight targetElement
+                targetElement.style.opacity = '1';
+                targetElement.style.filter = 'none';
+                targetElement.style.border = '4px solid #ef4444';
+                targetElement.style.borderRadius = '8px';
+                targetElement.style.boxShadow = '0 0 20px rgba(239,68,68,0.8)';
+                targetElement.style.position = 'relative';
+                targetElement.style.zIndex = '9999';
+                targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+           }, bestCandidate.title);
+           
+           await new Promise(r => setTimeout(r, 1500)); // Tunggu render
+           await injectWatermark(page);
+           // Timpa screenshot pencarian lama dengan yang sudah di-highlight
+           await page.screenshot({ path: searchFile, fullPage: false });
+           console.log(`  ✅ Highlight berhasil. Screenshot pencarian diperbarui.`);
+        } catch (highlighterr) {
+           console.log(`  ⚠️ Gagal melakukan highlight fallback: ${highlighterr.message}`);
+        }
+        // ---------------------------------
       }
     }
 
@@ -627,7 +765,8 @@ async function searchItem(page, item, index) {
         : `/screenshots/${safeId}_search.png`,
       searchImg: `/screenshots/${safeId}_search.png`,
       success: true,
-      comparator: autoComparator
+      comparators: comparators,
+      isFallbackScreenshot: !isDetailShot && isValidMatch
     };
 
   } catch (err) {
@@ -661,6 +800,7 @@ app.post('/api/survey/run', async (req, res) => {
   });
 
   // Tambahkan job ke antrean Redis
+  console.log('Received payload items:', items);
   const job = await surveyQueue.add('survey', { items });
   console.log(`[Queue] Diterima Job ID: ${job.id} untuk ${items.length} item.`);
   
@@ -682,6 +822,307 @@ app.get('/api/survey/status/:id', async (req, res) => {
     error: job.failedReason || null,
     isCanceled: !!isCanceled
   });
+});
+
+app.post('/api/survey/find-comparator', async (req, res) => {
+  const { query, originalVendor } = req.body;
+  if (!query) return res.status(400).json({ error: 'Query is required' });
+  
+  const jobId = Date.now().toString() + '_' + Math.floor(Math.random() * 1000);
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      headless: 'new',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--window-size=1280,900',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process'
+      ]
+    });
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 900 });
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    );
+    
+    console.log(`[Comparator] Searching for: ${query}`);
+    await page.goto(`https://katalog.inaproc.id/search?keyword=${encodeURIComponent(query)}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await new Promise(r => setTimeout(r, 4000));
+    
+    const extractCandidates = () => {
+        const rpElements = Array.from(document.querySelectorAll('*')).filter(el => {
+            return el.children.length === 0 && el.textContent.includes('Rp');
+        });
+        
+        const list = [];
+        for (const rpEl of rpElements) {
+            let curr = rpEl;
+            let aTag = null;
+            let card = null;
+            while (curr && curr !== document.body) {
+                if (curr.tagName === 'A' && !aTag) aTag = curr;
+                if (curr.className && typeof curr.className === 'string' && curr.className.includes('card')) card = curr;
+                curr = curr.parentElement;
+            }
+            
+            const container = card || aTag || rpEl.parentElement.parentElement;
+            if (container) {
+                const href = aTag ? aTag.getAttribute('href') : (container.querySelector('a') ? container.querySelector('a').getAttribute('href') : '');
+                const text = container.innerText.replace(/\n/g, ' | ');
+                
+                if (!list.some(item => item.href === href)) {
+                    // Extract Vendor from text heuristically (usually 3rd or 4th item after split by |)
+                    const parts = text.split(' | ');
+                    const name = parts[0] || 'Produk';
+                    let price = 0;
+                    const pricePart = parts.find(p => p.includes('Rp'));
+                    if (pricePart) {
+                       price = parseInt(pricePart.replace(/[^0-9]/g, '')) || 0;
+                    }
+                    
+                    let vendor = 'Vendor e-Katalog';
+                    if (parts.length > 2) {
+                       vendor = parts[2];
+                    }
+                    
+                    list.push({ text, href, name, price, vendor });
+                }
+            }
+        }
+        return list;
+    };
+    
+    const results = await page.evaluate(extractCandidates);
+    let bestResult = null;
+    
+    // Find a comparator that is preferably a DIFFERENT vendor
+    for (const r of results) {
+       if (r.href && r.href.startsWith('/') && (!originalVendor || !r.vendor.toLowerCase().includes(originalVendor.toLowerCase()))) {
+           bestResult = r;
+           break;
+       }
+    }
+    
+    if (!bestResult && results.length > 0 && results[0].href && results[0].href.startsWith('/')) {
+        bestResult = results[0];
+    }
+    
+    if (!bestResult) {
+        throw new Error('Tidak ditemukan pembanding yang sesuai di halaman pertama');
+    }
+    
+    const detailUrl = `https://katalog.inaproc.id${bestResult.href}`;
+    console.log(`[Comparator] Found: ${detailUrl}`);
+    
+    await page.goto(detailUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    await new Promise(r => setTimeout(r, 4000));
+    
+    await injectWatermark(page);
+    
+    const screenshotName = `comparator_${jobId}.png`;
+    const screenshotPath = path.join(screenshotDir, screenshotName);
+    await page.screenshot({ path: screenshotPath, fullPage: false });
+    
+    await browser.close();
+    
+    res.json({
+       success: true,
+       name: bestResult.name,
+       vendor: bestResult.vendor,
+       price: bestResult.price,
+       detailUrl: detailUrl,
+       screenshotUrl: `/screenshots/${screenshotName}`
+    });
+    
+  } catch (error) {
+    if (browser) await browser.close().catch(() => {});
+    console.error('[Comparator] Error:', error);
+    res.status(500).json({ error: error.message || 'Failed to find comparator' });
+  }
+});
+
+app.post('/api/survey/screenshot', async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'URL is required' });
+  
+  const jobId = Date.now().toString() + '_' + Math.floor(Math.random() * 1000);
+  try {
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--window-size=1280,900',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process'
+      ]
+    });
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 900 });
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    );
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+    
+    // Tambah waktu tunggu agar konten (misal gambar produk) selesai dimuat
+    await new Promise(r => setTimeout(r, 4000));
+    
+    // Gunakan metode yang aman (inject watermark) seperti survei di PPK
+    await injectWatermark(page);
+    
+    const screenshotPath = path.join(screenshotDir, `manual_${jobId}.png`);
+    await page.screenshot({ path: screenshotPath, fullPage: false });
+    
+    await browser.close();
+    
+    res.json({ success: true, img: `/screenshots/manual_${jobId}.png` });
+  } catch (err) {
+    console.error('Manual screenshot error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post('/api/survey/analyze', async (req, res) => {
+  const { keyword, targetVendor, pagu } = req.body;
+  if (!keyword) return res.status(400).json({ error: 'Keyword is required' });
+
+  const numPagu = parseInt(pagu) || 0;
+  
+  try {
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--window-size=1280,900',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process'
+      ]
+    });
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 900 });
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    );
+    await page.goto(`https://katalog.inaproc.id/search?keyword=${encodeURIComponent(keyword)}`, { waitUntil: 'networkidle2', timeout: 30000 });
+    
+    // Tunggu render
+    await new Promise(r => setTimeout(r, 3000));
+    
+    const extractCandidates = () => {
+      const rpElements = Array.from(document.querySelectorAll('*')).filter(el => {
+          return el.children.length === 0 && el.textContent.includes('Rp');
+      });
+      
+      const list = [];
+      for (const rpEl of rpElements) {
+          let curr = rpEl;
+          let aTag = null;
+          let card = null;
+          while (curr && curr !== document.body) {
+              if (curr.tagName === 'A' && !aTag) aTag = curr;
+              if (curr.className && typeof curr.className === 'string' && curr.className.includes('card')) card = curr;
+              curr = curr.parentElement;
+          }
+          
+          const container = card || aTag || rpEl.parentElement.parentElement;
+          if (container) {
+              const href = aTag ? aTag.getAttribute('href') : (container.querySelector('a') ? container.querySelector('a').getAttribute('href') : '');
+              const textLines = container.innerText.split('\n').map(t => t.trim()).filter(t => t);
+              
+              if (!list.some(item => item.href === href)) {
+                  let price = 0;
+                  let vendor = '';
+                  let name = textLines[0] || '';
+                  
+                  // Simple heuristic to extract price and vendor
+                  for(let i=0; i<textLines.length; i++) {
+                    if (textLines[i].includes('Rp')) {
+                       const pStr = textLines[i].replace(/[^0-9]/g, '');
+                       if (pStr) price = parseInt(pStr);
+                       // Usually vendor is the line right after price or near it
+                       if (i + 1 < textLines.length && !textLines[i+1].includes('Kab.') && !textLines[i+1].includes('Kota')) {
+                          vendor = textLines[i+1];
+                       }
+                    }
+                  }
+                  
+                  if (price > 0 && vendor) {
+                    list.push({ name, vendor, price, href });
+                  }
+              }
+          }
+      }
+      return list;
+    };
+    
+    const results = await page.evaluate(extractCandidates);
+    await browser.close();
+
+    if (results.length === 0) {
+      return res.json({ success: false, error: 'Tidak ada produk ditemukan di e-Katalog' });
+    }
+
+    // Hitung Min Max
+    const prices = results.map(r => r.price);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+
+    // Cari Target Vendor
+    const currentVendorItem = results.find(r => r.vendor.toLowerCase().includes((targetVendor || '').toLowerCase()));
+    
+    // Cari Alternatif Murah (Di bawah Pagu, beda vendor)
+    let alternative = null;
+    const cheaperOptions = results.filter(r => 
+       r.price <= numPagu && 
+       (!targetVendor || !r.vendor.toLowerCase().includes(targetVendor.toLowerCase()))
+    );
+    if (cheaperOptions.length > 0) {
+       cheaperOptions.sort((a, b) => a.price - b.price);
+       alternative = cheaperOptions[0]; // Termurah
+    }
+
+    // Cari Produk Pembanding (Lebih mahal)
+    let comparator = null;
+    const expensiveOptions = results.filter(r => 
+       (!targetVendor || !r.vendor.toLowerCase().includes(targetVendor.toLowerCase())) &&
+       (currentVendorItem ? r.price > currentVendorItem.price : true) &&
+       (alternative ? r.vendor !== alternative.vendor : true)
+    );
+    if (expensiveOptions.length > 0) {
+       expensiveOptions.sort((a, b) => b.price - a.price);
+       comparator = expensiveOptions[0]; // Termahal
+    }
+
+    res.json({
+      success: true,
+      data: {
+        keyword,
+        targetVendor,
+        pagu: numPagu,
+        minPrice,
+        maxPrice,
+        currentVendorItem: currentVendorItem || null,
+        alternative: alternative || null,
+        comparator: comparator || null,
+        totalFound: results.length
+      }
+    });
+    
+  } catch (err) {
+    console.error('Market analysis error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.post('/api/survey/cancel/:id', async (req, res) => {

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 // SirupPackage represents a parsed package from LKPP SIRUP
@@ -28,7 +30,7 @@ func GetSirupPackages(w http.ResponseWriter, r *http.Request) {
 
 	tahun := r.URL.Query().Get("tahun")
 	if tahun == "" {
-		tahun = "2026"
+		tahun = strconv.Itoa(time.Now().Year())
 	}
 
 	// Fetch up to 2000 records to ensure we get all package data

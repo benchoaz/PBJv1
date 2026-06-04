@@ -17,7 +17,7 @@ func NewProjectRepository(db *sql.DB) *ProjectRepository {
 }
 
 func (r *ProjectRepository) GetAll(filter *models.ProjectFilter) ([]*models.Project, error) {
-	query := `SELECT id, name, COALESCE(description, '') as description, budget, ministry, province, COALESCE(source_url, '') as source_url, status,
+	query := `SELECT id, name, COALESCE(description, '') as description, budget, ministry, province, id_satker, COALESCE(source_url, '') as source_url, status,
 	          COALESCE(start_date::text, '') as start_date,
 	          COALESCE(end_date::text, '') as end_date,
 	          created_at, updated_at
@@ -33,6 +33,11 @@ func (r *ProjectRepository) GetAll(filter *models.ProjectFilter) ([]*models.Proj
 	if filter.Province != "" {
 		query += fmt.Sprintf(" AND province ILIKE $%d", argPos)
 		args = append(args, "%"+filter.Province+"%")
+		argPos++
+	}
+	if filter.IdSatker != "" {
+		query += fmt.Sprintf(" AND id_satker = $%d", argPos)
+		args = append(args, filter.IdSatker)
 		argPos++
 	}
 	if filter.Status != "" {
@@ -75,7 +80,7 @@ func (r *ProjectRepository) GetAll(filter *models.ProjectFilter) ([]*models.Proj
 		p := &models.Project{}
 		var startDate, endDate string
 		err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Budget, &p.Ministry,
-			&p.Province, &p.SourceURL, &p.Status, &startDate, &endDate,
+			&p.Province, &p.IdSatker, &p.SourceURL, &p.Status, &startDate, &endDate,
 			&p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("scanning project row: %w", err)
@@ -89,7 +94,7 @@ func (r *ProjectRepository) GetAll(filter *models.ProjectFilter) ([]*models.Proj
 }
 
 func (r *ProjectRepository) GetByID(id int64) (*models.Project, error) {
-	query := `SELECT id, name, description, budget, ministry, province, source_url, status,
+	query := `SELECT id, name, description, budget, ministry, province, id_satker, source_url, status,
 	          COALESCE(start_date::text, '') as start_date,
 	          COALESCE(end_date::text, '') as end_date,
 	          created_at, updated_at
@@ -98,7 +103,7 @@ func (r *ProjectRepository) GetByID(id int64) (*models.Project, error) {
 	p := &models.Project{}
 	var startDate, endDate string
 	err := r.db.QueryRow(query, id).Scan(&p.ID, &p.Name, &p.Description, &p.Budget,
-		&p.Ministry, &p.Province, &p.SourceURL, &p.Status, &startDate, &endDate,
+		&p.Ministry, &p.Province, &p.IdSatker, &p.SourceURL, &p.Status, &startDate, &endDate,
 		&p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -117,14 +122,14 @@ func (r *ProjectRepository) Create(input *models.ProjectCreate) (*models.Project
 		status = "baru"
 	}
 
-	query := `INSERT INTO projects (name, description, budget, ministry, province, source_url, status, start_date, end_date)
-	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	query := `INSERT INTO projects (name, description, budget, ministry, province, id_satker, source_url, status, start_date, end_date, created_at, updated_at)
+	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
 	          RETURNING id, created_at, updated_at`
 
 	var id int64
 	var createdAt, updatedAt string
 	err := r.db.QueryRow(query, input.Name, input.Description, input.Budget,
-		input.Ministry, input.Province, input.SourceURL, status,
+		input.Ministry, input.Province, input.IdSatker, input.SourceURL, status,
 		input.StartDate, input.EndDate).Scan(&id, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("inserting project: %w", err)
@@ -161,6 +166,11 @@ func (r *ProjectRepository) Update(id int64, input *models.ProjectUpdate) (*mode
 	if input.Province != nil {
 		setClauses = append(setClauses, fmt.Sprintf("province = $%d", argPos))
 		args = append(args, *input.Province)
+		argPos++
+	}
+	if input.IdSatker != nil {
+		setClauses = append(setClauses, fmt.Sprintf("id_satker = $%d", argPos))
+		args = append(args, *input.IdSatker)
 		argPos++
 	}
 	if input.Status != nil {
@@ -206,6 +216,11 @@ func (r *ProjectRepository) Count(filter *models.ProjectFilter) (int, error) {
 	if filter.Province != "" {
 		query += fmt.Sprintf(" AND province ILIKE $%d", argPos)
 		args = append(args, "%"+filter.Province+"%")
+		argPos++
+	}
+	if filter.IdSatker != "" {
+		query += fmt.Sprintf(" AND id_satker = $%d", argPos)
+		args = append(args, filter.IdSatker)
 		argPos++
 	}
 	if filter.Status != "" {

@@ -68,26 +68,35 @@ export function AuthProvider({ children }) {
     if (finalRole.toLowerCase() === 'pp') finalRole = 'PP'
     if (finalRole.toLowerCase() === 'kpa') finalRole = 'KPA'
     
-    // Resolve departments array (backward-compatible)
+    // Resolve departments and idSatker arrays
     let userDepartments = []
+    let userIdSatkers = []
     if (matchedUser) {
-      if (matchedUser.departments && Array.isArray(matchedUser.departments)) {
-        userDepartments = matchedUser.departments
-      } else if (matchedUser.department) {
-        userDepartments = [matchedUser.department]
+      if (matchedUser.department) {
+        userDepartments = matchedUser.department.split(',').map(s => s.trim()).filter(Boolean)
+      }
+      if (matchedUser.idSatker) {
+        userIdSatkers = matchedUser.idSatker.split(',').map(s => s.trim()).filter(Boolean)
       }
     }
     if (userDepartments.length === 0) {
       userDepartments = ['Kecamatan Besuk']
+      userIdSatkers = ['67081']
     }
 
-    // Determine active department
+    // Determine active department and idSatker
     let activeDept = userDepartments[0]
-    if (customDepartment && userDepartments.includes(customDepartment)) {
-      activeDept = customDepartment
-    } else if (customDepartment) {
-      // If custom department specified but not in list, still use it (override from login)
-      activeDept = customDepartment
+    let activeIdSatker = userIdSatkers[0] || ''
+    
+    if (customDepartment) {
+      const idx = userDepartments.findIndex(d => d.toLowerCase() === customDepartment.toLowerCase())
+      if (idx >= 0) {
+        activeDept = userDepartments[idx]
+        activeIdSatker = userIdSatkers[idx] || ''
+      } else {
+        // If custom department specified but not in list, fallback
+        activeDept = customDepartment
+      }
     }
 
     const enrichedUser = matchedUser ? {
@@ -99,7 +108,7 @@ export function AuthProvider({ children }) {
       departments: userDepartments,
       department: activeDept,
       activeDepartment: activeDept,
-      idSatker: matchedUser.idSatker || '',
+      idSatker: activeIdSatker,
       perangkatDaerah: matchedUser.perangkatDaerah || 'Pemerintah Daerah Kabupaten Probolinggo'
     } : {
       ...data.user,

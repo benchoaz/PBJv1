@@ -28,8 +28,8 @@ export default function Step5Review() {
     surveyLogs, setSurveyLogs,
     aiError, setAiError,
     activeDocPreview, setActiveDocPreview,
-    resetAll, handleSimpanPaket, currentUser,
-    dppSpecs, setDppSpecs
+    resetAll, handleSimpanPaket, currentUser, getPackageItems,
+    dppSpecs, setDppSpecs, currentProjectId
   } = usePPK();
 
   const [isSigned, setIsSigned] = useState(false);
@@ -78,9 +78,9 @@ export default function Step5Review() {
           {/* Action Buttons */}
           <div className="flex justify-end gap-4 pt-4">
             <button
-              onClick={handleSimpanPaket}
+              onClick={() => handleSimpanPaket(false)}
               disabled={isUpdating}
-              className="bg-slate-800 hover:bg-slate-900 text-white px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-50 pointer-events-auto"
+              className="bg-white border-2 border-slate-200 hover:border-indigo-500 text-slate-700 hover:text-indigo-600 px-6 py-2.5 rounded-xl font-bold transition-all disabled:opacity-50 pointer-events-auto shadow-sm"
             >
               💾 Simpan Paket
             </button>
@@ -93,13 +93,18 @@ export default function Step5Review() {
                       return qty > 0;
                     })
                     .map((item, idx) => {
-                      const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
-                      const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
+                      const surveyProduct = surveyData?.products?.[idx];
+                      const unitHpsPrice = surveyProduct?.price !== undefined ? surveyProduct.price : item.price;
                       return {
                         ...item,
                         qty: item.qty === '' ? 0 : (item.qty || 0),
                         name: surveyProduct?.name || item.name,
-                        price: unitHpsPrice
+                        price: unitHpsPrice,
+                        paguDpa: item.price,
+                        katalogPrice: surveyProduct?.price || unitHpsPrice,
+                        vendor: surveyProduct?.vendor || '',
+                        link: surveyProduct?.link || '',
+                        img: surveyProduct?.img || ''
                       };
                     });
                   
@@ -119,11 +124,30 @@ export default function Step5Review() {
                     sentDate: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
                     dppSpecs: dppSpecs
                   }
-                  localStorage.setItem('pbj_submitted_package', JSON.stringify(submittedData));
                   
-                  // ALso save to database with 'Terkirim ke PP'
-                  setStatus('Terkirim ke PP');
-                  setTimeout(() => handleSimpanPaket(), 100);
+
+                  // SAVE DIRECTLY TO DB INSTEAD OF LOCALSTORAGE
+                  fetch(currentProjectId ? `/api/projects/${currentProjectId}` : '/api/projects', {
+                    method: currentProjectId ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      name: submittedData.packName,
+                      budget: submittedData.pagu || 0,
+                      idSatker: satkerId || '',
+                      status: 'Terkirim ke PP',
+                      description: JSON.stringify(submittedData)
+                    })
+                  }).then(res => {
+                    if (res.ok) {
+                      console.log('Terkirim');
+                      alert('✅ Dokumen berhasil dikirim ke PP!');
+                    } else {
+                      alert('Gagal mengirim ke PP');
+                    }
+                  }).catch(e => {
+                    alert('Error: ' + e.message);
+                  });
+
                 }
               }}
               disabled={step < 4}

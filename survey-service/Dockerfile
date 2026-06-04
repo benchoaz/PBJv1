@@ -5,8 +5,25 @@ WORKDIR /app
 # Salin package.json dengan kepemilikan pptruser
 COPY --chown=pptruser:pptruser package*.json ./
 
-# Jalankan npm install sebagai user pptruser (default di base image) agar Puppeteer mengunduh Chrome ke cache pptruser
+# Install dependencies
 RUN npm install
+
+# Install Chrome yang sesuai dengan versi puppeteer, lalu fix ekstraksi jika gagal
+RUN CHROME_VERSION=$(node -e "const p=require('./node_modules/puppeteer/package.json'); \
+    const v=p.puppeteer?.chrome || p.puppeteer?.chromiumVersion || '127.0.6533.88'; \
+    console.log(v)") && \
+    CACHE_DIR="/home/pptruser/.cache/puppeteer/chrome" && \
+    npx puppeteer browsers install chrome || true && \
+    ZIP_FILE=$(find "$CACHE_DIR" -name "*.zip" | head -1) && \
+    if [ -n "$ZIP_FILE" ]; then \
+      VERSION_DIR=$(basename "$ZIP_FILE" .zip | sed 's/-chrome-linux64//') && \
+      TARGET="$CACHE_DIR/linux-$VERSION_DIR" && \
+      if [ ! -f "$TARGET/chrome-linux64/chrome" ]; then \
+        rm -rf "$TARGET" && \
+        unzip -q "$ZIP_FILE" -d "$TARGET" && \
+        chmod +x "$TARGET/chrome-linux64/chrome"; \
+      fi; \
+    fi
 
 # Salin source code dengan kepemilikan pptruser
 COPY --chown=pptruser:pptruser server.js .

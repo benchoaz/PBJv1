@@ -11,8 +11,6 @@ services:
       - ./frontend:/app
       - /app/node_modules
     command: sh -c "npm install && npm run dev -- --host"
-    depends_on:
-      - api
     restart: unless-stopped
 
   dpa-parser:
@@ -38,10 +36,6 @@ services:
       - DPA_PARSER_URL=http://127.0.0.1:8000
     volumes:
       - ./backend/main:/root/main
-    depends_on:
-      - scraper
-      - db
-      - dpa-parser
     restart: unless-stopped
 
   db:
@@ -68,9 +62,6 @@ services:
       - DB_NAME=pbj_db
       - N8N_WEBHOOK_URL=http://127.0.0.1:5678/webhook/sirup-data
       - SCRAPE_INTERVAL=3600000
-    depends_on:
-      - n8n
-      - db
     restart: unless-stopped
 
   n8n:
@@ -100,8 +91,6 @@ services:
     volumes:
       - ./frontend/public/screenshots:/app/screenshots
       - ./survey-service/server.js:/app/server.js
-    depends_on:
-      - redis
     restart: unless-stopped
 
   redis:

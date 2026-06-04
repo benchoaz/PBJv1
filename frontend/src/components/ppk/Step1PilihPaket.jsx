@@ -112,7 +112,7 @@ export default function Step1PilihPaket() {
           <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
             <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex justify-between items-center">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                Paket RUP LKPP 2026 — {sirupPackages.filter(p => (p.packName || '').toLowerCase().includes(sirupSearchQuery.toLowerCase()) || (p.noSirup || '').includes(sirupSearchQuery)).length} paket
+                Paket RUP LKPP {new Date().getFullYear()} — {sirupPackages.filter(p => (p.packName || '').toLowerCase().includes(sirupSearchQuery.toLowerCase()) || (p.noSirup || '').includes(sirupSearchQuery)).length} paket
               </span>
               <span className="px-2 py-0.5 text-[9px] rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold">● Live</span>
             </div>
@@ -155,8 +155,8 @@ export default function Step1PilihPaket() {
                           onClick={() => {
                             const selected = {
                               ...p,
-                              klpd: 'Kab. Probolinggo',
-                              satker: satkerId === '67081' ? 'Kecamatan Besuk' : 'Satker Kecamatan',
+                              klpd: currentUser?.perangkatDaerah || '',
+                              satker: currentUser?.department || '',
                               volume: '1 Paket',
                               uraian: p.packName,
                               spesifikasi: 'Spesifikasi sesuai rincian DPA',
@@ -234,8 +234,8 @@ export default function Step1PilihPaket() {
                       method: 'Pengadaan Langsung',
                       sumberDana: 'APBD',
                       tahun: '2026',
-                      klpd: 'Kab. Probolinggo',
-                      satker: currentUser?.department || 'Kecamatan Besuk',
+                      klpd: currentUser?.perangkatDaerah || '',
+                      satker: currentUser?.department || '',
                       volume: '1 Paket',
                       uraian: namaPaket,
                       spesifikasi: 'Spesifikasi sesuai rincian DPA',

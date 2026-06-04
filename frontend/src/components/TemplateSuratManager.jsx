@@ -504,7 +504,8 @@ export default function TemplateSuratManager() {
 
   // Load actual procurement projects list from DB on mount
   useEffect(() => {
-    fetch('/api/projects')
+    const queryParam = user?.role === 'Admin' ? '' : `?idSatker=${user?.idSatker || ''}`
+    fetch(`/api/projects${queryParam}`)
       .then(res => res.json())
       .then(data => {
         setProjects(Array.isArray(data) ? data : (data?.data || []));

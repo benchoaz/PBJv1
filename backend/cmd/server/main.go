@@ -54,14 +54,17 @@ func main() {
 	gormDB.Model(&models.User{}).Count(&count)
 	if count == 0 {
 		defaultUsers := []models.User{
-			{ID: 1, Name: "Handik Hariyanto, S.Kom., M.Si", Role: "PPK", NIP: "197909102002121004", Department: "Kecamatan Besuk", IdSatker: "67081", PerangkatDaerah: "Pemerintah Daerah Kabupaten Probolinggo", Password: "admin"},
-			{ID: 2, Name: "Beni Trisna Wijaya, S.Kom", Role: "PP", NIP: "198205192010011010", Department: "Kecamatan Besuk", IdSatker: "67081", PerangkatDaerah: "Pemerintah Daerah Kabupaten Probolinggo", Password: "admin"},
-			{ID: 3, Name: "Beni (Super Admin)", Role: "Admin", NIP: "admin", Department: "Unit Kerja Pengadaan Barang/Jasa (UKPBJ)", IdSatker: "308386", PerangkatDaerah: "Pemerintah Daerah Kabupaten Probolinggo", Password: "admin"},
+			{Name: "Handik Hariyanto, S.Kom., M.Si", Role: "PPK", NIP: "197909102002121004", Department: "Kecamatan Besuk", IdSatker: "67081", PerangkatDaerah: "Pemerintah Daerah Kabupaten Probolinggo", Password: "admin"},
+			{Name: "Beni Trisna Wijaya, S.Kom", Role: "PP", NIP: "198205192010011010", Department: "Kecamatan Besuk", IdSatker: "67081", PerangkatDaerah: "Pemerintah Daerah Kabupaten Probolinggo", Password: "admin"},
+			{Name: "Beni (Super Admin)", Role: "Admin", NIP: "admin", Department: "Unit Kerja Pengadaan Barang/Jasa (UKPBJ)", IdSatker: "308386", PerangkatDaerah: "Pemerintah Daerah Kabupaten Probolinggo", Password: "admin"},
 		}
 		for _, u := range defaultUsers {
 			gormDB.Create(&u)
 		}
 	}
+
+	// Fix PostgreSQL sequence for users table to prevent duplicate key errors after manual inserts
+	gormDB.Exec("SELECT setval(pg_get_serial_sequence('users', 'id'), COALESCE(MAX(id), 1)) FROM users")
 
 	projectRepo := repository.NewProjectRepository(sqlDB)
 	bahpRepo := repository.NewBahpRepository(sqlDB)
@@ -86,6 +89,8 @@ func main() {
 	mux.HandleFunc("GET /api/auth/me", authHandler.Me)
 	
 	// User Routes
+	mux.HandleFunc("OPTIONS /api/users", userHandler.Options)
+	mux.HandleFunc("OPTIONS /api/users/{id}", userHandler.Options)
 	mux.HandleFunc("GET /api/users", userHandler.GetAll)
 	mux.HandleFunc("POST /api/users", userHandler.Create)
 	mux.HandleFunc("PUT /api/users/{id}", userHandler.Update)
@@ -126,6 +131,33 @@ func main() {
 	// AI Survey endpoint
 	mux.HandleFunc("POST /api/survey/run", handlers.RunSurvey)
 	mux.HandleFunc("OPTIONS /api/survey/run", handlers.RunSurveyOptions)
+
+	// AI BAHP Refinement endpoint
+	mux.HandleFunc("POST /api/ai/refine-bahp", handlers.RefineBahp)
+	mux.HandleFunc("OPTIONS /api/ai/refine-bahp", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-AI-Provider, X-AI-Key")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// AI Exception Refinement endpoint
+	mux.HandleFunc("POST /api/ai/refine-exception", handlers.RefineException)
+	mux.HandleFunc("OPTIONS /api/ai/refine-exception", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-AI-Provider, X-AI-Key")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// AI Generic Text Refinement endpoint
+	mux.HandleFunc("POST /api/ai/refine-text", handlers.RefineText)
+	mux.HandleFunc("OPTIONS /api/ai/refine-text", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-AI-Provider, X-AI-Key")
+		w.WriteHeader(http.StatusOK)
+	})
 
 	addr := ":8080"
 	if port := os.Getenv("PORT"); port != "" {

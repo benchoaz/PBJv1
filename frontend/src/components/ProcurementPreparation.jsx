@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PPKProvider, usePPK } from './ppk/PPKContext';
 import Step1PilihPaket from './ppk/Step1PilihPaket';
@@ -24,9 +24,13 @@ function ProcurementPreparationContent() {
 
   const [searchParams] = useSearchParams();
   const paketId = searchParams.get('paketId');
+  const fetchedIdRef = useRef(null);
 
   useEffect(() => {
-    if (paketId && paketId !== currentProjectId) {
+    // ALWAYS fetch from DB when navigating here with a paketId
+    // We use a ref to prevent infinite loops caused by loadProjectData changing
+    if (paketId && fetchedIdRef.current !== paketId) {
+      fetchedIdRef.current = paketId;
       fetch(`/api/projects/${paketId}`)
         .then(res => {
           if (!res.ok) throw new Error('Paket tidak ditemukan');
@@ -40,7 +44,7 @@ function ProcurementPreparationContent() {
           alert('Gagal memuat paket: ' + err.message);
         });
     }
-  }, [paketId, currentProjectId, loadProjectData]);
+  }, [paketId, loadProjectData]);
 
   useEffect(() => {
     if (!user) {

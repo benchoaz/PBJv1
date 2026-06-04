@@ -18,6 +18,14 @@ func NewUserHandler(db *gorm.DB) *UserHandler {
 	return &UserHandler{db: db}
 }
 
+// Options handles CORS preflight
+func (h *UserHandler) Options(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.WriteHeader(http.StatusOK)
+}
+
 // GetAll Users
 func (h *UserHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	var users []models.User

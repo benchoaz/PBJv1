@@ -11,12 +11,12 @@ export default function Step4TemplateSurat() {
     step, setStep,
     aiError, setAiError,
     hpsValue, isHpsExemptSelected,
-    surveyData, hpsPrices
+    surveyData, hpsPrices, getPackageItems
   } = usePPK();
 
   const [activeDocPreview, setActiveDocPreview] = useState(null);
   const getPacketCategory = () => 'ATK';
-  const getPackageItems = () => [];
+
   const getActiveSurveyData = () => null;
   const parseSmartColons = (t) => t;
 
@@ -721,7 +721,7 @@ export default function Step4TemplateSurat() {
  }
  groups[justText].items.push(p.name);
  if (comparisons[p.id] && comparisons[p.id].name) {
- groups[justText].comparisons.push({ pName: p.name, comp: comparisons[p.id] });
+ groups[justText].comparisons.push({ pName: p.name, mainPrice: p.price, comp: comparisons[p.id] });
  }
  });
 
@@ -745,49 +745,146 @@ export default function Step4TemplateSurat() {
  <div className="mb-3 text-slate-600 italic leading-relaxed">
  {group.items.join(', ')}
  </div>
+ 
+ {(() => {
+    const isMamin = getPacketCategory(selectedPack?.packName || '').startsWith('Mamin');
+    return (
+      <>
+        <div className="mb-4">
+          <div className="font-bold text-slate-800 mb-1">
+            {isMamin ? 'Catatan Pertimbangan Pemilihan:' : 'Pertimbangan Pemilihan Penyedia:'}
+          </div>
+          <div className={`text-justify pl-3 border-l-4 ${justText ? 'border-indigo-400' : 'border-slate-400'} mt-2 text-[11pt] text-slate-700`}>
+            {isMamin ? (
+              <>
+                <p className="mb-2">Mengingat karakteristik pengadaan Makan Minum (Mamin) yang bersifat habis pakai dan memiliki risiko penurunan kualitas (basi) jika menempuh waktu perjalanan yang lama, maka Pejabat Pembuat Komitmen (PPK) menetapkan Kriteria Pembanding Utama secara terbatas, yaitu:</p>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li><strong>Kesesuaian Harga:</strong> Membandingkan nilai ekonomis porsi yang selaras dengan pagu anggaran.</li>
+                  <li><strong>Kedekatan Jarak Geografis:</strong> Memilih penyedia dengan radius terdekat (satu kecamatan/wilayah kerja) untuk memastikan ketepatan waktu distribusi saat jam konsumsi acara dan menjamin makanan diterima dalam kondisi segar (higienis).</li>
+                </ul>
+              </>
+            ) : justText ? (
+              <>
+                Berdasarkan hasil survei pasar e-Katalog, Pejabat Pembuat Komitmen (PPK) menetapkan pemilihan penyedia dengan pertimbangan spesifikasi kinerja, waktu, dan/atau layanan pendukung sebagai berikut:<br/>
+                <div className="mt-2 font-medium italic text-slate-800">"{justText}"</div>
+              </>
+            ) : (
+              <>
+                Berdasarkan hasil perbandingan katalog elektronik pada tabel referensi, Pejabat Pembuat Komitmen (PPK) menetapkan pemilihan penyedia didasarkan pada prinsip <span className="italic">Best Value for Money</span>. Pemilihan tidak semata-mata mempertimbangkan harga termurah, melainkan mempertimbangkan keunggulan spesifikasi teknis, ketersediaan stok, kecepatan pengiriman, serta garansi/layanan purna jual yang lebih dapat diandalkan untuk menunjang urgensi operasional pemerintah daerah.
+              </>
+            )}
+          </div>
+        </div>
 
- {justText ? (
- <div className="mb-4">
- <div className="font-bold text-slate-800 mb-1">Pertimbangan Pemilihan Penyedia:</div>
- <div className="text-justify pl-3 border-l-4 border-indigo-400 mt-2">
- Berdasarkan hasil survei pasar e-Katalog, Pejabat Pembuat Komitmen (PPK) menetapkan pemilihan penyedia dengan pertimbangan spesifikasi kinerja, waktu, dan/atau layanan pendukung sebagai berikut:<br/>
- <div className="mt-2 font-medium italic text-slate-800">"{justText}"</div>
- </div>
- </div>
- ) : (
- <div className="mb-4">
- <div className="font-bold text-slate-800 mb-1">Pertimbangan Pemilihan Penyedia:</div>
- <div className="text-justify pl-3 border-l-4 border-slate-400 mt-2 text-[11pt] text-slate-700">
- Berdasarkan hasil perbandingan katalog elektronik pada tabel referensi, Pejabat Pembuat Komitmen (PPK) menetapkan pemilihan penyedia didasarkan pada prinsip <span className="italic">Best Value for Money</span>. Pemilihan tidak semata-mata mempertimbangkan harga termurah, melainkan mempertimbangkan keunggulan spesifikasi teknis, ketersediaan stok, kecepatan pengiriman, serta garansi/layanan purna jual yang lebih dapat diandalkan untuk menunjang urgensi operasional pemerintah daerah.
- </div>
- </div>
- )}
-
- {group.comparisons.length > 0 && (
- <div className="mt-4">
- <div className="font-bold text-slate-800 mb-2">Referensi Produk Pembanding:</div>
- <table className="w-full border-collapse border border-slate-300">
- <thead>
- <tr className="bg-slate-200 text-slate-800">
- <th className="border border-slate-300 p-1.5 text-left font-bold">Item Utama</th>
- <th className="border border-slate-300 p-1.5 text-left font-bold">Penyedia Pembanding</th>
- <th className="border border-slate-300 p-1.5 text-left font-bold">Produk Pembanding</th>
- <th className="border border-slate-300 p-1.5 text-right font-bold">Harga (Rp)</th>
- </tr>
- </thead>
- <tbody>
- {group.comparisons.map((c, i) => (
- <tr key={i}>
- <td className="border border-slate-300 p-1.5">{c.pName}</td>
- <td className="border border-slate-300 p-1.5">{c.comp.vendor || '-'}</td>
- <td className="border border-slate-300 p-1.5">{c.comp.name}</td>
- <td className="border border-slate-300 p-1.5 text-right">{parseInt(c.comp.price || 0).toLocaleString('id-ID')}</td>
- </tr>
- ))}
- </tbody>
- </table>
- </div>
- )}
+        {group.comparisons.length > 0 && (
+          <div className="mt-4">
+            <div className="font-bold text-slate-800 mb-2">Tabel Komparasi Produk:</div>
+            {group.comparisons.map((c, i) => (
+              <div key={i} className="mb-6">
+                <table className="w-full border-collapse border border-slate-300 text-[10pt]">
+                  <thead>
+                    <tr className="bg-slate-200 text-slate-800">
+                      <th className="border border-slate-300 p-1.5 text-left font-bold w-[25%]">Komponen Evaluasi</th>
+                      <th className="border border-slate-300 p-1.5 text-left font-bold w-[25%]">{isMamin ? 'Penyedia A (Pilihan)' : 'Produk Utama (Pilihan)'}</th>
+                      <th className="border border-slate-300 p-1.5 text-left font-bold w-[25%]">{isMamin ? 'Penyedia B (Pembanding 1)' : 'Produk Pembanding 1'}</th>
+                      <th className="border border-slate-300 p-1.5 text-left font-bold w-[25%]">{isMamin ? 'Penyedia C (Pembanding 2)' : 'Produk Pembanding 2'}</th>
+                    </tr>
+                  </thead>
+                  <tbody contentEditable="true" suppressContentEditableWarning={true}>
+                    {isMamin ? (
+                      <>
+                        <tr>
+                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Nama Paket Mamin</td>
+                          <td className="border border-slate-300 p-1.5">{c.pName}</td>
+                          <td className="border border-slate-300 p-1.5">{c.comp.name || '-'}</td>
+                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Harga per Porsi</td>
+                          <td className="border border-slate-300 p-1.5 font-bold">Rp {(c.mainPrice || 0).toLocaleString('id-ID')}</td>
+                          <td className="border border-slate-300 p-1.5 font-bold">Rp {parseInt(c.comp.price || 0).toLocaleString('id-ID')}</td>
+                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Lokasi Dapur/Toko</td>
+                          <td className="border border-slate-300 p-1.5">Kecamatan ... (1 Wilayah)</td>
+                          <td className="border border-slate-300 p-1.5">{c.comp.lokasi || 'Kecamatan ... (Beda Wilayah)'}</td>
+                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Jarak & Estimasi Waktu</td>
+                          <td className="border border-slate-300 p-1.5">2 KM / 10 Menit</td>
+                          <td className="border border-slate-300 p-1.5">{c.comp.jarak || '15 KM / 45 Menit'}</td>
+                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Status TKDN</td>
+                          <td className="border border-slate-300 p-1.5">PDN (Skala UMK)</td>
+                          <td className="border border-slate-300 p-1.5">{c.comp.tkdn || 'PDN (Skala UMK)'}</td>
+                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Rekomendasi Akhir</td>
+                          <td className="border border-slate-300 p-1.5 font-bold text-emerald-700">DIPILIH</td>
+                          <td className="border border-slate-300 p-1.5 font-bold text-rose-600">Tidak Dipilih</td>
+                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
+                        </tr>
+                      </>
+                    ) : (
+                      <>
+                        <tr>
+                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Merek & Tipe</td>
+                          <td className="border border-slate-300 p-1.5">{c.pName}</td>
+                          <td className="border border-slate-300 p-1.5">{c.comp.name || '-'}</td>
+                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Link E-Katalog</td>
+                          <td className="border border-slate-300 p-1.5 text-blue-600">Terlampir</td>
+                          <td className="border border-slate-300 p-1.5 text-blue-600">Terlampir</td>
+                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Spesifikasi Fisik</td>
+                          <td className="border border-slate-300 p-1.5">Sesuai KAK</td>
+                          <td className="border border-slate-300 p-1.5">{c.comp.spesifikasi || 'Sesuai KAK'}</td>
+                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Nilai TKDN (%)</td>
+                          <td className="border border-slate-300 p-1.5"></td>
+                          <td className="border border-slate-300 p-1.5">{c.comp.tkdn || ''}</td>
+                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Harga (Inc. Ongkir & PPN)</td>
+                          <td className="border border-slate-300 p-1.5 font-bold">Rp {(c.mainPrice || 0).toLocaleString('id-ID')}</td>
+                          <td className="border border-slate-300 p-1.5 font-bold">Rp {parseInt(c.comp.price || 0).toLocaleString('id-ID')}</td>
+                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
+                        </tr>
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+            
+            {isMamin && (
+              <div className="mt-2 text-[10pt] text-justify mb-4" contentEditable="true" suppressContentEditableWarning={true}>
+                <div className="font-bold underline mb-1">JUSTIFIKASI TEKNIS PEMILIHAN PRODUK MAMIN</div>
+                <p className="mb-2">Berdasarkan hasil telaah produk sejenis pada Etalase Katalog Elektronik Lokal, harga satuan porsi antara penyedia adalah sama/sebanding. Namun, Pejabat Pembuat Komitmen (PPK) menetapkan untuk memilih penyedia terpilih dengan pertimbangan teknis utama sebagai berikut:</p>
+                <ul className="list-decimal pl-5 space-y-1">
+                  <li><strong>Faktor Kedekatan Jarak dan Ketepatan Waktu:</strong> Penyedia berdomisili di Kecamatan yang sama dengan lokasi pelaksanaan acara/kantor (jarak &plusmn; 2 KM). Hal ini memastikan makanan dapat dikirim tepat waktu sesuai jadwal konsumsi peserta tanpa risiko keterlambatan akibat kemacetan jalan lintas kecamatan.</li>
+                  <li><strong>Kualitas dan Higienitas Makanan:</strong> Jarak pengiriman yang pendek (&le; 10 menit) meminimalisir risiko penurunan kualitas makanan (basi/rusak) selama perjalanan, sehingga makanan diterima dalam kondisi segar dan hangat.</li>
+                  <li><strong>Pemberdayaan Ekonomi Lokal:</strong> Memprioritaskan pelaku usaha mikro/kecil yang berada di lingkungan terdekat tempat kegiatan sesuai asas efektivitas pengadaan.</li>
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </>
+    );
+  })()}
  </div>
  );
  })}

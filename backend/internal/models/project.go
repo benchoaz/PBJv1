@@ -9,6 +9,7 @@ type Project struct {
 	Budget          float64   `json:"budget"`
 	Ministry        string    `json:"ministry"`
 	Province        string    `json:"province"`
+	IdSatker        string    `json:"idSatker" gorm:"index"`
 	SourceURL       string    `json:"source_url"`
 	Status          string    `json:"status"`
 	StartDate       *time.Time `json:"start_date,omitempty"`
@@ -20,6 +21,7 @@ type Project struct {
 type ProjectFilter struct {
 	Ministry  string `json:"ministry,omitempty"`
 	Province  string `json:"province,omitempty"`
+	IdSatker  string `json:"idSatker,omitempty"`
 	Status    string `json:"status,omitempty"`
 	MinBudget float64 `json:"min_budget,omitempty"`
 	MaxBudget float64 `json:"max_budget,omitempty"`
@@ -33,6 +35,7 @@ type ProjectCreate struct {
 	Budget      float64 `json:"budget"`
 	Ministry    string  `json:"ministry"`
 	Province    string  `json:"province"`
+	IdSatker    string  `json:"idSatker"`
 	SourceURL   string  `json:"source_url"`
 	Status      string  `json:"status"`
 	StartDate   *time.Time `json:"start_date,omitempty"`
@@ -45,6 +48,7 @@ type ProjectUpdate struct {
 	Budget      *float64    `json:"budget,omitempty"`
 	Ministry    *string     `json:"ministry,omitempty"`
 	Province    *string     `json:"province,omitempty"`
+	IdSatker    *string     `json:"idSatker,omitempty"`
 	Status      *string     `json:"status,omitempty"`
 	StartDate   *time.Time  `json:"start_date,omitempty"`
 	EndDate     *time.Time  `json:"end_date,omitempty"`

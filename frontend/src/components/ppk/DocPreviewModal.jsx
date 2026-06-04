@@ -66,7 +66,7 @@ function terbilang(angka) {
     return "";
   }
 
-export default function DocPreviewModal({ isHpsExemptSelected, comparisons, justifications }) {
+export default function DocPreviewModal({ isHpsExemptSelected, comparisons, justifications, autoComparator }) {
   const {
     activeDocPreview, setActiveDocPreview,
     selectedPack,
@@ -792,7 +792,7 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
  const nomorBase = docSettingsFallback ? (docSettingsFallback.formatNomorSurat || '027/{nomor}/BPBJ/2026') : '027/{nomor}/BPBJ/2026';
  // Replace variables
  const replacements = {
- '{{tahun_anggaran}}': new Date(tanggalSurat).getFullYear(),
+ '{{tahun_anggaran}}': packageMetadata.tahun_anggaran || new Date(tanggalSurat).getFullYear(),
   '{{nama_satker}}': currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
  '{{nama_satker_kapital}}': (currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
  '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283',
@@ -896,6 +896,7 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
  const nomorBase = docSettingsFallback ? (docSettingsFallback.formatNomorSurat || '027/{nomor}/BPBJ/2026') : '027/{nomor}/BPBJ/2026';
  // Replace variables
  const replacements = {
+ '{{tahun_anggaran}}': packageMetadata.tahun_anggaran || new Date(tanggalSurat).getFullYear(),
  '{{nama_satker}}': currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
  '{{nama_satker_kapital}}': (currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
  '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283',
@@ -1041,17 +1042,29 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
       BAB III. DOKUMEN PENGUMPULAN REFERENSI HARGA
     </div>
     <p className="mb-2 indent-8">
-      Sebagai metode pengadaan e-purchasing, dokumen Referensi Harga ini digunakan untuk membuktikan harga yang disepakati wajar. Estimasi perbandingan harga (Harga HPS/SHS vs Harga Tayang Katalog) adalah sebagai berikut:
+      Sebagai metode pengadaan e-purchasing, dokumen Referensi Harga ini digunakan untuk membuktikan harga yang disepakati wajar. Estimasi perbandingan harga (Harga DPA vs Harga Tayang e-Katalog) adalah sebagai berikut:
     </p>
     
     <table className="w-full border-collapse border border-slate-900 mb-2">
       <thead>
-        <tr className="bg-slate-100 font-bold text-center">
-          <td className="border border-slate-900 p-1 w-8">No</td>
-          <td className="border border-slate-900 p-1">Uraian Barang</td>
-          <td className="border border-slate-900 p-1 w-32 text-right">Harga HPS/SHS</td>
-          <td className="border border-slate-900 p-1 w-32 text-right">Harga Tayang Katalog</td>
-        </tr>
+        {autoComparator ? (
+          <tr className="bg-slate-100 font-bold text-center">
+            <td className="border border-slate-900 p-1 w-8">No</td>
+            <td className="border border-slate-900 p-1">Uraian Barang</td>
+            <td className="border border-slate-900 p-1 w-24 text-right">Harga DPA</td>
+            <td className="border border-slate-900 p-1 w-32 bg-emerald-50">Produk Potensial (e-Katalog)</td>
+            <td className="border border-slate-900 p-1 w-32 bg-amber-50">Produk Pembanding</td>
+            <td className="border border-slate-900 p-1 w-24 text-right">Selisih Harga</td>
+            <td className="border border-slate-900 p-1">Alasan Pemilihan</td>
+          </tr>
+        ) : (
+          <tr className="bg-slate-100 font-bold text-center">
+            <td className="border border-slate-900 p-1 w-8">No</td>
+            <td className="border border-slate-900 p-1">Uraian Barang</td>
+            <td className="border border-slate-900 p-1 w-32 text-right">Harga DPA</td>
+            <td className="border border-slate-900 p-1 w-32 text-right">Harga Tayang e-Katalog</td>
+          </tr>
+        )}
       </thead>
       <tbody>
         {getPackageItems(selectedPack).map((item, idx) => {
@@ -1059,14 +1072,49 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
           const surveyProduct = surveyData?.products?.[idx];
           const displayName = surveyProduct?.name || item.name;
           const hargaTayang = surveyProduct?.price ? surveyProduct.price : 0;
-          return (
-            <tr key={item.no}>
-              <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
-              <td className="border border-slate-900 p-1">{displayName}</td>
-              <td className="border border-slate-900 p-1 text-right">Rp {unitHpsPrice.toLocaleString('id-ID')}</td>
-              <td className="border border-slate-900 p-1 text-right">Rp {hargaTayang.toLocaleString('id-ID')}</td>
-            </tr>
-          )
+          const compKey = 'ITEM-' + idx;
+          const comp = comparisons && comparisons[compKey];
+          const selisih = comp?.price ? comp.price - hargaTayang : null;
+
+          if (autoComparator) {
+            return (
+              <tr key={item.no}>
+                <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
+                <td className="border border-slate-900 p-1 text-sm">{displayName}</td>
+                <td className="border border-slate-900 p-1 text-right text-sm">Rp {(item.price || 0).toLocaleString('id-ID')}</td>
+                <td className="border border-slate-900 p-1 bg-emerald-50/30">
+                  <div className="font-bold text-[10px]">{surveyProduct?.vendor || '-'}</div>
+                  <div className="font-mono text-xs">Rp {hargaTayang.toLocaleString('id-ID')}</div>
+                </td>
+                <td className="border border-slate-900 p-1 bg-amber-50/30">
+                  {comp ? (
+                    <>
+                      <div className="font-bold text-[10px]">{comp.vendor}</div>
+                      <div className="font-mono text-xs">Rp {(comp.price || 0).toLocaleString('id-ID')}</div>
+                      <div className="text-[9px] text-slate-500">{comp.status || 'Luar Katalog'}</div>
+                    </>
+                  ) : <span className="text-slate-600 font-semibold text-[9px] italic">Tidak ada pembanding di wilayah yang sama</span>}
+                </td>
+                <td className="border border-slate-900 p-1 text-right font-mono text-emerald-700 text-[10px]">
+                  {selisih ? `Hemat Rp ${selisih.toLocaleString('id-ID')}` : '-'}
+                </td>
+                <td className="border border-slate-900 p-1 text-[9px]">
+                  {comp ? (comp.alasan || (hargaTayang < item.price 
+                    ? 'Harga e-Katalog lebih efisien dari pagu DPA' 
+                    : 'Sesuai pagu DPA, efisien')) : <span className="font-semibold text-emerald-800">Satu-satunya pelaku usaha potensial di wilayah kerja</span>}
+                </td>
+              </tr>
+            );
+          } else {
+            return (
+              <tr key={item.no}>
+                <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
+                <td className="border border-slate-900 p-1">{displayName}</td>
+                <td className="border border-slate-900 p-1 text-right">Rp {(item.price || 0).toLocaleString('id-ID')}</td>
+                <td className="border border-slate-900 p-1 text-right">Rp {(hargaTayang || 0).toLocaleString('id-ID')}</td>
+              </tr>
+            );
+          }
         })}
       </tbody>
     </table>
@@ -1084,7 +1132,7 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
   </div>
 
   {parts[1] && (
-    <div className="mt-8 pt-6 signature-section" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', textAlign: 'justify', fontSize: '12pt', fontFamily: 'Arial, sans-serif', pageBreakInside: 'avoid', breakInside: 'avoid' }} dangerouslySetInnerHTML={{ __html: parseSmartColons(parts[1]) }} />
+    <div className="mt-2 signature-section" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', textAlign: 'justify', fontSize: '12pt', fontFamily: 'Arial, sans-serif', pageBreakInside: 'avoid', breakInside: 'avoid' }} dangerouslySetInnerHTML={{ __html: parseSmartColons(parts[1].trimStart()) }} />
   )}
 
   {/* LAMPIRAN SCREENSHOT - selalu halaman baru, setelah konten utama dan TTD pertama */}
@@ -1100,25 +1148,58 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
       return (
         <div className="space-y-8">
           {foundProducts.map((p, idx) => {
+            const compKey = 'ITEM-' + idx;
+            const comp = comparisons && comparisons[compKey];
+            const comp2 = comparisons && comparisons[compKey + '-2'];
             let imgSrc = p.searchImg || p.img;
             if (imgSrc && imgSrc.startsWith('/screenshots/')) {
               imgSrc = `http://localhost:3001${imgSrc}`;
             }
             return (
-              <div key={p.id} className="border border-slate-400 p-4 bg-slate-50" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                <div className="font-bold text-lg mb-2 border-b border-slate-300 pb-2">Item {idx + 1}: {p.name}</div>
-                <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                  <div><strong>Penyedia:</strong> {p.vendor}</div>
-                  <div><strong>Harga Tayang:</strong> Rp {(p.price || 0).toLocaleString('id-ID')}</div>
-                  <div className="col-span-2"><strong>Tautan (Link):</strong> <a href={p.link} target="_blank" className="text-blue-600 break-all">{p.link}</a></div>
+              <React.Fragment key={p.id}>
+                <div className="border border-slate-400 p-4 bg-slate-50 mb-4" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                  <div className="font-bold text-lg mb-2 border-b border-slate-300 pb-2">Item {idx + 1}: {p.name} <span className="text-emerald-600 text-sm">(Daftar Produk Potensial)</span></div>
+                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                    <div><strong>Pelaku Usaha:</strong> {p.vendor}</div>
+                    <div><strong>Harga Tayang:</strong> Rp {(p.price || 0).toLocaleString('id-ID')}</div>
+                    <div className="col-span-2"><strong>Tautan (Link):</strong> <a href={p.link} target="_blank" className="text-blue-600 break-all">{p.link}</a></div>
+                  </div>
+                  {imgSrc && (
+                    <div className="mt-2 text-center">
+                      <div className="text-xs font-semibold text-slate-500 mb-1">Bukti Tangkapan Layar Katalog</div>
+                      <img src={imgSrc} alt="Tangkapan Layar" className="max-w-full h-auto max-h-[800px] mx-auto border border-slate-200 shadow-sm" />
+                    </div>
+                  )}
                 </div>
-                {imgSrc && (
-                  <div className="mt-2 text-center">
-                    <div className="text-xs font-semibold text-slate-500 mb-1">Bukti Tangkapan Layar Katalog</div>
-                    <img src={imgSrc} alt="Tangkapan Layar" className="max-w-full h-auto max-h-[800px] mx-auto border border-slate-200 shadow-sm" />
+                
+                {autoComparator && comp && (
+                  <div className="border border-slate-400 p-4 bg-amber-50 mb-8" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                    <div className="font-bold text-lg mb-2 border-b border-slate-300 pb-2">Pembanding Item {idx + 1}: {comp.name}</div>
+                    <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                      <div><strong>Pelaku Usaha:</strong> {comp.vendor}</div>
+                      <div><strong>Harga Tayang:</strong> Rp {(comp.price || 0).toLocaleString('id-ID')}</div>
+                      <div className="col-span-2"><strong>Tautan (Link):</strong> <a href={comp.link} target="_blank" className="text-blue-600 break-all">{comp.link}</a></div>
+                      <div className="col-span-2"><strong>Alasan:</strong> {comp.alasan || 'Harga e-Katalog lebih efisien dari harga pembanding'}</div>
+                    </div>
+                    {/* Kami tidak mengambil screenshot untuk pembanding demi kecepatan, tapi menyertakan tautannya */}
+                    <div className="mt-2 text-center italic text-slate-500 text-xs">
+                      Tangkapan layar tidak dilampirkan otomatis. Silakan merujuk pada tautan di atas untuk melihat detail produk pembanding.
+                    </div>
                   </div>
                 )}
-              </div>
+                
+                {autoComparator && comp2 && (
+                  <div className="border border-slate-400 p-4 bg-amber-50 mb-8" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                    <div className="font-bold text-lg mb-2 border-b border-slate-300 pb-2">Pembanding 2 Item {idx + 1}: {comp2.name}</div>
+                    <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                      <div><strong>Pelaku Usaha:</strong> {comp2.vendor}</div>
+                      <div><strong>Harga Tayang:</strong> Rp {(comp2.price || 0).toLocaleString('id-ID')}</div>
+                      <div className="col-span-2"><strong>Tautan (Link):</strong> <a href={comp2.link} target="_blank" className="text-blue-600 break-all">{comp2.link}</a></div>
+                      <div className="col-span-2"><strong>Alasan:</strong> {comp2.alasan || 'Alternatif pembanding e-Katalog dengan harga lebih tinggi'}</div>
+                    </div>
+                  </div>
+                )}
+              </React.Fragment>
             );
           })}
         </div>

@@ -1145,6 +1145,9 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
     if not file_bytes:
         raise HTTPException(400, 'Berkas kosong.')
 
+    import os
+    os.makedirs('logs', exist_ok=True)
+
     # Save bytes for local debugging and inspection
     try:
         ext = 'xlsx' if (filename.endswith('.xlsx') or filename.endswith('.xls')) else 'png' if (filename.endswith('.png') or filename.endswith('.jpg') or filename.endswith('.jpeg')) else 'pdf'

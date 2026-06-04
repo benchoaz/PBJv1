@@ -24,7 +24,8 @@ export default function ProjectList() {
 
   const fetchProjects = () => {
     setLoading(true)
-    fetch('/api/projects')
+    const queryParam = user?.role === 'Admin' ? '' : `?idSatker=${user?.idSatker || ''}`
+    fetch(`/api/projects${queryParam}`)
       .then(res => res.json())
       .then(data => setProjects(Array.isArray(data) ? data : (data?.data || [])))
       .catch(err => console.error('Failed to fetch projects:', err))
@@ -50,6 +51,72 @@ export default function ProjectList() {
         let parsedData = {};
         try { parsedData = JSON.parse(targetPack.description || '{}'); } catch(e) {}
         
+        let finalItems = [];
+        if (parsedData?.surveyData?.products?.length > 0) {
+           finalItems = parsedData.surveyData.products.map((p, idx) => {
+               let qty = 1;
+               let unit = 'Paket';
+               let dpaPrice = 0;
+               if (parsedData.dpaRincian) {
+                  Object.values(parsedData.dpaRincian).forEach(rArray => {
+                      if (Array.isArray(rArray)) {
+                         const m = rArray.find(r => {
+                            const rName = r.nama || r.name || '';
+                            return rName.toLowerCase() === p.name.toLowerCase() || (p.name && p.name.toLowerCase().includes(rName.toLowerCase()));
+                         });
+                         if (m) { qty = m.volume || m.qty || qty; unit = m.satuan || m.unit || unit; dpaPrice = m.harga_satuan || m.price || dpaPrice; }
+                      }
+                  });
+               }
+               const price = (parsedData.hpsPrices && parsedData.hpsPrices[p.name]) ? parsedData.hpsPrices[p.name] : (p.price || 0);
+               return { no: idx + 1, name: p.name, qty, unit, price, dpaPrice, vendor: p.vendor || '' };
+           });
+        } else if (parsedData?.dpaRincian) {
+           const sirupMak = parsedData?.selectedPack?.mak || '';
+           let targetKey = null;
+           
+           if (sirupMak) {
+               const cleanSirup = sirupMak.replace(/[^0-9]/g, '');
+               for (const key of Object.keys(parsedData.dpaRincian)) {
+                   const cleanDpa = key.replace(/[^0-9]/g, '');
+                   if (cleanSirup.includes(cleanDpa) || cleanDpa.includes(cleanSirup)) {
+                       targetKey = key;
+                       break;
+                   }
+               }
+           }
+           
+           if (targetKey && Array.isArray(parsedData.dpaRincian[targetKey])) {
+               parsedData.dpaRincian[targetKey].forEach(r => {
+                   finalItems.push({
+                       no: finalItems.length + 1,
+                       name: r.nama || r.name || 'Barang DPA',
+                       qty: r.volume || r.qty || 1,
+                       unit: r.satuan || r.unit || 'Paket',
+                       price: (parsedData?.hpsPrices && parsedData.hpsPrices[r.nama || r.name]) ? parsedData.hpsPrices[r.nama || r.name] : (r.harga_satuan || r.price || 0),
+                       dpaPrice: r.harga_satuan || r.price || 0,
+                       vendor: ''
+                   });
+               });
+           } else {
+               Object.values(parsedData.dpaRincian).forEach(rArray => {
+                   if (Array.isArray(rArray)) {
+                       rArray.forEach(r => {
+                           finalItems.push({
+                               no: finalItems.length + 1,
+                               name: r.nama || r.name || 'Barang DPA',
+                               qty: r.volume || r.qty || 1,
+                               unit: r.satuan || r.unit || 'Paket',
+                               price: (parsedData?.hpsPrices && parsedData.hpsPrices[r.nama || r.name]) ? parsedData.hpsPrices[r.nama || r.name] : (r.harga_satuan || r.price || 0),
+                               dpaPrice: r.harga_satuan || r.price || 0,
+                               vendor: ''
+                           });
+                       });
+                   }
+               });
+           }
+        }
+
         const convertedPack = {
           id: targetPack.id,
           packName: targetPack.name || parsedData?.selectedPack?.packName || 'Paket Pengadaan',
@@ -65,7 +132,7 @@ export default function ProjectList() {
           senderNip: parsedData?.currentUser?.nip || '',
           senderDepartment: parsedData?.currentUser?.department || 'Instansi Terkait',
           sentDate: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
-          items: parsedData?.dppSpecs || []
+          items: finalItems
         };
         localStorage.setItem('pbj_submitted_package', JSON.stringify(convertedPack));
       }
@@ -93,9 +160,13 @@ export default function ProjectList() {
     }
   }
 
-  const statusList = ['Semua', 'Draft', 'Terkirim ke PP', 'Disetujui PP', 'Selesai (Arsip Lengkap)']
+  const visibleProjects = user?.role === 'PP' ? projects.filter(p => p.status !== 'Draft') : projects;
 
-  const filtered = projects.filter(p => {
+  const statusList = user?.role === 'PP' 
+    ? ['Semua', 'Terkirim ke PP', 'Disetujui PP', 'Selesai (Arsip Lengkap)'] 
+    : ['Semua', 'Draft', 'Terkirim ke PP', 'Disetujui PP', 'Selesai (Arsip Lengkap)'];
+
+  const filtered = visibleProjects.filter(p => {
     const matchStatus = filterStatus === 'Semua' || p.status === filterStatus
     const matchSearch = !search || (p.name || '').toLowerCase().includes(search.toLowerCase())
     return matchStatus && matchSearch
@@ -105,7 +176,7 @@ export default function ProjectList() {
   let processedRups = new Set();
   const rupUtilization = {};
 
-  projects.forEach(p => {
+  visibleProjects.forEach(p => {
     let parsedData = {};
     try { parsedData = JSON.parse(p.description || '{}'); } catch(e) {}
     const noSirup = parsedData?.selectedPack?.noSirup;
@@ -142,8 +213,8 @@ export default function ProjectList() {
     }
   });
 
-  const totalDraft = projects.filter(p => p.status === 'Draft').length
-  const totalKirim = projects.filter(p => p.status === 'Terkirim ke PP').length
+  const totalDraft = visibleProjects.filter(p => p.status === 'Draft').length
+  const totalKirim = visibleProjects.filter(p => p.status === 'Terkirim ke PP').length
 
   return (
     <div className="animate-fade-in min-h-screen bg-gray-50/50">
@@ -164,7 +235,10 @@ export default function ProjectList() {
             </div>
           </div>
           <button
-            onClick={() => navigate('/ppk/persiapan')}
+            onClick={() => {
+              localStorage.removeItem('pbj_current_project_id');
+              navigate('/ppk/persiapan');
+            }}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-md shadow-indigo-200 transition-all hover:scale-[1.02] active:scale-95"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -188,7 +262,7 @@ export default function ProjectList() {
             </div>
             <div>
               <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Total Paket</div>
-              <div className="text-xl font-bold text-slate-800 leading-tight">{projects.length}</div>
+              <div className="text-xl font-bold text-slate-800 leading-tight">{visibleProjects.length}</div>
               <div className="text-[10px] text-slate-400">Semua status</div>
             </div>
           </div>
@@ -234,7 +308,7 @@ export default function ProjectList() {
                     : 'text-slate-500 hover:bg-slate-100'
                 }`}
               >
-                {s === 'Semua' ? `Semua (${projects.length})` : s}
+                {s === 'Semua' ? `Semua (${visibleProjects.length})` : s}
               </button>
             ))}
           </div>

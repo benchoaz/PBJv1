@@ -100,7 +100,7 @@ export default function Header() {
   ]
 
   return (
-    <aside className="w-64 min-h-screen bg-white border-r border-slate-100 sticky top-0 flex flex-col justify-between py-6 px-4 shadow-[1px_0_20px_rgba(0,0,0,0.04)] shrink-0 print:hidden">
+    <aside className="w-64 h-screen bg-white border-r border-slate-100 sticky top-0 flex flex-col justify-between py-6 px-4 shadow-[1px_0_20px_rgba(0,0,0,0.04)] shrink-0 print:hidden overflow-y-auto custom-scrollbar">
       <div className="space-y-7">
         {/* Brand Logo */}
         <Link to="/" className="flex items-center gap-3 px-3 py-1 mb-2">

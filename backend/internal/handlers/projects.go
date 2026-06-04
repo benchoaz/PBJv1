@@ -22,6 +22,7 @@ func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	filter := &models.ProjectFilter{
 		Ministry:  r.URL.Query().Get("ministry"),
 		Province:  r.URL.Query().Get("province"),
+		IdSatker:  r.URL.Query().Get("idSatker"),
 		Status:    r.URL.Query().Get("status"),
 		MinBudget: parseQueryParamFloat(r, "min_budget"),
 		MaxBudget: parseQueryParamFloat(r, "max_budget"),
@@ -98,6 +99,10 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "Failed to update project")
 		return
 	}
+	if project == nil {
+		writeError(w, http.StatusNotFound, "Project not found")
+		return
+	}
 
 	writeJSON(w, http.StatusOK, project)
 }
@@ -118,7 +123,9 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectHandler) Stats(w http.ResponseWriter, r *http.Request) {
-	total, err := h.repo.Count(&models.ProjectFilter{})
+	total, err := h.repo.Count(&models.ProjectFilter{
+		IdSatker: r.URL.Query().Get("idSatker"),
+	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to fetch stats")
 		return
@@ -149,12 +156,14 @@ func parseQueryParamFloat(r *http.Request, key string) float64 {
 }
 
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
