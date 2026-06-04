@@ -2292,6 +2292,25 @@ export default function ProcurementPanel() {
                 background-color: transparent !important;
               }
               
+              /* Prevent awkward table row splitting and orphan headers across page breaks */
+              #print-bahp-document table {
+                page-break-inside: auto !important;
+              }
+              #print-bahp-document tr, #print-bahp-document td, #print-bahp-document th {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+              #print-bahp-document h1, #print-bahp-document h2, #print-bahp-document h3, #print-bahp-document h4, #print-bahp-document h5, #print-bahp-document h6 {
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+              #print-bahp-document .signature-section {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+              
               @page {
                 size: ${docSettings.paperSize === 'F4' ? '215mm 330mm' : 'A4'};
                 margin: 0 !important;
