@@ -1148,6 +1148,24 @@ export default function Step3RincianHPS() {
                                   {surveyItem && surveyItem.success && surveyItem.vendor !== 'TIDAK DITEMUKAN' ? (
                                     <div className="flex flex-col gap-0.5">
                                       <span className="text-[10px] font-bold text-slate-700 truncate max-w-[150px]" title={surveyItem.vendor}>🏪 {surveyItem.vendor}</span>
+                                      {(() => {
+                                        const location = surveyItem.location || surveyItem.location_name || surveyItem.address || '';
+                                        const isOutside = location && searchLocations && !searchLocations.split(',').some(loc => location.toLowerCase().includes(loc.trim().toLowerCase()));
+                                        if (isOutside) {
+                                          return (
+                                            <span className="text-[8px] font-bold text-rose-700 bg-rose-50 px-1 py-0.5 rounded border border-rose-200 w-fit mt-0.5" title={`Produk ditemukan di ${location}, di luar target wilayah: ${searchLocations}`}>
+                                              📍 Luar Wilayah ({location})
+                                            </span>
+                                          );
+                                        } else if (location) {
+                                          return (
+                                            <span className="text-[8px] text-slate-500 font-medium mt-0.5">
+                                              📍 {location}
+                                            </span>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
                                       <a href={surveyItem.link} target="_blank" rel="noopener noreferrer" className="text-[9px] text-indigo-600 hover:text-indigo-800 underline">Tautan Produk</a>
                                       {surveyItem.isFallbackScreenshot && (
                                         <span className="text-[8px] font-bold text-amber-600 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 w-fit mt-0.5" title="Menggunakan screenshot hasil pencarian karena halaman detail error/diblokir">⚠️ Mode Pencarian</span>
