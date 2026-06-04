@@ -2294,7 +2294,8 @@ export default function ProcurementPanel() {
               
               /* Prevent awkward table row splitting and orphan headers across page breaks */
               #print-bahp-document table {
-                page-break-inside: auto !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
               }
               #print-bahp-document tr, #print-bahp-document td, #print-bahp-document th {
                 page-break-inside: avoid !important;
