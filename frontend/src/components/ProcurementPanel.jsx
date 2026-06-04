@@ -1257,7 +1257,24 @@ export default function ProcurementPanel() {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-slate-200 font-bold text-slate-500 text-[10px] uppercase">
-                        <th className="pb-2 w-10 text-center">Pilih</th>
+                        <th className="pb-2 w-10 text-center">
+                          <input 
+                            type="checkbox" 
+                            checked={submittedPack ? getPackageItems(submittedPack).length > 0 && getPackageItems(submittedPack).every(item => checkedItems[item.no]) : false}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              const items = submittedPack ? getPackageItems(submittedPack) : [];
+                              const updated = {};
+                              items.forEach(item => {
+                                updated[item.no] = checked;
+                              });
+                              setCheckedItems(updated);
+                              localStorage.setItem('pbj_pp_checked_items', JSON.stringify(updated));
+                            }}
+                            className="w-3.5 h-3.5 rounded border-slate-300 text-slate-800 focus:ring-slate-800 cursor-pointer"
+                            title="Centang / Hapus Semua"
+                          />
+                        </th>
                         <th className="pb-2 w-6 text-center">No</th>
                         <th className="pb-2">Uraian Barang (Hasil Survei HPS)</th>
                         <th className="pb-2 text-center w-12">Jumlah</th>
