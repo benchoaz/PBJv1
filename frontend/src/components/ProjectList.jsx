@@ -38,104 +38,112 @@ export default function ProjectList() {
     if (!confirm('Anda yakin ingin mengirim paket ini ke Pejabat Pengadaan? Setelah dikirim, dokumen ini akan DIGEMBOK.')) return
     setIsUpdating(true)
     try {
+      // 1. Ambil data saat ini
+      const targetPack = projects.find(p => p.id === projectId);
+      if (!targetPack) throw new Error('Paket tidak ditemukan');
+
+      let parsedData = {};
+      try { parsedData = JSON.parse(targetPack.description || '{}'); } catch(e) {}
+      
+      // 2. Bentuk daftar barang (items)
+      let finalItems = [];
+      if (parsedData?.surveyData?.products?.length > 0) {
+         finalItems = parsedData.surveyData.products.map((p, idx) => {
+             let qty = 1;
+             let unit = 'Paket';
+             let dpaPrice = 0;
+             if (parsedData.dpaRincian) {
+                Object.values(parsedData.dpaRincian).forEach(rArray => {
+                    if (Array.isArray(rArray)) {
+                       const m = rArray.find(r => {
+                          const rName = r.nama || r.name || '';
+                          return rName.toLowerCase() === p.name.toLowerCase() || (p.name && p.name.toLowerCase().includes(rName.toLowerCase()));
+                       });
+                       if (m) { qty = m.volume || m.qty || qty; unit = m.satuan || m.unit || unit; dpaPrice = m.harga_satuan || m.price || dpaPrice; }
+                    }
+                });
+             }
+             const price = (parsedData.hpsPrices && parsedData.hpsPrices[p.name]) ? parsedData.hpsPrices[p.name] : (p.price || 0);
+             return { no: idx + 1, name: p.name, qty, unit, price, dpaPrice, vendor: p.vendor || '' };
+         });
+      } else if (parsedData?.dpaRincian) {
+         const sirupMak = parsedData?.selectedPack?.mak || '';
+         let targetKey = null;
+         
+         if (sirupMak) {
+             const cleanSirup = sirupMak.replace(/[^0-9]/g, '');
+             for (const key of Object.keys(parsedData.dpaRincian)) {
+                 const cleanDpa = key.replace(/[^0-9]/g, '');
+                 if (cleanSirup.includes(cleanDpa) || cleanDpa.includes(cleanSirup)) {
+                     targetKey = key;
+                     break;
+                 }
+             }
+         }
+         
+         if (targetKey && Array.isArray(parsedData.dpaRincian[targetKey])) {
+             parsedData.dpaRincian[targetKey].forEach(r => {
+                 finalItems.push({
+                     no: finalItems.length + 1,
+                     name: r.nama || r.name || 'Barang DPA',
+                     qty: r.volume || r.qty || 1,
+                     unit: r.satuan || r.unit || 'Paket',
+                     price: (parsedData?.hpsPrices && parsedData.hpsPrices[r.nama || r.name]) ? parsedData.hpsPrices[r.nama || r.name] : (r.harga_satuan || r.price || 0),
+                     dpaPrice: r.harga_satuan || r.price || 0,
+                     vendor: ''
+                 });
+             });
+         } else {
+             Object.values(parsedData.dpaRincian).forEach(rArray => {
+                 if (Array.isArray(rArray)) {
+                     rArray.forEach(r => {
+                         finalItems.push({
+                             no: finalItems.length + 1,
+                             name: r.nama || r.name || 'Barang DPA',
+                             qty: r.volume || r.qty || 1,
+                             unit: r.satuan || r.unit || 'Paket',
+                             price: (parsedData?.hpsPrices && parsedData.hpsPrices[r.nama || r.name]) ? parsedData.hpsPrices[r.nama || r.name] : (r.harga_satuan || r.price || 0),
+                             dpaPrice: r.harga_satuan || r.price || 0,
+                             vendor: ''
+                         });
+                     });
+                 }
+             });
+         }
+      }
+
+      parsedData.items = finalItems;
+
+      // 3. Kirim status dan description baru ke backend
       const res = await fetch(`/api/projects/${projectId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'Terkirim ke PP' })
+        body: JSON.stringify({ 
+          status: 'Terkirim ke PP',
+          description: JSON.stringify(parsedData)
+        })
       })
       if (!res.ok) throw new Error('Gagal mengirim ke PP')
       
-      // Sinkronisasi ke localStorage untuk backward compatibility dengan PP Panel
-      const targetPack = projects.find(p => p.id === projectId);
-      if (targetPack) {
-        let parsedData = {};
-        try { parsedData = JSON.parse(targetPack.description || '{}'); } catch(e) {}
-        
-        let finalItems = [];
-        if (parsedData?.surveyData?.products?.length > 0) {
-           finalItems = parsedData.surveyData.products.map((p, idx) => {
-               let qty = 1;
-               let unit = 'Paket';
-               let dpaPrice = 0;
-               if (parsedData.dpaRincian) {
-                  Object.values(parsedData.dpaRincian).forEach(rArray => {
-                      if (Array.isArray(rArray)) {
-                         const m = rArray.find(r => {
-                            const rName = r.nama || r.name || '';
-                            return rName.toLowerCase() === p.name.toLowerCase() || (p.name && p.name.toLowerCase().includes(rName.toLowerCase()));
-                         });
-                         if (m) { qty = m.volume || m.qty || qty; unit = m.satuan || m.unit || unit; dpaPrice = m.harga_satuan || m.price || dpaPrice; }
-                      }
-                  });
-               }
-               const price = (parsedData.hpsPrices && parsedData.hpsPrices[p.name]) ? parsedData.hpsPrices[p.name] : (p.price || 0);
-               return { no: idx + 1, name: p.name, qty, unit, price, dpaPrice, vendor: p.vendor || '' };
-           });
-        } else if (parsedData?.dpaRincian) {
-           const sirupMak = parsedData?.selectedPack?.mak || '';
-           let targetKey = null;
-           
-           if (sirupMak) {
-               const cleanSirup = sirupMak.replace(/[^0-9]/g, '');
-               for (const key of Object.keys(parsedData.dpaRincian)) {
-                   const cleanDpa = key.replace(/[^0-9]/g, '');
-                   if (cleanSirup.includes(cleanDpa) || cleanDpa.includes(cleanSirup)) {
-                       targetKey = key;
-                       break;
-                   }
-               }
-           }
-           
-           if (targetKey && Array.isArray(parsedData.dpaRincian[targetKey])) {
-               parsedData.dpaRincian[targetKey].forEach(r => {
-                   finalItems.push({
-                       no: finalItems.length + 1,
-                       name: r.nama || r.name || 'Barang DPA',
-                       qty: r.volume || r.qty || 1,
-                       unit: r.satuan || r.unit || 'Paket',
-                       price: (parsedData?.hpsPrices && parsedData.hpsPrices[r.nama || r.name]) ? parsedData.hpsPrices[r.nama || r.name] : (r.harga_satuan || r.price || 0),
-                       dpaPrice: r.harga_satuan || r.price || 0,
-                       vendor: ''
-                   });
-               });
-           } else {
-               Object.values(parsedData.dpaRincian).forEach(rArray => {
-                   if (Array.isArray(rArray)) {
-                       rArray.forEach(r => {
-                           finalItems.push({
-                               no: finalItems.length + 1,
-                               name: r.nama || r.name || 'Barang DPA',
-                               qty: r.volume || r.qty || 1,
-                               unit: r.satuan || r.unit || 'Paket',
-                               price: (parsedData?.hpsPrices && parsedData.hpsPrices[r.nama || r.name]) ? parsedData.hpsPrices[r.nama || r.name] : (r.harga_satuan || r.price || 0),
-                               dpaPrice: r.harga_satuan || r.price || 0,
-                               vendor: ''
-                           });
-                       });
-                   }
-               });
-           }
-        }
-
-        const convertedPack = {
-          id: targetPack.id,
-          packName: targetPack.name || parsedData?.selectedPack?.packName || 'Paket Pengadaan',
-          pagu: targetPack.budget || parsedData?.selectedPack?.pagu || 0,
-          mak: parsedData?.selectedPack?.mak || '',
-          noSirup: parsedData?.selectedPack?.noSirup || '',
-          volume: parsedData?.packageMetadata?.volume || '1 Paket',
-          spesifikasi: parsedData?.packageMetadata?.spesifikasi || '',
-          hpsValue: parsedData?.hpsValue || targetPack.budget || '',
-          techSpecs: parsedData?.techSpecs || '',
-          dpaName: parsedData?.dpaName || 'DPA_Document.pdf',
-          senderName: parsedData?.currentUser?.name || targetPack.created_by || 'PPK',
-          senderNip: parsedData?.currentUser?.nip || '',
-          senderDepartment: parsedData?.currentUser?.department || 'Instansi Terkait',
-          sentDate: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
-          items: finalItems
-        };
-        localStorage.setItem('pbj_submitted_package', JSON.stringify(convertedPack));
-      }
+      // Sinkronisasi ke localStorage untuk backward compatibility
+      const convertedPack = {
+        id: targetPack.id,
+        packName: targetPack.name || parsedData?.selectedPack?.packName || 'Paket Pengadaan',
+        pagu: targetPack.budget || parsedData?.selectedPack?.pagu || 0,
+        mak: parsedData?.selectedPack?.mak || '',
+        noSirup: parsedData?.selectedPack?.noSirup || '',
+        volume: parsedData?.packageMetadata?.volume || '1 Paket',
+        spesifikasi: parsedData?.packageMetadata?.spesifikasi || '',
+        hpsValue: parsedData?.hpsValue || targetPack.budget || '',
+        techSpecs: parsedData?.techSpecs || '',
+        dpaName: parsedData?.dpaName || 'DPA_Document.pdf',
+        senderName: parsedData?.currentUser?.name || targetPack.created_by || 'PPK',
+        senderNip: parsedData?.currentUser?.nip || '',
+        senderDepartment: parsedData?.currentUser?.department || 'Instansi Terkait',
+        sentDate: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+        items: finalItems
+      };
+      localStorage.setItem('pbj_submitted_package', JSON.stringify(convertedPack));
       
       alert('Paket berhasil dikirim!')
       fetchProjects()
@@ -234,18 +242,20 @@ export default function ProjectList() {
               <p className="text-xs text-slate-500 mt-0.5">Dokumen Persiapan Pengadaan (DPP) &amp; Riwayat Survei HPS</p>
             </div>
           </div>
-          <button
-            onClick={() => {
-              localStorage.removeItem('pbj_current_project_id');
-              navigate('/ppk/persiapan');
-            }}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-md shadow-indigo-200 transition-all hover:scale-[1.02] active:scale-95"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Buat DPP Baru
-          </button>
+          {user?.role !== 'PP' && (
+            <button
+              onClick={() => {
+                localStorage.removeItem('pbj_current_project_id');
+                navigate('/ppk/persiapan');
+              }}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-md shadow-indigo-200 transition-all hover:scale-[1.02] active:scale-95"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Buat DPP Baru
+            </button>
+          )}
         </div>
       </div>
 
@@ -441,14 +451,20 @@ export default function ProjectList() {
                       <td className="px-4 py-4 text-center">
                         <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold border px-2.5 py-1 rounded-full ${cfg.color}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`}></span>
-                          {cfg.label}
+                          {user?.role === 'PP' && project.status === 'Terkirim ke PP' ? 'Usulan Masuk' : cfg.label}
                         </span>
                       </td>
                       <td className="px-4 py-4 text-center text-xs text-slate-500 whitespace-nowrap">{tgl}</td>
                       <td className="px-4 py-4 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button
-                            onClick={() => navigate(`/ppk/persiapan?paketId=${project.id}`)}
+                            onClick={() => {
+                              if (user?.role === 'PP') {
+                                navigate(`/pp/panel?paketId=${project.id}`)
+                              } else {
+                                navigate(`/ppk/persiapan?paketId=${project.id}`)
+                              }
+                            }}
                             title={isLocked ? 'Lihat Arsip DPP' : 'Edit Dokumen'}
                             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors border border-slate-200"
                           >
@@ -457,7 +473,7 @@ export default function ProjectList() {
                             ) : (
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                             )}
-                            {isLocked ? 'Lihat' : 'Edit'}
+                            {user?.role === 'PP' ? (project.status === 'Terkirim ke PP' ? 'Proses Usulan' : 'Lihat') : (isLocked ? 'Lihat' : 'Edit')}
                           </button>
                           {!isLocked && (
                             <button
@@ -528,7 +544,7 @@ export default function ProjectList() {
                     <div className="text-[10px] font-mono text-slate-400">#{String(idx+1).padStart(3,'0')}</div>
                     <span className={`inline-flex items-center gap-1 text-[10px] font-semibold border px-2 py-0.5 rounded-full ${cfg.color}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`}></span>
-                      {cfg.label}
+                      {user?.role === 'PP' && project.status === 'Terkirim ke PP' ? 'Usulan Masuk' : cfg.label}
                     </span>
                   </div>
 
@@ -561,11 +577,17 @@ export default function ProjectList() {
 
                   <div className="flex gap-2">
                     <button
-                      onClick={() => navigate(`/ppk/persiapan?paketId=${project.id}`)}
+                      onClick={() => {
+                        if (user?.role === 'PP') {
+                          navigate(`/pp/panel?paketId=${project.id}`)
+                        } else {
+                          navigate(`/ppk/persiapan?paketId=${project.id}`)
+                        }
+                      }}
                       className="flex-1 inline-flex items-center justify-center gap-1.5 border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600 text-[11px] font-semibold py-2 rounded-lg transition-all"
                     >
                       {isLocked ? (
-                        <><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg> Lihat DPP</>
+                        <><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg> {user?.role === 'PP' && project.status === 'Terkirim ke PP' ? 'Proses Usulan' : 'Lihat DPP'}</>
                       ) : (
                         <><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg> Edit</>  
                       )}

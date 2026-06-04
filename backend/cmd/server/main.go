@@ -44,6 +44,8 @@ func main() {
 		&models.SurveyResult{},
 		&models.AppSetting{},
 		&models.Project{}, // Added Project here
+		&models.ProjectItem{},
+		&models.ProjectItemSurvey{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate models: %v", err)
@@ -66,7 +68,7 @@ func main() {
 	// Fix PostgreSQL sequence for users table to prevent duplicate key errors after manual inserts
 	gormDB.Exec("SELECT setval(pg_get_serial_sequence('users', 'id'), COALESCE(MAX(id), 1)) FROM users")
 
-	projectRepo := repository.NewProjectRepository(sqlDB)
+	projectRepo := repository.NewProjectRepository(sqlDB, gormDB)
 	bahpRepo := repository.NewBahpRepository(sqlDB)
 	if err := bahpRepo.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize BAHP repository: %v", err)

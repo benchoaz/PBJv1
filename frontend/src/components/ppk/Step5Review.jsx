@@ -122,7 +122,9 @@ export default function Step5Review() {
                     senderNip: currentUser.nip,
                     senderDepartment: currentUser.department,
                     sentDate: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
-                    dppSpecs: dppSpecs
+                    dppSpecs: dppSpecs,
+                    selectedTplId: selectedTplId,
+                    selectedNdTplId: selectedNdTplId
                   }
                   
 

@@ -98,6 +98,42 @@ function getQueryAttempts(originalName) {
 }
 
 /**
+ * Menentukan batas harga min/max untuk filtering kandidat produk.
+ * 
+ * LOGIKA:
+ * - Jika PP mengisi explicitMinPrice DAN/ATAU explicitMaxPrice → gunakan KETAT (mode per-produk)
+ * - Jika keduanya kosong/null → hitung otomatis dari fallbackPrice ± toleransi % (mode massal)
+ * 
+ * @param {object} item - item dari payload pencarian
+ * @returns {{ minPrice: number|null, maxPrice: number|null, isExplicit: boolean }}
+ */
+function resolvePriceRange(item) {
+  const hasExplicitMin = item.explicitMinPrice !== null && item.explicitMinPrice !== undefined && item.explicitMinPrice > 0;
+  const hasExplicitMax = item.explicitMaxPrice !== null && item.explicitMaxPrice !== undefined && item.explicitMaxPrice > 0;
+
+  if (hasExplicitMin || hasExplicitMax) {
+    // Mode per-produk: pakai batas yang diisi PP secara ketat
+    return {
+      minPrice: hasExplicitMin ? item.explicitMinPrice : null,
+      maxPrice: hasExplicitMax ? item.explicitMaxPrice : null,
+      isExplicit: true
+    };
+  }
+
+  // Mode massal: hitung dari fallbackPrice ± toleransi %
+  if (item.fallbackPrice && item.fallbackPrice > 0) {
+    const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.025;
+    return {
+      minPrice: Math.floor(item.fallbackPrice * (1 - tolerance)),
+      maxPrice: Math.floor(item.fallbackPrice * (1 + tolerance)),
+      isExplicit: false
+    };
+  }
+
+  return { minPrice: null, maxPrice: null, isExplicit: false };
+}
+
+/**
  * Menghitung skor kemiripan teks antara produk target (DPA) dan kandidat dari Inaproc.
  * Menggunakan perpaduan Word Overlap, Jaccard Similarity, dan Length Penalty.
  */
@@ -188,40 +224,70 @@ async function searchItem(page, item, index) {
 
     // --- BYPASS: URL Spesifik ---
     if (item.targetUrl && item.targetUrl.startsWith('http')) {
-      console.log(`  → BYPASS: Mengunjungi URL langsung: ${item.targetUrl}`);
-      try {
-        await page.goto(item.targetUrl, { waitUntil: 'networkidle2', timeout: 45000 });
-        await new Promise(r => setTimeout(r, 4000));
-        const detailFile = path.join(screenshotDir, safeId + '_detail.png');
-        await injectWatermark(page);
-        await page.screenshot({ path: detailFile, fullPage: false });
-        
-        const detailData = await page.evaluate(() => {
-          let price = null, vendor = null;
-          const pEl = document.querySelector('.harga-produk') || document.querySelector('h2.text-primary');
-          if (pEl) {
-            const pm = pEl.innerText.match(/Rp\s*([\d.,]+)/);
-            if (pm) price = parseInt(pm[1].replace(/\./g, '').replace(/,\d+$/, ''));
-          }
-          const vEl = document.querySelector('.penyedia-name') || document.querySelector('.card-body strong');
-          if (vEl) vendor = vEl.innerText.trim();
-          return { price, vendor };
-        });
+      // Tentukan apakah ini URL produk spesifik atau hanya halaman toko
+      let urlPath = '';
+      try { urlPath = new URL(item.targetUrl).pathname; } catch(e) {}
+      const pathSegments = urlPath.split('/').filter(Boolean);
+      const isProductUrl = pathSegments.length >= 2; // /{vendor}/{produk} = produk spesifik
+      const isStoreUrl   = pathSegments.length === 1;  // /{vendor} saja = halaman toko
 
-        return {
-          name: item.name,
-          query: searchTarget,
-          vendor: detailData.vendor || 'PENYEDIA TARGET',
-          price: detailData.price || item.fallbackPrice,
-          link: item.targetUrl,
-          img: `/screenshots/${path.basename(detailFile)}`,
-          searchImg: `/screenshots/${path.basename(detailFile)}`,
-          success: true
-        };
-      } catch (err) {
-        console.log(`  ❌ BYPASS gagal: ${err.message}. Lanjut pencarian manual...`);
+      if (isProductUrl) {
+        // URL produk spesifik → BYPASS langsung buka dan ambil data
+        console.log(`  → BYPASS (Produk Spesifik): Mengunjungi URL langsung: ${item.targetUrl}`);
+        try {
+          await page.goto(item.targetUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+          await new Promise(r => setTimeout(r, 4000));
+          const detailFile = path.join(screenshotDir, safeId + '_detail.png');
+          await injectWatermark(page);
+          await page.screenshot({ path: detailFile, fullPage: false });
+          
+          const detailData = await page.evaluate(() => {
+            let price = null, vendor = null;
+            const allText = document.body.innerText || '';
+            const rpMatch = allText.match(/Rp\s*([\d.,]+)/);
+            if (rpMatch) {
+              const priceStr = rpMatch[1].replace(/\./g, '').replace(/,\d+$/, '');
+              const parsed = parseInt(priceStr);
+              if (parsed >= 100) price = parsed;
+            }
+            const vEl = document.querySelector('.penyedia-name') || document.querySelector('.card-body strong');
+            if (vEl) vendor = vEl.innerText.trim();
+            return { price, vendor };
+          });
+
+          // Validasi harga terhadap batas eksplisit PP sebelum bypass return
+          const { minPrice: bpMin, maxPrice: bpMax } = resolvePriceRange(item);
+          const bpPrice = detailData.price || item.fallbackPrice;
+          if (bpMin !== null && bpMin !== undefined && bpPrice < bpMin) {
+            console.log(`  ⚠️ [BYPASS] Harga Rp ${bpPrice} di bawah min (Rp ${bpMin}). Lanjut pencarian manual...`);
+          } else if (bpMax !== null && bpMax !== undefined && bpPrice > bpMax) {
+            console.log(`  ⚠️ [BYPASS] Harga Rp ${bpPrice} melampaui max (Rp ${bpMax}). Lanjut pencarian manual...`);
+          } else {
+            return {
+              name: item.name,
+              query: searchTarget,
+              vendor: detailData.vendor ? detailData.vendor : (item.targetVendor ? item.targetVendor.toUpperCase() : 'PENYEDIA TARGET'),
+              price: bpPrice,
+              link: item.targetUrl,
+              img: `/screenshots/${path.basename(detailFile)}`,
+              searchImg: `/screenshots/${path.basename(detailFile)}`,
+              success: true
+            };
+          }
+        } catch (err) {
+          console.log(`  ❌ BYPASS gagal: ${err.message}. Lanjut pencarian manual...`);
+        }
+      } else if (isStoreUrl) {
+        // URL toko penyedia → extract slug, gunakan sebagai targetVendor jika belum diisi
+        const storeSlug = pathSegments[0].toLowerCase();
+        console.log(`  ℹ️ [BYPASS] URL toko terdeteksi (/${storeSlug}), digunakan sebagai target vendor (bukan bypass)`);
+        if (!item.targetVendor || !item.targetVendor.trim()) {
+          item.targetVendor = storeSlug;
+        }
+        // Tidak bypass — lanjut pencarian normal di bawah
       }
     }
+
 
     const attempts = getQueryAttempts(searchTarget);
     console.log(`  → Query pencarian yang akan dicoba (Target: ${searchTarget}):`, attempts);
@@ -272,25 +338,10 @@ async function searchItem(page, item, index) {
       // (sebelumnya maxPrice tetap terkirim ke URL meski toggle "Abaikan Harga" aktif,
       //  sehingga inaproc memblokir produk di atas pagu sebelum logika scoring kita melihatnya)
       if (!item.ignorePriceLimit) {
-        let minPrice = item.explicitMinPrice;
-        let maxPrice = item.explicitMaxPrice;
-        
-        if (item.fallbackPrice && item.fallbackPrice > 0) {
-          const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.025;
-          if (minPrice === undefined || minPrice === null) {
-            minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
-          }
-          if (maxPrice === undefined || maxPrice === null) {
-            maxPrice = Math.floor(item.fallbackPrice * (1 + tolerance));
-          }
-        }
-        
-        if (minPrice !== undefined && minPrice !== null) {
-          sUrl += `&minPrice=${minPrice}`;
-        }
-        if (maxPrice !== undefined && maxPrice !== null) {
-          sUrl += `&maxPrice=${maxPrice}`;
-        }
+        // Gunakan fungsi terpusat: eksplisit PP diprioritaskan, fallback hanya jika tidak ada
+        const { minPrice, maxPrice } = resolvePriceRange(item);
+        if (minPrice !== null && minPrice !== undefined) sUrl += `&minPrice=${minPrice}`;
+        if (maxPrice !== null && maxPrice !== undefined) sUrl += `&maxPrice=${maxPrice}`;
       }
       
       if (item.locations && item.locations.length > 0) {
@@ -346,14 +397,10 @@ async function searchItem(page, item, index) {
     if (item.locations && item.locations.length > 0) {
       attempts.forEach(q => {
         let sNasionalUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(q);
-        if (!item.ignorePriceLimit && item.fallbackPrice && item.fallbackPrice > 0) {
-          let minPrice = item.explicitMinPrice;
-          let maxPrice = item.explicitMaxPrice;
-          const tolerance = 0.3;
-          if (minPrice === undefined || minPrice === null) minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
-          if (maxPrice === undefined || maxPrice === null) maxPrice = Math.floor(item.fallbackPrice * (1 + tolerance));
-          if (minPrice !== undefined && minPrice !== null) sNasionalUrl += `&minPrice=${minPrice}`;
-          if (maxPrice !== undefined && maxPrice !== null) sNasionalUrl += `&maxPrice=${maxPrice}`;
+        if (!item.ignorePriceLimit) {
+          const { minPrice, maxPrice } = resolvePriceRange(item);
+          if (minPrice !== null && minPrice !== undefined) sNasionalUrl += `&minPrice=${minPrice}`;
+          if (maxPrice !== null && maxPrice !== undefined) sNasionalUrl += `&maxPrice=${maxPrice}`;
         }
         searchScenarios.push({ url: sNasionalUrl, query: q, type: 'fallback-nasional' });
       });
@@ -427,21 +474,22 @@ async function searchItem(page, item, index) {
 
         if (candidates && candidates.length > 0) {
           if (scenario.type === 'global-noprice') {
-            const hasTargetVendor = candidates.some(c => 
-              item.targetVendor && c.vendor.toLowerCase().includes(item.targetVendor.toLowerCase())
+            const vendorMatchKeyword = item._resolvedVendorSlug ? item._resolvedVendorSlug.replace(/-/g, ' ') : (item.targetVendor ? item.targetVendor.replace(/-/g, ' ') : null);
+            const hasTargetVendor = vendorMatchKeyword && candidates.some(c => 
+              c.vendor.toLowerCase().includes(vendorMatchKeyword.toLowerCase())
             );
             if (!hasTargetVendor) {
-              console.log(`    ℹ️ Fallback global (tanpa harga) tidak menemukan produk dari ${item.targetVendor}, dilewati.`);
+              console.log(`    ℹ️ Fallback global (tanpa harga) tidak menemukan produk dari ${vendorMatchKeyword}, dilewati.`);
               continue;
             }
             if (searchData.length > 0) {
               const newVendorProducts = candidates.filter(c => 
-                item.targetVendor && c.vendor.toLowerCase().includes(item.targetVendor.toLowerCase())
+                vendorMatchKeyword && c.vendor.toLowerCase().includes(vendorMatchKeyword.toLowerCase())
               );
               searchData = [...searchData, ...newVendorProducts.filter(nc => 
                 !searchData.some(sd => sd.productHref === nc.productHref)
               )];
-              console.log(`    ✅ Menggabungkan ${newVendorProducts.length} produk ${item.targetVendor} dari fallback ke searchData.`);
+              console.log(`    ✅ Menggabungkan ${newVendorProducts.length} produk ${vendorMatchKeyword} dari fallback ke searchData.`);
               break;
             }
             searchData = candidates;
@@ -485,31 +533,28 @@ async function searchItem(page, item, index) {
       const vendorMatchKeyword = (() => {
         if (!item.targetVendor) return null;
         const slug = item._resolvedVendorSlug || item.targetVendor;
-        // Ambil bagian pertama sebelum tanda hubung (misal 'sultoni' dari 'sultoni-wza2')
-        const firstPart = slug.split('-')[0];
-        return firstPart.length >= 3 ? firstPart : slug;
+        // Jangan dipotong '-' jika slug sudah spesifik (misal sultoni-wza2)
+        // Cukup ganti '-' dengan spasi agar cocok dengan nama vendor (SULTONI WZA2)
+        return slug.replace(/-/g, ' ');
       })();
       searchData.forEach(cand => {
         // HUKUM BATAS PAGU (PRICE CEILING) — berlaku mutlak
         const isTargetMatch = vendorMatchKeyword && cand.vendor.toLowerCase().includes(vendorMatchKeyword.toLowerCase());
         
         if (!item.ignorePriceLimit) {
-          let minPrice = item.explicitMinPrice;
-          let maxPrice = item.explicitMaxPrice;
-          
-          if (item.fallbackPrice && item.fallbackPrice > 0) {
-            const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.025;
-            if (minPrice === undefined || minPrice === null) minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
-            if (maxPrice === undefined || maxPrice === null) maxPrice = Math.floor(item.fallbackPrice * (1 + tolerance));
-          }
+          const { minPrice, maxPrice } = resolvePriceRange(item);
           
           if (minPrice !== undefined && minPrice !== null && cand.price < minPrice) {
             console.log(`    🚫 [TOLAK] Harga Rp ${cand.price} terlalu murah (di bawah batas Rp ${minPrice}): ${cand.title}`);
             return;
           }
           if (maxPrice !== undefined && maxPrice !== null && cand.price > maxPrice) {
-            console.log(`    🚫 [TOLAK] Harga Rp ${cand.price} melampaui batas atas (Rp ${maxPrice}): ${cand.title}`);
-            return;
+            if (isTargetMatch) {
+              console.log(`    ⚠️ [TOLERANSI TARGET] Harga Rp ${cand.price} melampaui batas atas (Rp ${maxPrice}) TAPI diizinkan karena ini dari Target Penyedia (bisa dinego)`);
+            } else {
+              console.log(`    🚫 [TOLAK] Harga Rp ${cand.price} melampaui batas atas (Rp ${maxPrice}): ${cand.title}`);
+              return;
+            }
           }
         }
 
@@ -606,16 +651,9 @@ async function searchItem(page, item, index) {
     // ── STEP 3: Navigate to product detail (Direct clean link) ─────────
     let detailUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(successfulQuery || searchTarget);
     if (!item.ignorePriceLimit) {
-      let minPrice = item.explicitMinPrice;
-      let maxPrice = item.explicitMaxPrice;
-      
-      if (item.fallbackPrice && item.fallbackPrice > 0) {
-        const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.025;
-        if (minPrice === undefined || minPrice === null) minPrice = Math.floor(item.fallbackPrice * (1 - tolerance));
-        if (maxPrice === undefined || maxPrice === null) maxPrice = Math.floor(item.fallbackPrice * (1 + tolerance));
-      }
-      if (minPrice !== undefined && minPrice !== null) detailUrl += `&minPrice=${minPrice}`;
-      if (maxPrice !== undefined && maxPrice !== null) detailUrl += `&maxPrice=${maxPrice}`;
+      const { minPrice: dMin, maxPrice: dMax } = resolvePriceRange(item);
+      if (dMin !== null && dMin !== undefined) detailUrl += `&minPrice=${dMin}`;
+      if (dMax !== null && dMax !== undefined) detailUrl += `&maxPrice=${dMax}`;
     }
     if (item.locations && item.locations.length > 0) {
         let rNames = [];

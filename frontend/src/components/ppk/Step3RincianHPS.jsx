@@ -738,9 +738,9 @@ export default function Step3RincianHPS() {
         // Auto-Comparator Capture
         if (autoComparator && res.comparators && res.comparators.length > 0) {
           const comp = res.comparators[0];
-          setComparisons(prev => ({
-            ...prev,
-            ['ITEM-' + originalIndex]: {
+          setComparisons(prev => {
+            const newComps = { ...prev };
+            newComps['ITEM-' + originalIndex] = {
               vendor: comp.vendor,
               name: comp.name,
               price: comp.price,
@@ -748,8 +748,22 @@ export default function Step3RincianHPS() {
               link: comp.link,
               alasan: comp.alasan,
               isAuto: true
+            };
+            
+            if (res.comparators.length > 1) {
+              const comp2 = res.comparators[1];
+              newComps['ITEM-' + originalIndex + '-2'] = {
+                vendor: comp2.vendor,
+                name: comp2.name,
+                price: comp2.price,
+                status: comp2.status,
+                link: comp2.link,
+                alasan: comp2.alasan,
+                isAuto: true
+              };
             }
-          }));
+            return newComps;
+          });
         }
       });
 

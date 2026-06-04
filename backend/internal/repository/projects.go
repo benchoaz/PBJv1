@@ -2,18 +2,22 @@ package repository
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
+
+	"gorm.io/gorm"
 
 	"pbj/internal/models"
 )
 
 type ProjectRepository struct {
-	db *sql.DB
+	db   *sql.DB
+	gorm *gorm.DB
 }
 
-func NewProjectRepository(db *sql.DB) *ProjectRepository {
-	return &ProjectRepository{db: db}
+func NewProjectRepository(db *sql.DB, gormDB *gorm.DB) *ProjectRepository {
+	return &ProjectRepository{db: db, gorm: gormDB}
 }
 
 func (r *ProjectRepository) GetAll(filter *models.ProjectFilter) ([]*models.Project, error) {
@@ -90,6 +94,29 @@ func (r *ProjectRepository) GetAll(filter *models.ProjectFilter) ([]*models.Proj
 		projects = append(projects, p)
 	}
 
+	if len(projects) > 0 {
+		var projectIDs []int64
+		for _, p := range projects {
+			projectIDs = append(projectIDs, p.ID)
+		}
+
+		var allItems []models.ProjectItem
+		r.gorm.Preload("Surveys").Where("project_id IN ?", projectIDs).Find(&allItems)
+
+		itemsByProject := make(map[int64][]models.ProjectItem)
+		for _, item := range allItems {
+			itemsByProject[item.ProjectID] = append(itemsByProject[item.ProjectID], item)
+		}
+
+		for _, p := range projects {
+			if items, ok := itemsByProject[p.ID]; ok {
+				p.Items = items
+			} else {
+				p.Items = []models.ProjectItem{}
+			}
+		}
+	}
+
 	return projects, rows.Err()
 }
 
@@ -113,6 +140,11 @@ func (r *ProjectRepository) GetByID(id int64) (*models.Project, error) {
 	}
 	p.StartDate = parseTimePtr(startDate)
 	p.EndDate = parseTimePtr(endDate)
+
+	var allItems []models.ProjectItem
+	r.gorm.Preload("Surveys").Where("project_id = ?", id).Find(&allItems)
+	p.Items = allItems
+
 	return p, nil
 }
 
@@ -149,6 +181,31 @@ func (r *ProjectRepository) Update(id int64, input *models.ProjectUpdate) (*mode
 		argPos++
 	}
 	if input.Description != nil {
+		var parsed map[string]interface{}
+		if err := json.Unmarshal([]byte(*input.Description), &parsed); err == nil {
+			if itemsRaw, ok := parsed["items"]; ok {
+				// extract items, delete from parsed
+				delete(parsed, "items")
+				newDescBytes, _ := json.Marshal(parsed)
+				newDescStr := string(newDescBytes)
+				input.Description = &newDescStr
+
+				// Delete old items
+				r.gorm.Where("project_id = ?", id).Delete(&models.ProjectItem{})
+				
+				itemsBytes, _ := json.Marshal(itemsRaw)
+				var items []models.ProjectItem
+				if err := json.Unmarshal(itemsBytes, &items); err == nil {
+					for i := range items {
+						items[i].ProjectID = id
+					}
+					if len(items) > 0 {
+						r.gorm.Create(&items)
+					}
+				}
+			}
+		}
+
 		setClauses = append(setClauses, fmt.Sprintf("description = $%d", argPos))
 		args = append(args, *input.Description)
 		argPos++

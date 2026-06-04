@@ -252,6 +252,8 @@ description: JSON.stringify({
           techSpecs,
           hpsPrices,
           tanggalSurat,
+          selectedTplId,
+          selectedNdTplId,
           items: getPackageItems(selectedPack)
         })
       };
