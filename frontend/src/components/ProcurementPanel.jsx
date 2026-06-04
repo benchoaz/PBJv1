@@ -2241,6 +2241,10 @@ export default function ProcurementPanel() {
           {/* Inject Dynamic Print Media CSS to isolate and clean up the printable BAHP document */}
           <style>{`
             @media print {
+              @page {
+                size: ${docSettings.paperSize || 'A4'};
+                margin: ${docSettings.marginTop !== undefined ? docSettings.marginTop : 20}mm ${docSettings.marginRight !== undefined ? docSettings.marginRight : 20}mm ${docSettings.marginBottom !== undefined ? docSettings.marginBottom : 25}mm ${docSettings.marginLeft !== undefined ? docSettings.marginLeft : 30}mm;
+              }
               /* Hide all page content by default */
               body * {
                 visibility: hidden;

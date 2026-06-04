@@ -68,16 +68,71 @@ export default function BahpDocument({
   const extraCols = extraColDefs[templateId] || [];
 
   return (
-    <div className="bg-white text-slate-900 text-[9.5px] leading-relaxed font-serif max-w-[780px] mx-auto print:max-w-none">
+    <div 
+      className="bg-white text-slate-900 mx-auto print:max-w-none"
+      style={{
+        fontFamily: docSettings.fontFamily || 'Georgia, serif',
+        fontSize: docSettings.fontSize || '9.5px',
+        lineHeight: docSettings.lineHeight || '1.35',
+        maxWidth: '780px',
+      }}
+    >
 
       {/* ╔══════════════════════════════════════════════╗
           ║ KOP SURAT                                    ║
           ╚══════════════════════════════════════════════╝ */}
       {docSettings.showKop !== false && (
-        <div className="text-center border-b-4 border-double border-slate-900 pb-3 mb-4 font-sans">
-          <div className="text-[12px] font-bold tracking-wider uppercase">PEMERINTAH KABUPATEN PROBOLINGGO</div>
-          <div className="text-[13px] font-bold tracking-widest uppercase mt-0.5">{ukpbj}</div>
-          <div className="text-[8.5px] mt-0.5 text-slate-600">{alamat}</div>
+        <div className="border-b-4 border-double border-slate-900 pb-3 mb-5 font-sans">
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              <tr>
+                {/* Emblem Left Column */}
+                <td style={{ width: '15%', verticalAlign: 'middle', textAlign: 'center', paddingRight: '12px' }}>
+                  <div className="relative inline-block">
+                    {docSettings.logoType === 'pemda' ? (
+                      <img 
+                        src="https://upload.wikimedia.org/wikipedia/commons/2/25/Lambang_Kabupaten_Probolinggo.png" 
+                        alt="Logo Daerah" 
+                        style={{ maxHeight: '72px', maxWidth: '72px', objectFit: 'contain', display: 'inline-block' }} 
+                      />
+                    ) : docSettings.logoType === 'garuda' ? (
+                      <LogoGarudaPlaceholder />
+                    ) : docSettings.customLogo ? (
+                      <img 
+                        src={docSettings.customLogo} 
+                        alt="Logo Kustom" 
+                        style={{ maxHeight: '72px', maxWidth: '72px', objectFit: 'contain', display: 'inline-block' }} 
+                      />
+                    ) : (
+                      <img 
+                        src="https://upload.wikimedia.org/wikipedia/commons/2/25/Lambang_Kabupaten_Probolinggo.png" 
+                        alt="Logo Daerah" 
+                        style={{ maxHeight: '72px', maxWidth: '72px', objectFit: 'contain', display: 'inline-block' }} 
+                      />
+                    )}
+                  </div>
+                </td>
+                {/* Text Header Middle Column */}
+                <td style={{ width: '85%', textAlign: 'center', verticalAlign: 'middle' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '11pt', textTransform: 'uppercase', lineHeight: '1.2', letterSpacing: '0.04em', color: 'black' }}>
+                    {docSettings.namaPemda || 'PEMERINTAH KABUPATEN PROBOLINGGO'}
+                  </div>
+                  <div style={{ fontWeight: 'bold', fontSize: '13pt', textTransform: 'uppercase', lineHeight: '1.25', marginTop: '4px', color: 'black', whiteSpace: 'pre-line' }}>
+                    {(docSettings.namaInstansi || ukpbj || '').split(', ').map((part, idx, arr) => (
+                      <React.Fragment key={idx}>
+                        {part}{idx < arr.length - 1 ? ',' : ''}
+                        {idx < arr.length - 1 && <br />}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                  <div 
+                    style={{ fontSize: '8.5pt', marginTop: '6px', lineHeight: '1.35', color: '#0f172a' }}
+                    dangerouslySetInnerHTML={{ __html: formatAlamatKop(docSettings.alamatLengkap || docSettings.alamatInstansi || alamat) }}
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -509,3 +564,36 @@ function SectionTitle({ letter, children }) {
     </div>
   );
 }
+
+// High-fidelity SVG of the Indonesian Garuda Emblem
+const LogoGarudaPlaceholder = () => (
+  <svg width="65" height="65" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-sm select-none">
+    <path d="M50 8 C58 20 85 24 90 28 C90 45 82 72 50 94 C18 72 10 45 10 28 C15 24 42 20 50 8 Z" fill="#D97706" opacity="0.1" />
+    <path d="M50 8 C58 20 85 24 90 28 C90 45 82 72 50 94 C18 72 10 45 10 28 C15 24 42 20 50 8 Z" stroke="#8F5C12" strokeWidth="2.5" strokeLinejoin="round" />
+    <path d="M50 35 C35 32 18 36 12 44 C16 52 24 58 35 56 C33 62 25 68 20 72 C30 72 38 68 42 60" stroke="#8F5C12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M50 35 C65 32 82 36 88 44 C84 52 76 58 65 56 C67 62 75 68 80 72 C70 72 62 68 58 60" stroke="#8F5C12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M43 62 L43 78 C43 82 50 84 50 84 C50 84 57 82 57 78 L57 62 Z" fill="#8F5C12" opacity="0.2"/>
+    <path d="M46 62 V76 M50 62 V80 M54 62 V76" stroke="#8F5C12" strokeWidth="1.8" strokeLinecap="round"/>
+    <rect x="42" y="38" width="16" height="20" rx="3" fill="#B91C1C" stroke="#8F5C12" strokeWidth="2" />
+    <path d="M42 48 H58" stroke="#8F5C12" strokeWidth="1.5" />
+    <path d="M50 38 V58" stroke="#8F5C12" strokeWidth="1.5" />
+    <circle cx="50" cy="48" r="3" fill="#D97706" />
+    <path d="M50 18 C52 14 55 12 58 14 C58 17 56 20 53 22 Z" fill="#8F5C12" stroke="#8F5C12" strokeWidth="1" />
+    <circle cx="53" cy="17" r="1" fill="#FFFFFF" />
+  </svg>
+);
+
+const formatAlamatKop = (alamat) => {
+  if (!alamat) return '';
+  let formatted = alamat;
+  
+  // Replace URL
+  const urlRegex = /(https?:\/\/[^\s,]+)/g;
+  formatted = formatted.replace(urlRegex, '<a href="$1" target="_blank" class="text-blue-600 underline hover:text-blue-800 transition-colors" style="color: #2563eb; text-decoration: underline;">$1</a>');
+  
+  // Replace Email
+  const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/g;
+  formatted = formatted.replace(emailRegex, '<a href="mailto:$1" class="text-blue-600 underline hover:text-blue-800 transition-colors" style="color: #2563eb; text-decoration: underline;">$1</a>');
+  
+  return formatted;
+};
