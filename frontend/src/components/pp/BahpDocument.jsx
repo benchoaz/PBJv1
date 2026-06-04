@@ -71,7 +71,7 @@ export default function BahpDocument({
     <div 
       className="bg-white text-black mx-auto print:shadow-none print:border-none print:w-full transition-all duration-300"
       style={{
-        width: docSettings.paperSize === 'F4' ? '215mm' : '210mm',
+        width: '100%',
         minHeight: docSettings.paperSize === 'F4' ? '330mm' : '297mm',
         paddingTop: `${docSettings.marginTop !== undefined ? docSettings.marginTop : 20}mm`,
         paddingRight: `${docSettings.marginRight !== undefined ? docSettings.marginRight : 20}mm`,

@@ -2240,44 +2240,50 @@ export default function ProcurementPanel() {
         <div className="glass-panel p-6 animate-slide-up bg-white border border-slate-200 rounded-2xl shadow-sm">
           <style>{`
             @media print {
-              /* Reset body, html, and react root layout to avoid extra space displacement */
-              html, body, #root, #root > div {
+              /* Reset body and html margins */
+              html, body {
                 margin: 0 !important;
                 padding: 0 !important;
-                height: auto !important;
-                min-height: 0 !important;
-                display: block !important;
-                position: static !important;
-                overflow: visible !important;
-              }
-              @page {
-                size: ${docSettings.paperSize || 'A4'};
-                margin: ${docSettings.marginTop !== undefined ? docSettings.marginTop : 20}mm ${docSettings.marginRight !== undefined ? docSettings.marginRight : 20}mm ${docSettings.marginBottom !== undefined ? docSettings.marginBottom : 25}mm ${docSettings.marginLeft !== undefined ? docSettings.marginLeft : 30}mm;
-              }
-              /* Hide all page content by default */
-              body * {
-                visibility: hidden;
-              }
-              /* Reveal only the BAHP document and its descendants */
-              #print-bahp-document, #print-bahp-document * {
-                visibility: visible;
-              }
-              #print-bahp-document {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                margin: 0;
-                padding: 0 !important;
                 background: white !important;
+                width: 100% !important;
+                height: auto !important;
+              }
+              
+              /* Hide all standard web UI elements and siblings */
+              body > *, #root > *, main > *, .glass-panel > *, .sidebar, .navbar, header, footer, button, label, select, input, .mb-5 {
+                display: none !important;
+              }
+              
+              /* Force wrapper path to display as clean block and override any transforms/animations/shadows */
+              #root, main, .glass-panel, #print-bahp-document {
+                display: block !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: none !important;
                 box-shadow: none !important;
                 border: none !important;
+                transform: none !important;
+                animation: none !important;
+                transition: none !important;
               }
-              /* Ensure the design looks highly official, crisp black, print-optimized */
+
+              /* Reveal the printable BAHP document */
+              #print-bahp-document, #print-bahp-document * {
+                visibility: visible !important;
+                opacity: 1 !important;
+              }
+
+              /* Standardize crisp official black/white colors and borders */
               #print-bahp-document * {
                 color: #000 !important;
                 border-color: #000 !important;
                 background-color: transparent !important;
+              }
+              
+              @page {
+                size: ${docSettings.paperSize === 'F4' ? '215mm 330mm' : 'A4'};
+                margin: 0 !important;
               }
             }
           `}</style>
