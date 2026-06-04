@@ -44,7 +44,7 @@ export default function BahpDocument({
   const activeItems = (getPackageItems?.(submittedPack) || []).filter(i => checkedItems[i.no]);
   const grandTotal  = activeItems.reduce((acc, item) => {
     const n = negotiatedItems[item.no] || {};
-    return acc + parseFloat(n.price || 0) * (item.qty || 1) + parseFloat(n.ongkir || 0);
+    return acc + parseFloat(n.price || 0) * (item.qty || 1);
   }, 0);
 
   const today    = new Date();
@@ -185,13 +185,13 @@ export default function BahpDocument({
       <table className="w-full text-[0.95em] border-collapse mb-4">
         <tbody>
           {[
-            ['Satuan Kerja',          instansi],
+            ['Satuan Kerja',          submittedPack?.senderDepartment || instansi],
             ['Nama Pekerjaan',        submittedPack?.packName       || '-'],
             ['Jenis Pengadaan',       tpl.jenisPengadaan],
             ['Metode Pemilihan',      tpl.metodePemilihan],
             ['Kode RUP (SIRUP LKPP)', submittedPack?.noSirup        || '-'],
             ['MAK / Akun Belanja',    submittedPack?.mak             || '-'],
-            ['Total Pagu HPS DPA',    `Rp ${(getDynamicTotalPagu?.() || 0).toLocaleString('id-ID')}`],
+            ['Total Pagu HPS DPA',    `Rp ${(submittedPack?.pagu || getDynamicTotalPagu?.() || 0).toLocaleString('id-ID')}`],
             ['Tanggal Pemrosesan',    tglShort],
           ].map(([label, val]) => (
             <tr key={label}>
@@ -224,9 +224,9 @@ export default function BahpDocument({
             <td className={TH}>Nama {tpl.jenisPengadaan}</td>
             <td className={`${TH} w-10`}>Vol</td>
             <td className={TH}>Penyedia</td>
+            <td className={`${TH} text-right`}>Harga DPA</td>
             <td className={`${TH} text-right`}>Harga Tayang</td>
             <td className={`${TH} text-right`}>Harga Negosiasi</td>
-            <td className={`${TH} text-right`}>Biaya Kirim</td>
             {extraCols.map(c => <td key={c.key} className={`${TH}`}>{c.label}</td>)}
             <td className={`${TH} text-right`}>Total</td>
             <td className={`${TH} w-14`}>Status</td>
@@ -239,11 +239,11 @@ export default function BahpDocument({
             </td></tr>
           ) : activeItems.map((item, idx) => {
             const nego    = negotiatedItems[item.no] || {};
+            const dpaPrice = parseFloat(item.paguDpa ?? item.price ?? 0);
             const tayang  = parseFloat(nego.tayang  ?? item.tayang ?? item.price ?? 0);
             const negoVal = parseFloat(nego.price   ?? 0);
-            const ongkir  = parseFloat(nego.ongkir  ?? 0);
             const vendor  = nego.vendor || item.vendor || item.dppVendor || '-';
-            const total   = (negoVal * (item.qty || 1)) + ongkir;
+            const total   = negoVal * (item.qty || 1);
             const status  = nego.itemStatus || 'Tersedia';
             return (
               <tr key={item.no} className={idx % 2 === 0 ? 'bg-white' : ''}>
@@ -251,9 +251,9 @@ export default function BahpDocument({
                 <td className={TD}>{item.name}</td>
                 <td className={`${TD} text-center`}>{item.qty} {item.unit}</td>
                 <td className={TD}>{vendor}</td>
+                <td className={`${TD} text-right font-mono`}>Rp {dpaPrice.toLocaleString('id-ID')}</td>
                 <td className={`${TD} text-right font-mono`}>Rp {tayang.toLocaleString('id-ID')}</td>
                 <td className={`${TD} text-right font-mono font-bold`}>Rp {negoVal.toLocaleString('id-ID')}</td>
-                <td className={`${TD} text-right font-mono`}>Rp {ongkir.toLocaleString('id-ID')}</td>
                 {extraCols.map(c => (
                   <td key={c.key} className={`${TD} text-center`}>
                     {nego?.[c.key] || resolveCritVal(c.key, { vendor, harga_tayang: tayang, harga_nego: negoVal, extra: nego }, true)}

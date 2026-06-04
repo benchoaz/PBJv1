@@ -1191,7 +1191,7 @@ export default function Step2UploadDPA() {
           {/* Step 2: Scraped Data Table */}
           {scrapedData.length > 0 && (
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm animate-slide-up mt-6">
-              <h2 className="text-lg font-bold text-slate-900 mb-2">Hasil Scraping Paket SIRUP</h2>
+              <h2 className="text-lg font-bold text-slate-900 mb-2">Hasil Pencarian Paket SIRUP</h2>
               <p className="text-xs text-slate-500 mb-6">Berikut adalah paket APBD yang ditemukan untuk RUP Penyedia Kecamatan Besuk. Pilih paket untuk memuat detailnya.</p>
 
               <div className="overflow-x-auto border border-slate-100 rounded-xl shadow-sm bg-white">

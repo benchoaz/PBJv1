@@ -1066,7 +1066,7 @@ export default function Step3RincianHPS() {
                       </div>
                       <div>
                         <h3 className="text-[13px] font-bold text-slate-900 uppercase tracking-wide">
-                          Kalkulator HPS Berbasis Survei Pasar
+                          Kalkulator Harga Tayang E-Katalog Berbasis Survei Pasar
                         </h3>
                         <p className="text-[10.5px] text-slate-500 mt-0.5 font-sans leading-relaxed">
                           Sesuaikan harga satuan berdasarkan survei harga pasar riil terbaru di Kabupaten Probolinggo.
@@ -1114,8 +1114,8 @@ export default function Step3RincianHPS() {
                           <th className="py-2.5 px-2">Referensi e-Katalog</th>
                           <th className="py-2.5 px-2 text-center w-12">Qty</th>
                           <th className="py-2.5 px-2 text-right">Pagu DPA (Rp)</th>
-                          <th className="py-2.5 px-4 text-right w-44">Harga Satuan HPS (Rp)</th>
-                          <th className="py-2.5 px-3 text-right rounded-r-xl">Total HPS (Rp)</th>
+                          <th className="py-2.5 px-4 text-right w-44">Harga Tayang E-Katalog (Rp)</th>
+                          <th className="py-2.5 px-3 text-right rounded-r-xl">Total Tayang E-Katalog (Rp)</th>
                         </tr>
                       </thead>
                       <tbody>
