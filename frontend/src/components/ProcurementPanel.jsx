@@ -2249,29 +2249,40 @@ export default function ProcurementPanel() {
                 height: auto !important;
               }
               
-              /* Hide all standard web UI elements and siblings */
-              body > *, #root > *, main > *, .glass-panel > *, .sidebar, .navbar, header, footer, button, label, select, input, .mb-5 {
-                display: none !important;
-              }
-              
-              /* Force wrapper path to display as clean block and override any transforms/animations/shadows */
-              #root, main, .glass-panel, #print-bahp-document {
-                display: block !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 100% !important;
-                max-width: none !important;
-                box-shadow: none !important;
-                border: none !important;
+              /* Disable all transforms/animations/display-flex on parent wrappers to prevent scaling context bugs */
+              #root, main, .glass-panel {
                 transform: none !important;
                 animation: none !important;
                 transition: none !important;
+                display: block !important;
+                max-width: none !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
               }
 
-              /* Reveal the printable BAHP document */
+              /* Hide all elements visually by default */
+              body * {
+                visibility: hidden;
+              }
+
+              /* Reveal only the printable BAHP document and its content */
               #print-bahp-document, #print-bahp-document * {
                 visibility: visible !important;
-                opacity: 1 !important;
+              }
+
+              #print-bahp-document {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                box-shadow: none !important;
+                border: none !important;
               }
 
               /* Standardize crisp official black/white colors and borders */
