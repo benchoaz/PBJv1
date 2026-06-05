@@ -214,35 +214,35 @@ export default function Login() {
       `}</style>
 
       {/* MAIN CONTAINER (Centered Card) */}
-      <div className="w-full max-w-[460px] custom-glass rounded-2xl sm:rounded-3xl p-5 sm:p-7 lg:p-8 shadow-2xl z-10 transition-all duration-300 mt-4 sm:mt-0">
+      <div className="w-full max-w-[380px] custom-glass rounded-2xl p-5 sm:p-6 shadow-2xl z-10 transition-all duration-300 mt-4 sm:mt-0">
         
         {/* Government Emblem */}
-        <div className="flex justify-center mb-3">
+        <div className="flex justify-center mb-2">
           <img 
             src={kopLogo}
             alt="Logo Kabupaten Probolinggo" 
-            className="h-16 w-auto object-contain drop-shadow-md"
+            className="h-12 w-auto object-contain drop-shadow-md"
           />
         </div>
 
         {/* Brand Headers */}
-        <div className="text-center mb-5">
-          <span className="text-[10px] lg:text-[11px] font-extrabold tracking-[0.16em] text-slate-800 uppercase block mb-1">
+        <div className="text-center mb-4">
+          <span className="text-[9px] lg:text-[10px] font-extrabold tracking-[0.16em] text-slate-800 uppercase block mb-0.5">
             Pemerintah Kabupaten Probolinggo
           </span>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-wide mb-0.5 flex justify-center items-center gap-1.5">
+          <h1 className="text-xl sm:text-2xl font-black tracking-wide mb-0.5 flex justify-center items-center gap-1.5">
             <span className="text-[#0f2942]">PBJ</span>
             <span className="text-[#d97706]">SAE</span>
           </h1>
-          <span className="text-xs font-bold tracking-[0.2em] text-[#0f2942] uppercase block mb-2">
+          <span className="text-[10px] font-bold tracking-[0.2em] text-[#0f2942] uppercase block mb-1">
             Dashboard Gateway
           </span>
-          <div className="w-16 h-[2px] bg-gradient-to-r from-blue-900 via-indigo-900 to-amber-500 mx-auto mb-3"></div>
+          <div className="w-12 h-[2px] bg-gradient-to-r from-blue-900 via-indigo-900 to-amber-500 mx-auto mb-2"></div>
           
-          <p className="text-slate-700 text-xs font-bold">
+          <p className="text-slate-700 text-[10px] font-bold">
             PBJ SAE: Sinergi, Aman, Efisien
           </p>
-          <p className="text-slate-500 text-[10px] mt-1 font-medium">
+          <p className="text-slate-500 text-[9px] mt-0.5 font-medium">
             Login Sistem Informasi Terintegrasi
           </p>
         </div>
@@ -362,50 +362,6 @@ export default function Login() {
             Belum punya akun? <a href="#" className="font-extrabold text-[#0f2942] hover:underline">Daftar Sekarang</a>
           </div>
         </form>
-      </div>
-
-      {/* SECONDARY CONTAINER: Premium Interactive Quick-Fill Demo Cards */}
-      <div className="w-full max-w-[460px] custom-glass-sub rounded-2xl p-3.5 sm:p-4.5 mt-3 sm:mt-4 shadow-xl z-10 text-center flex flex-col gap-2 mb-6 sm:mb-0">
-        <div className="flex items-center justify-between px-1 mb-1">
-          <span className="text-[10px] font-extrabold text-[#0f2942] uppercase tracking-wider flex items-center gap-1">
-            <Sparkles size={12} className="text-amber-600" />
-            <span>Akses Cepat (Demo)</span>
-          </span>
-          <span className="text-[9px] text-slate-500 font-bold hidden sm:block">Klik kartu untuk mengisi</span>
-        </div>
-        
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-          {demoAccounts.map((account) => {
-            const isActive = activeDemo === account.id;
-            return (
-              <button
-                key={account.id}
-                type="button"
-                onClick={() => handleQuickFill(account)}
-                className={`p-2.5 rounded-xl border bg-white/80 transition-all duration-300 text-left relative group flex flex-col justify-between ${
-                  isActive 
-                    ? 'ring-2 ring-blue-900 bg-white border-blue-900 shadow-md' 
-                    : 'hover:shadow-md hover:bg-white border-slate-300/60 hover:-translate-y-0.5'
-                }`}
-              >
-                {isActive && (
-                  <div className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full bg-[#0f2942] flex items-center justify-center text-white p-0.5">
-                    <Check size={8} className="safe-white-text stroke-[3]" />
-                  </div>
-                )}
-                
-                <div>
-                  <span className={`text-[8px] font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded border inline-block mb-1.5 ${account.badgeBg}`}>
-                    {account.role}
-                  </span>
-                  <h5 className="text-[10px] font-bold text-slate-800 group-hover:text-blue-900 transition-colors truncate">
-                    {account.name.split(' (')[0]}
-                  </h5>
-                </div>
-              </button>
-            );
-          })}
-        </div>
       </div>
     </div>
   )

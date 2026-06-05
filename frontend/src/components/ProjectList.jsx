@@ -419,7 +419,7 @@ export default function ProjectList() {
                       </td>
                       <td className="px-4 py-4 text-right whitespace-nowrap align-top">
                         <div className="flex justify-between items-center mb-1 gap-4">
-                          <span className="text-[10px] text-slate-400 font-semibold uppercase">Pagu DPA</span>
+                          <span className="text-[10px] text-slate-400 font-semibold uppercase">Pagu Anggaran (DPA)</span>
                           <span className="font-mono text-[13px] font-bold text-slate-700">{fmt(project.budget)}</span>
                         </div>
                         {parsedData?.selectedPack?.noSirup && rupUtilization[parsedData.selectedPack.noSirup] && (() => {
@@ -429,15 +429,15 @@ export default function ProjectList() {
                           return (
                             <div className="text-[10px] mt-2 text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200 shadow-sm text-left">
                               <div className="flex justify-between items-center mb-1">
-                                <span>HPS Paket Ini:</span>
+                                <span>Harga Perkiraan Sendiri (HPS):</span>
                                 <span className="font-mono font-medium text-slate-700">{fmt(hpsPaketIni)}</span>
                               </div>
                               <div className="flex justify-between items-center mb-1 text-slate-500 border-b border-slate-200 pb-1 border-dashed">
-                                <span>HPS Semua Paket (di RUP ini):</span>
+                                <span>Akumulasi HPS RUP (MAK):</span>
                                 <span className="font-mono">{fmt(util.used)}</span>
                               </div>
                               <div className="flex justify-between items-center pt-0.5">
-                                <span className="font-semibold text-slate-600">Sisa Pagu RUP:</span>
+                                <span className="font-semibold text-slate-600">Sisa Pagu Anggaran RUP:</span>
                                 <span className={`font-mono font-bold ${sisa < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{fmt(sisa)}</span>
                               </div>
                             </div>
@@ -528,7 +528,7 @@ export default function ProjectList() {
             {filtered.map((project, idx) => {
               let parsedData = {}
               try { parsedData = JSON.parse(project.description || '{}') } catch (e) {}
-              const totalHps = parsedData?.totalHps || 0
+              const totalHps = parseFloat(parsedData?.hpsValue || 0) || 0;
               const pagu = project.budget || 0
               const efisiensi = pagu - totalHps
               const isLocked = project.status === 'Terkirim ke PP' || project.status === 'Selesai (Arsip Lengkap)'
@@ -565,15 +565,15 @@ export default function ProjectList() {
 
                   <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2 mb-4 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-slate-500 font-medium">Pagu DPA</span>
+                      <span className="text-slate-500 font-medium">Pagu Anggaran (DPA)</span>
                       <span className="font-mono font-semibold text-slate-700">{fmt(pagu)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500 font-medium">Survei HPS</span>
+                      <span className="text-slate-500 font-medium">Harga Perkiraan Sendiri (HPS)</span>
                       <span className="font-mono text-slate-600">{fmt(totalHps)}</span>
                     </div>
                     <div className="flex justify-between border-t border-slate-200 pt-2">
-                      <span className="text-slate-500 font-medium">Efisiensi</span>
+                      <span className="text-slate-500 font-medium">Sisa Pagu Anggaran RUP</span>
                       <span className={`font-mono font-bold ${efisiensi > 0 ? 'text-emerald-600' : 'text-slate-500'}`}>{fmt(efisiensi > 0 ? efisiensi : 0)}</span>
                     </div>
                   </div>

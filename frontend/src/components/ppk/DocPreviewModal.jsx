@@ -66,7 +66,7 @@ function terbilang(angka) {
     return "";
   }
 
-export default function DocPreviewModal({ isHpsExemptSelected, comparisons, justifications, autoComparator }) {
+export default function DocPreviewModal({ isHpsExemptSelected }) {
   const {
     activeDocPreview, setActiveDocPreview,
     selectedPack,
@@ -81,7 +81,10 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
     selectedNdTplId,
     selectedTplId,
     tanggalSurat,
-    getPackageItems
+    getPackageItems,
+    autoComparator,
+    comparisons,
+    justifications
   } = usePPK();
 
   const formatTanggalIndo = (tglStr) => {
@@ -600,7 +603,7 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
  </tr>
  </thead>
  <tbody>
- {getPackageItems(selectedPack).map((item, idx) => {
+ {getPackageItems(selectedPack).filter(item => (item.qty === '' ? 0 : (item.qty || 0)) > 0).map((item, idx) => {
  const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
  const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
  const displayName = surveyProduct?.name || item.name;
@@ -665,14 +668,14 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
  // Replace variables
  const replacements = {
  '{{tahun_anggaran}}': packageMetadata.tahun_anggaran || new Date(tanggalSurat).getFullYear(),
-  '{{nama_satker}}': currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
- '{{nama_satker_kapital}}': (currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
+  '{{nama_satker}}': currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
+ '{{nama_satker_kapital}}': (currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
  '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283',
  '{{nama_pekerjaan}}': selectedPack.packName || '',
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
  '{{sumber_dana}}': `${selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date(tanggalSurat).getFullYear()}`,
- '{{nama_ppk}}': currentUser.name || '',
- '{{nip_ppk}}': currentUser.nip || '',
+ '{{nama_ppk}}': currentUser?.name || '',
+ '{{nip_ppk}}': currentUser?.nip || '',
  '{{nomor_surat}}': nomorBase.replace('{nomor}', '045.2'),
  '{{nomor_nd}}': packageMetadata.nomor_nd || nomorBase.replace('{nomor}', '011/ND'),
  '{{nama_penyedia}}': '_______________________',
@@ -720,8 +723,8 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
  content = content.replace(/(?:<p>\s*<br\s*\/?>\s*<\/p>|\s*<br\s*\/?>){2,}/g, '<br/>');
 
  // Inject PPK and PP Signatures
- if (docSettingsFallback && docSettingsFallback.ttdPpk && currentUser.nip) {
-   const ppkNipLine = `NIP. ${currentUser.nip}`;
+ if (docSettingsFallback && docSettingsFallback.ttdPpk && currentUser?.nip) {
+   const ppkNipLine = `NIP. ${currentUser?.nip}`;
    const ttdPpkStyle = 'display:block; max-height:75px; max-width:200px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);';
    content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${docSettingsFallback.ttdPpk}" alt="TTD PPK" style="${ttdPpkStyle}" />${ppkNipLine}`);
  }
@@ -769,14 +772,14 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
  // Replace variables
  const replacements = {
  '{{tahun_anggaran}}': packageMetadata.tahun_anggaran || new Date(tanggalSurat).getFullYear(),
- '{{nama_satker}}': currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
- '{{nama_satker_kapital}}': (currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
+ '{{nama_satker}}': currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
+ '{{nama_satker_kapital}}': (currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
  '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283',
  '{{nama_pekerjaan}}': selectedPack.packName || '',
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
  '{{sumber_dana}}': `${selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date(tanggalSurat).getFullYear()}`,
- '{{nama_ppk}}': currentUser.name || '',
- '{{nip_ppk}}': currentUser.nip || '',
+ '{{nama_ppk}}': currentUser?.name || '',
+ '{{nip_ppk}}': currentUser?.nip || '',
  '{{nomor_surat}}': nomorBase.replace('{nomor}', '045.2'),
  '{{nomor_nd}}': packageMetadata.nomor_nd || nomorBase.replace('{nomor}', '011/ND'),
  '{{nama_penyedia}}': '_______________________',
@@ -821,8 +824,8 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
  });
 
  // Inject PPK and PP Signatures
- if (docSettingsFallback && docSettingsFallback.ttdPpk && currentUser.nip) {
-   const ppkNipLine = `NIP. ${currentUser.nip}`;
+ if (docSettingsFallback && docSettingsFallback.ttdPpk && currentUser?.nip) {
+   const ppkNipLine = `NIP. ${currentUser?.nip}`;
    content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${docSettingsFallback.ttdPpk}" alt="TTD PPK" style="display:block; max-height:75px; max-width:200px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);" />${ppkNipLine}`);
  }
  if (docSettingsFallback && docSettingsFallback.ttdPp && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
@@ -874,7 +877,7 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
         </tr>
       </thead>
       <tbody>
-        {getPackageItems(selectedPack).map((item, idx) => {
+        {getPackageItems(selectedPack).filter(item => (item.qty === '' ? 0 : (item.qty || 0)) > 0).map((item, idx) => {
           return (
             <tr key={item.no}>
               <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
@@ -895,7 +898,7 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
     </table>
 
     <div className="font-bold mt-4">B. Spesifikasi Waktu dan Layanan</div>
-    <p className="indent-8 mb-2">Waktu pelaksanaan pengadaan maksimal selama <strong>{dppSpecs.waktu || packageMetadata.waktu_penyelesaian || '14 (Empat Belas) hari kalender'}</strong>. Lokasi tujuan akhir pengiriman berada di: <strong>{dppSpecs.tempat || packageMetadata.lokasi_pekerjaan || currentUser.department || 'Kabupaten Probolinggo'}</strong>.</p>
+    <p className="indent-8 mb-2">Waktu pelaksanaan pengadaan maksimal selama <strong>{dppSpecs.waktu || packageMetadata.waktu_penyelesaian || '14 (Empat Belas) hari kalender'}</strong>. Lokasi tujuan akhir pengiriman berada di: <strong>{dppSpecs.tempat || packageMetadata.lokasi_pekerjaan || currentUser?.department || 'Kabupaten Probolinggo'}</strong>.</p>
     {dppSpecs.spesifikasiLayanan && (
       <div className="whitespace-pre-wrap text-justify mb-4 leading-relaxed indent-8">
         {dppSpecs.spesifikasiLayanan}
@@ -939,7 +942,7 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
         )}
       </thead>
       <tbody>
-        {getPackageItems(selectedPack).map((item, idx) => {
+        {getPackageItems(selectedPack).filter(item => (item.qty === '' ? 0 : (item.qty || 0)) > 0).map((item, idx) => {
           const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
           const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
           const displayName = surveyProduct?.name || item.name;
@@ -1119,8 +1122,8 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
      ) : (
        <div className="h-24"></div>
      )}
-     <div className="font-bold uppercase underline">{currentUser.name}</div>
-     <div className="font-mono">NIP. {currentUser.nip}</div>
+     <div className="font-bold uppercase underline">{currentUser?.name}</div>
+     <div className="font-mono">NIP. {currentUser?.nip}</div>
    </div>
  </div>
 

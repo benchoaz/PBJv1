@@ -43,7 +43,7 @@ export default function Step5Review() {
                           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                           <div>
                             <div className="text-xs font-semibold text-slate-800">Persiapan Selesai</div>
-                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{currentUser.name} · NIP {currentUser.nip}</div>
+                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{(currentUser && currentUser.name) || ''} · NIP {(currentUser && currentUser.nip) || ''}</div>
                           </div>
                         </div>
                         <button
@@ -119,9 +119,9 @@ export default function Step5Review() {
                     techSpecs: techSpecs,
                     dpaName: dpaName,
                     items: finalizedItems,
-                    senderName: currentUser.name,
-                    senderNip: currentUser.nip,
-                    senderDepartment: currentUser.department,
+                    senderName: currentUser?.name || '',
+                    senderNip: currentUser?.nip || '',
+                    senderDepartment: currentUser?.department || '',
                     sentDate: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
                     dppSpecs: dppSpecs,
                     selectedTplId: selectedTplId,

@@ -332,7 +332,7 @@ export default function Step4TemplateSurat() {
  </tr>
  </thead>
  <tbody>
- {getPackageItems(selectedPack).map((item, idx) => {
+ {getPackageItems(selectedPack).filter(item => (item.qty === '' ? 0 : (item.qty || 0)) > 0).map((item, idx) => {
  const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
  const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
  const displayName = surveyProduct?.name || item.name;
@@ -396,14 +396,14 @@ export default function Step4TemplateSurat() {
  const nomorBase = docSettingsFallback ? (docSettingsFallback.formatNomorSurat || '027/{nomor}/BPBJ/2026') : '027/{nomor}/BPBJ/2026';
  // Replace variables
  const replacements = {
- '{{nama_satker}}': currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
- '{{nama_satker_kapital}}': (currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
+ '{{nama_satker}}': currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
+ '{{nama_satker_kapital}}': (currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
  '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283',
  '{{nama_pekerjaan}}': selectedPack.packName || '',
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
  '{{sumber_dana}}': `${selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date().getFullYear()}`,
- '{{nama_ppk}}': currentUser.name || '',
- '{{nip_ppk}}': currentUser.nip || '',
+ '{{nama_ppk}}': currentUser?.name || '',
+ '{{nip_ppk}}': currentUser?.nip || '',
  '{{nomor_surat}}': nomorBase.replace('{nomor}', '045.2'),
  '{{nomor_nd}}': nomorBase.replace('{nomor}', '011/ND'),
  '{{nama_penyedia}}': '_______________________',
@@ -483,14 +483,14 @@ export default function Step4TemplateSurat() {
  const nomorBase = docSettingsFallback ? (docSettingsFallback.formatNomorSurat || '027/{nomor}/BPBJ/2026') : '027/{nomor}/BPBJ/2026';
  // Replace variables
  const replacements = {
- '{{nama_satker}}': currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
- '{{nama_satker_kapital}}': (currentUser.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
+ '{{nama_satker}}': currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
+ '{{nama_satker_kapital}}': (currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
  '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283',
  '{{nama_pekerjaan}}': selectedPack.packName || '',
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
  '{{sumber_dana}}': `${selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date().getFullYear()}`,
- '{{nama_ppk}}': currentUser.name || '',
- '{{nip_ppk}}': currentUser.nip || '',
+ '{{nama_ppk}}': currentUser?.name || '',
+ '{{nip_ppk}}': currentUser?.nip || '',
  '{{nomor_surat}}': nomorBase.replace('{nomor}', '045.2'),
  '{{nomor_nd}}': nomorBase.replace('{nomor}', '011/ND'),
  '{{nama_penyedia}}': '_______________________',
@@ -556,7 +556,7 @@ export default function Step4TemplateSurat() {
  </tr>
  </thead>
  <tbody>
- {getPackageItems(selectedPack).map((item, idx) => {
+ {getPackageItems(selectedPack).filter(item => (item.qty === '' ? 0 : (item.qty || 0)) > 0).map((item, idx) => {
  return (
  <tr key={item.no}>
  <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
@@ -583,7 +583,7 @@ export default function Step4TemplateSurat() {
  <p className="text-justify">Waktu pelaksanaan pengadaan maksimal selama {dppSpecs.waktu || '14 (Empat Belas) hari kalender'} sejak penerbitan SP.</p>
 
  <div className="font-bold mt-2">d. Spesifikasi Tempat</div>
- <p className="text-justify">Alamat tujuan akhir: {dppSpecs.tempat || (currentUser.department?.includes('Bago') ? 'Jl. Raya Bago No. 176, Besuk' : 'Komp. Perkantoran Pemerintah Kabupaten Probolinggo')}</p>
+ <p className="text-justify">Alamat tujuan akhir: {dppSpecs.tempat || (currentUser?.department?.includes('Bago') ? 'Jl. Raya Bago No. 176, Besuk' : 'Komp. Perkantoran Pemerintah Kabupaten Probolinggo')}</p>
 
  <div className="font-bold mt-2">e. Spesifikasi Tingkat Layanan</div>
  <ul className="list-disc pl-4 space-y-1">
@@ -677,7 +677,7 @@ export default function Step4TemplateSurat() {
  </tr>
  </thead>
  <tbody>
- {getPackageItems(selectedPack).map((item, idx) => {
+ {getPackageItems(selectedPack).filter(item => (item.qty === '' ? 0 : (item.qty || 0)) > 0).map((item, idx) => {
  const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
  // ✅ FIX: Use updated name from surveyData if available (e.g. user changed keyword)
  const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
@@ -980,10 +980,10 @@ export default function Step4TemplateSurat() {
  <div className="h-24"></div>
 
  <div className=" font-bold uppercase underline">
- {currentUser.name}
+ {currentUser?.name}
  </div>
  <div className=" font-mono -mt-1">
- NIP. {currentUser.nip}
+ NIP. {currentUser?.nip}
  </div>
  </div>
  </div>

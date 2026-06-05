@@ -3,6 +3,12 @@ import { usePPK } from './PPKContext';
 import DocPreviewModal from './DocPreviewModal';
 
 export default function Step3RincianHPS() {
+  const DAFTAR_KECAMATAN = [
+    "Bantaran", "Banyuanyar", "Besuk", "Dringu", "Gading", "Gending", "Kotaanyar", 
+    "Kraksaan", "Krucil", "Kuripan", "Leces", "Lumbang", "Maron", 
+    "Paiton", "Pajarakan", "Pakuniran", "Sukapura", "Sumber", "Sumberasih", 
+    "Tegalsiwalan", "Tiris", "Tongas", "Wonomerto"
+  ];
   // ── Dari PPKContext (tersedia) ──────────────────────────────────────────────
   const { 
     docSettings, setDocSettings,
@@ -32,7 +38,10 @@ export default function Step3RincianHPS() {
     activeDocPreview, setActiveDocPreview,
     resetAll, handleSimpanPaket, currentUser,
     dppSpecs, setDppSpecs,
-    tanggalSurat, setTanggalSurat, getPackageItems
+    tanggalSurat, setTanggalSurat, getPackageItems,
+    comparisons, setComparisons,
+    justifications, setJustifications,
+    autoComparator, setAutoComparator
   } = usePPK();
   const [isAiEditorOpen, setIsAiEditorOpen] = useState(true);
   const [aiLoadingField, setAiLoadingField] = useState(null);
@@ -68,13 +77,100 @@ export default function Step3RincianHPS() {
 
   // ── Local state (tidak ada di context) ─────────────────────────────────────
   const [isSigned, setIsSigned] = useState(false);
-  const [justifications, setJustifications] = useState({});
-  const [comparisons, setComparisons] = useState({});
   const [screenshotStatus, setScreenshotStatus] = useState({});
   const [isEnhancingJustification, setIsEnhancingJustification] = useState({});
   const [isSurveying, setIsSurveying] = useState(false);
   const [surveyProgress, setSurveyProgress] = useState('');
   const [surveyProgressPercent, setSurveyProgressPercent] = useState(0);
+  const [vendorLocationMap, setVendorLocationMap] = useState({});
+
+  useEffect(() => {
+    fetch('/api/vendor-locations')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const mapping = {};
+          data.forEach(item => {
+            if (item.vendor_name) {
+              mapping[item.vendor_name.toUpperCase().trim()] = item.subdistrict;
+            }
+          });
+          setVendorLocationMap(mapping);
+        }
+      })
+      .catch(err => console.error("Error fetching vendor locations:", err));
+  }, []);
+
+  useEffect(() => {
+    if (selectedPack) {
+      const items = getPackageItems(selectedPack);
+      const totalHps = items.reduce((sum, item) => {
+        const price = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
+        const qty = item.qty === '' ? 0 : (item.qty || 0);
+        return sum + (qty * price);
+      }, 0);
+      setHpsValue(totalHps.toString());
+    }
+  }, [hpsPrices, selectedPack, dpaRincian, getPackageItems, setHpsValue]);
+
+  const handleUpdateVendorLocation = async (vendorName, subdistrict) => {
+    if (!vendorName || vendorName === 'TIDAK DITEMUKAN') return;
+    try {
+      const response = await fetch('/api/vendor-locations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_name: vendorName, subdistrict: subdistrict })
+      });
+      if (response.ok) {
+        setVendorLocationMap(prev => ({
+          ...prev,
+          [vendorName.toUpperCase().trim()]: subdistrict
+        }));
+      }
+    } catch (e) {
+      console.error("Error saving vendor location:", e);
+    }
+  };
+
+  const getAutoJustificationText = (isMamin, targetVendor, targetPrice, targetLoc, compVendor, compPrice, compLoc, userSubdistrict) => {
+    const formatPrice = (p) => {
+      const num = parseFloat(p);
+      return isNaN(num) ? '0' : num.toLocaleString('id-ID');
+    };
+    
+    const cleanStr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanTargetLoc = cleanStr(targetLoc);
+    
+    // Determine Target Location Label
+    let targetLocLabel = targetLoc || 'Kab. Probolinggo';
+    if (targetLoc) {
+      if (userSubdistrict && cleanTargetLoc.includes(cleanStr(userSubdistrict))) {
+        targetLocLabel = `${targetLoc} (Zona 1: Kec. Sama)`;
+      } else {
+        const DAFTAR_KECAMATAN = [
+          "Bantaran", "Banyuanyar", "Besuk", "Dringu", "Gading", "Gending", "Kotaanyar", 
+          "Kraksaan", "Krucil", "Kuripan", "Leces", "Lumbang", "Maron", 
+          "Paiton", "Pajarakan", "Pakuniran", "Sukapura", "Sumber", "Sumberasih", 
+          "Tegalsiwalan", "Tiris", "Tongas", "Wonomerto"
+        ];
+        const isKec = DAFTAR_KECAMATAN.some(kec => cleanTargetLoc.includes(cleanStr(kec)));
+        if (isKec) {
+          targetLocLabel = `${targetLoc} (Zona 2: Luar Kecamatan)`;
+        }
+      }
+    }
+
+    const tPrice = parseFloat(targetPrice) || 0;
+    const cPrice = parseFloat(compPrice) || 0;
+    const diff = cPrice - tPrice;
+    const diffText = diff > 0 ? `dengan selisih penghematan Rp ${formatPrice(diff)} per unit` : 'dengan harga yang bersaing';
+
+    if (isMamin) {
+      return `Pemilihan ${targetVendor || 'Penyedia Terpilih'} (Rp ${formatPrice(tPrice)}) didasarkan pada harga e-Katalog yang lebih efisien dibandingkan penyedia pembanding ${compVendor || 'Penyedia Pembanding'} (Rp ${formatPrice(cPrice)}) ${diffText}. Selain itu, dari aspek logistik, penyedia berlokasi di ${targetLocLabel} yang mengefisienkan waktu pengiriman Mamin agar tetap segar saat dikerjakan. Pemilihan ini juga selaras dengan aspek pemerataan penyedia lokal dalam SE Bupati Probolinggo Nomor 000.3/2747/426.42/2025.`;
+    } else {
+      return `Pemilihan ${targetVendor || 'Penyedia Terpilih'} (Rp ${formatPrice(tPrice)}) dilakukan karena menawarkan harga tayang e-Katalog yang lebih kompetitif dibandingkan penyedia pembanding ${compVendor || 'Penyedia Pembanding'} (Rp ${formatPrice(cPrice)}) ${diffText}. Dari sisi lokasi, penyedia terpilih berlokasi di ${targetLocLabel} yang memudahkan koordinasi logistik serah terima barang.`;
+    }
+  };
 
   const [customTargets, setCustomTargets] = useState({});
   const [customMinPrices, setCustomMinPrices] = useState({});
@@ -122,7 +218,6 @@ export default function Step3RincianHPS() {
   const [customKeywords, setCustomKeywords] = useState({});
   
   const [ignorePriceLimit, setIgnorePriceLimit] = useState(false);
-  const [autoComparator, setAutoComparator] = useState(false);
 
   const handleTtdUpload = (e, role) => {
     const file = e.target.files[0];
@@ -441,6 +536,7 @@ export default function Step3RincianHPS() {
       const newHpsPrices = {};
       let totalHpsEstimate = 0;
       const newComparisons = { ...comparisons };
+      const newJustifications = { ...justifications };
 
       // Integrate real results
       results.forEach((res, index) => {
@@ -473,9 +569,36 @@ export default function Step3RincianHPS() {
               isAuto: true
             };
           }
+
+          // Auto-fill justification
+          const isMamin = category.startsWith('Mamin');
+          const targetLoc = res.location || res.location_name || res.address || '';
+          const compLoc = comp.location || comp.location_name || comp.address || '';
+          const DAFTAR_KECAMATAN = [
+            "Bantaran", "Banyuanyar", "Besuk", "Dringu", "Gading", "Gending", "Kotaanyar", 
+            "Kraksaan", "Krucil", "Kuripan", "Leces", "Lumbang", "Maron", 
+            "Paiton", "Pajarakan", "Pakuniran", "Sukapura", "Sumber", "Sumberasih", 
+            "Tegalsiwalan", "Tiris", "Tongas", "Wonomerto"
+          ];
+          const userSatker = currentUser?.department || '';
+          const userSubdistrict = DAFTAR_KECAMATAN.find(kec =>
+            userSatker.toLowerCase().replace(/[^a-z0-9]/g, '').includes(kec.toLowerCase().replace(/[^a-z0-9]/g, ''))
+          ) || '';
+
+          newJustifications['ITEM-' + index] = getAutoJustificationText(
+            isMamin,
+            res.vendor,
+            res.price,
+            targetLoc,
+            comp.vendor,
+            comp.price,
+            compLoc,
+            userSubdistrict
+          );
         }
       });
       setComparisons(newComparisons);
+      setJustifications(newJustifications);
 
       setSurveyProgressPercent(95);
       await new Promise(r => setTimeout(r, 500));
@@ -580,8 +703,11 @@ export default function Step3RincianHPS() {
 
       if (singleRes) {
         const updatedProducts = [...surveyData.products];
-        updatedProducts[productIndex] = {
-          ...updatedProducts[productIndex],
+        const targetName = targetItem.name;
+        const prodIdx = updatedProducts.findIndex(p => p.name === targetName);
+        const newProductObj = {
+          id: 'ITEM-' + productIndex,
+          name: singleRes.name || targetName,
           vendor: singleRes.vendor,
           price: singleRes.price,
           link: singleRes.link,
@@ -589,6 +715,11 @@ export default function Step3RincianHPS() {
           success: singleRes.success,
           location: singleRes.location || singleRes.location_name || singleRes.address || ''
         };
+        if (prodIdx !== -1) {
+          updatedProducts[prodIdx] = newProductObj;
+        } else {
+          updatedProducts.push(newProductObj);
+        }
         const updatedData = { ...surveyData, products: updatedProducts };
         setSurveyData(updatedData);
         // Update di konteks global (jika ingin disimpan permanen)
@@ -602,6 +733,64 @@ export default function Step3RincianHPS() {
           setHpsPrices(prev => ({
             ...prev,
             [targetItem.name]: singleRes.price
+          }));
+        }
+
+        if (autoComparator && singleRes.comparators && singleRes.comparators.length > 0) {
+          const comp = singleRes.comparators[0];
+          setComparisons(prev => {
+            const newComps = { ...prev };
+            newComps['ITEM-' + productIndex] = {
+              vendor: comp.vendor,
+              name: comp.name,
+              price: comp.price,
+              status: comp.status,
+              link: comp.link,
+              alasan: comp.alasan,
+              isAuto: true
+            };
+            
+            if (singleRes.comparators.length > 1) {
+              const comp2 = singleRes.comparators[1];
+              newComps['ITEM-' + productIndex + '-2'] = {
+                vendor: comp2.vendor,
+                name: comp2.name,
+                price: comp2.price,
+                status: comp2.status,
+                link: comp2.link,
+                alasan: comp2.alasan,
+                isAuto: true
+              };
+            }
+            return newComps;
+          });
+
+          const isMamin = getPacketCategory(selectedPack?.packName || '').startsWith('Mamin');
+          const targetLoc = singleRes.location || singleRes.location_name || singleRes.address || '';
+          const compLoc = comp.location || comp.location_name || comp.address || '';
+          const DAFTAR_KECAMATAN = [
+            "Bantaran", "Banyuanyar", "Besuk", "Dringu", "Gading", "Gending", "Kotaanyar", 
+            "Kraksaan", "Krucil", "Kuripan", "Leces", "Lumbang", "Maron", 
+            "Paiton", "Pajarakan", "Pakuniran", "Sukapura", "Sumber", "Sumberasih", 
+            "Tegalsiwalan", "Tiris", "Tongas", "Wonomerto"
+          ];
+          const userSatker = currentUser?.department || '';
+          const userSubdistrict = DAFTAR_KECAMATAN.find(kec =>
+            userSatker.toLowerCase().replace(/[^a-z0-9]/g, '').includes(kec.toLowerCase().replace(/[^a-z0-9]/g, ''))
+          ) || '';
+
+          setJustifications(prev => ({
+            ...prev,
+            ['ITEM-' + productIndex]: getAutoJustificationText(
+              isMamin,
+              singleRes.vendor,
+              singleRes.price,
+              targetLoc,
+              comp.vendor,
+              comp.price,
+              compLoc,
+              userSubdistrict
+            )
           }));
         }
         
@@ -679,13 +868,14 @@ export default function Step3RincianHPS() {
     const requestItems = [];
 
     // Cari barang yang punya ketikan baru di customKeywords (baik sukses maupun gagal)
-    surveyData.products.forEach((p, idx) => {
-      if (customKeywords[idx] && customKeywords[idx].trim() !== '') {
+    items.forEach((item, idx) => {
+      const qty = item.qty === '' ? 0 : (item.qty || 0);
+      if (qty > 0 && customKeywords[idx] && customKeywords[idx].trim() !== '') {
         indicesToSearch.push(idx);
         requestItems.push({
-          name: items[idx].name,
+          name: item.name,
           query: customKeywords[idx].trim(),
-          fallbackPrice: items[idx].price || items[idx].paguDpa,
+          fallbackPrice: item.price || item.paguDpa,
           explicitMinPrice: customMinPrices[idx] ? parseInt(customMinPrices[idx].toString().replace(/\D/g, ''), 10) : null,
           explicitMaxPrice: customMaxPrices[idx] ? parseInt(customMaxPrices[idx].toString().replace(/\D/g, ''), 10) : null,
           priceTolerance: globalPriceTolerance,
@@ -754,15 +944,24 @@ export default function Step3RincianHPS() {
         const originalIndex = indicesToSearch[i];
         const targetItem = items[originalIndex];
 
-        updatedProducts[originalIndex] = {
-          ...updatedProducts[originalIndex],
+        const prodIdx = updatedProducts.findIndex(p => p.name === targetItem.name);
+        const newProductObj = {
+          id: 'ITEM-' + originalIndex,
+          name: res.name || targetItem.name,
           vendor: res.vendor,
           price: res.price,
           link: res.link,
           img: res.img,
           searchImg: res.searchImg,
-          success: res.success
+          success: res.success,
+          location: res.location || res.location_name || res.address || ''
         };
+
+        if (prodIdx !== -1) {
+          updatedProducts[prodIdx] = newProductObj;
+        } else {
+          updatedProducts.push(newProductObj);
+        }
         if (res.success) {
           successCount++;
         }
@@ -797,6 +996,34 @@ export default function Step3RincianHPS() {
             }
             return newComps;
           });
+
+          const isMamin = getPacketCategory(selectedPack?.packName || '').startsWith('Mamin');
+          const targetLoc = res.location || res.location_name || res.address || '';
+          const compLoc = comp.location || comp.location_name || comp.address || '';
+          const DAFTAR_KECAMATAN = [
+            "Bantaran", "Banyuanyar", "Besuk", "Dringu", "Gading", "Gending", "Kotaanyar", 
+            "Kraksaan", "Krucil", "Kuripan", "Leces", "Lumbang", "Maron", 
+            "Paiton", "Pajarakan", "Pakuniran", "Sukapura", "Sumber", "Sumberasih", 
+            "Tegalsiwalan", "Tiris", "Tongas", "Wonomerto"
+          ];
+          const userSatker = currentUser?.department || '';
+          const userSubdistrict = DAFTAR_KECAMATAN.find(kec =>
+            userSatker.toLowerCase().replace(/[^a-z0-9]/g, '').includes(kec.toLowerCase().replace(/[^a-z0-9]/g, ''))
+          ) || '';
+
+          setJustifications(prev => ({
+            ...prev,
+            ['ITEM-' + originalIndex]: getAutoJustificationText(
+              isMamin,
+              res.vendor,
+              res.price,
+              targetLoc,
+              comp.vendor,
+              comp.price,
+              compLoc,
+              userSubdistrict
+            )
+          }));
         }
       });
 
@@ -1156,6 +1383,7 @@ export default function Step3RincianHPS() {
                           const items = getPackageItems(selectedPack)
                           const activeData = getActiveSurveyData()
                           return items.map((item, idx) => {
+                            const dpaIdx = idx;
                             const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
                             const qtyNum = item.qty === '' ? 0 : (item.qty || 0);
                             const totalHpsItem = qtyNum * unitHpsPrice;
@@ -1166,7 +1394,7 @@ export default function Step3RincianHPS() {
                             // Logika untuk kartu survei
                             const p = surveyItem;
                             const isFailed = p ? (!p.success || p.vendor === 'TIDAK DITEMUKAN') : false;
-                            const keyword = customKeywords[idx] !== undefined ? customKeywords[idx] : (p ? p.name : item.name);
+                            const keyword = customKeywords[dpaIdx] !== undefined ? customKeywords[dpaIdx] : (p ? p.name : item.name);
                             const isLoading = loadingProductIndex === idx;
 
                             return (
@@ -1215,27 +1443,67 @@ export default function Step3RincianHPS() {
                                     <div className="flex flex-col gap-0.5">
                                       <span className="text-[10px] font-bold text-slate-700 truncate max-w-[150px]" title={surveyItem.vendor}>🏪 {surveyItem.vendor}</span>
                                       {(() => {
-                                        const location = surveyItem.location || surveyItem.location_name || surveyItem.address || '';
+                                        const location = (comparisons[surveyItem.id] && comparisons[surveyItem.id].lokasi) 
+                                           || (surveyItem.vendor && vendorLocationMap[surveyItem.vendor.toUpperCase().trim()]) 
+                                           || surveyItem.location 
+                                           || surveyItem.location_name 
+                                           || surveyItem.address 
+                                           || '';
+                                        if (!location) return null;
+
                                         const cleanStr = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-                                        const isOutside = location && searchLocations && !searchLocations.split(',').some(loc => {
-                                          const cleanLoc = cleanStr(loc);
-                                          const cleanLocation = cleanStr(location);
-                                          return cleanLocation.includes(cleanLoc) || cleanLoc.includes(cleanLocation);
-                                        });
+                                        
+                                        let foundSubdistrict = DAFTAR_KECAMATAN.find(kec => 
+                                          cleanStr(location).includes(cleanStr(kec))
+                                        );
+
+                                        const userSatker = currentUser?.department || '';
+                                        const userSubdistrict = DAFTAR_KECAMATAN.find(kec =>
+                                          cleanStr(userSatker).includes(cleanStr(kec))
+                                        ) || '';
+
+                                        const cleanLoc = cleanStr(location);
+                                        const isExplicitOutside = location === 'Luar Kabupaten Probolinggo';
+                                        const isOutside = isExplicitOutside || (!foundSubdistrict && searchLocations && !searchLocations.split(',').some(loc => {
+                                          const cleanL = cleanStr(loc);
+                                          return cleanLoc.includes(cleanL) || cleanL.includes(cleanLoc);
+                                        }));
+
                                         if (isOutside) {
                                           return (
                                             <span className="text-[8px] font-bold text-rose-700 bg-rose-50 px-1 py-0.5 rounded border border-rose-200 w-fit mt-0.5" title={`Produk ditemukan di ${location}, di luar target wilayah: ${searchLocations}`}>
                                               📍 Luar Wilayah ({location})
                                             </span>
                                           );
-                                        } else if (location) {
-                                          return (
-                                            <span className="text-[8px] text-slate-500 font-medium mt-0.5">
-                                              📍 {location}
-                                            </span>
-                                          );
                                         }
-                                        return null;
+
+                                        if (foundSubdistrict) {
+                                          if (userSubdistrict && cleanStr(foundSubdistrict) === cleanStr(userSubdistrict)) {
+                                            return (
+                                              <div className="flex flex-col gap-0.5 mt-0.5">
+                                                <span className="text-[8px] text-slate-500 font-medium">📍 {location}</span>
+                                                <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded w-fit flex items-center gap-0.5" title="Kecamatan yang sama dengan Satuan Kerja - Prioritas Pengiriman Cepat">
+                                                  🟢 Zona 1: Kec. Sama ({foundSubdistrict})
+                                                </span>
+                                              </div>
+                                            );
+                                          } else {
+                                            return (
+                                              <div className="flex flex-col gap-0.5 mt-0.5">
+                                                <span className="text-[8px] text-slate-500 font-medium">📍 {location}</span>
+                                                <span className="text-[8px] font-bold text-sky-750 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded w-fit flex items-center gap-0.5" title="Kecamatan tetangga di Kabupaten Probolinggo">
+                                                  🔵 Zona 2: Kec. {foundSubdistrict}
+                                                </span>
+                                              </div>
+                                            );
+                                          }
+                                        }
+
+                                        return (
+                                          <span className="text-[8px] text-slate-500 font-medium mt-0.5">
+                                            📍 {location}
+                                          </span>
+                                        );
                                       })()}
                                       <a href={surveyItem.link} target="_blank" rel="noopener noreferrer" className="text-[9px] text-indigo-600 hover:text-indigo-800 underline">Tautan Produk</a>
                                       {surveyItem.isFallbackScreenshot && (
@@ -1359,7 +1627,7 @@ export default function Step3RincianHPS() {
                                                   className={`w-full px-3 py-2 bg-white border rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 min-h-[60px] resize-y transition-colors ${isEnhancingJustification[p.id] ? 'border-indigo-400 ring-1 ring-indigo-400 bg-indigo-50/30' : 'border-slate-300 focus:ring-indigo-500'}`}
                                                   disabled={isEnhancingJustification[p.id]}
                                                 />
-                                                <div className="flex gap-2 mt-2">
+                                                <div className="flex gap-2 mt-2 flex-wrap">
                                                   <button
                                                     type="button"
                                                     onClick={() => setJustifications({ ...justifications, [p.id]: "Penyedia ini dipilih karena mampu menyediakan mayoritas (>80%) dari total item barang yang dibutuhkan, sehingga sangat mengefisienkan biaya pengiriman, mempermudah administrasi kontrak, dan memastikan seluruh barang tiba dalam satu waktu." })}
@@ -1367,6 +1635,15 @@ export default function Step3RincianHPS() {
                                                   >
                                                     💡 Template: Satu Pintu (&gt;80%)
                                                   </button>
+                                                  {getPacketCategory(selectedPack?.packName || '').startsWith('Mamin') && (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setJustifications({ ...justifications, [p.id]: "Pemilihan penyedia ini disesuaikan dengan ketentuan Surat Edaran Bupati Probolinggo Nomor 000.3/2747/426.42/2025 tentang E-Purchasing Katalog Elektronik untuk pemenuhan aspek pemerataan penyedia lokal dan efisiensi pengiriman Mamin di lingkungan Pemerintah Kabupaten Probolinggo." })}
+                                                      className="text-[9px] font-bold text-amber-750 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded border border-amber-200 transition-colors"
+                                                    >
+                                                      📋 Template: SE Mamin (Pemerataan)
+                                                    </button>
+                                                  )}
                                                   <button
                                                     type="button"
                                                     onClick={() => {
@@ -1423,14 +1700,14 @@ export default function Step3RincianHPS() {
                                                   <input
                                                     type="text"
                                                     value={keyword}
-                                                    onChange={(e) => setCustomKeywords({ ...customKeywords, [idx]: e.target.value })}
+                                                    onChange={(e) => setCustomKeywords({ ...customKeywords, [dpaIdx]: e.target.value })}
                                                     placeholder="Contoh: Laptop i5"
                                                     className="flex-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] focus:ring-1 focus:ring-indigo-500"
                                                     disabled={isLoading}
                                                   />
                                                   <button
                                                     type="button"
-                                                    onClick={() => runSingleItemSurvey(idx, keyword)}
+                                                    onClick={() => runSingleItemSurvey(dpaIdx, keyword)}
                                                     disabled={isLoading || !keyword.trim()}
                                                     className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 text-white font-bold px-3 py-1.5 rounded-lg text-[10px] transition-all"
                                                   >
@@ -1443,8 +1720,8 @@ export default function Step3RincianHPS() {
                                                   <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Target Penyedia (Opsional)</label>
                                                   <input
                                                     type="text"
-                                                    value={customTargets[idx] || ''}
-                                                    onChange={(e) => setCustomTargets({ ...customTargets, [idx]: e.target.value })}
+                                                    value={customTargets[dpaIdx] || ''}
+                                                    onChange={(e) => setCustomTargets({ ...customTargets, [dpaIdx]: e.target.value })}
                                                     placeholder="Nama Toko"
                                                     className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] focus:ring-1 focus:ring-indigo-500"
                                                     disabled={isLoading}
@@ -1455,8 +1732,8 @@ export default function Step3RincianHPS() {
                                                     <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Harga Minimal (Opsional)</label>
                                                     <input
                                                       type="number"
-                                                      value={customMinPrices[idx] || ''}
-                                                      onChange={(e) => setCustomMinPrices({ ...customMinPrices, [idx]: e.target.value })}
+                                                      value={customMinPrices[dpaIdx] || ''}
+                                                      onChange={(e) => setCustomMinPrices({ ...customMinPrices, [dpaIdx]: e.target.value })}
                                                       placeholder={`> ${(p.price || p.paguDpa) * 0.5}`}
                                                       className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] focus:ring-1 focus:ring-indigo-500"
                                                       disabled={isLoading}
@@ -1466,8 +1743,8 @@ export default function Step3RincianHPS() {
                                                     <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Harga Maksimal (Opsional)</label>
                                                     <input
                                                       type="number"
-                                                      value={customMaxPrices[idx] || ''}
-                                                      onChange={(e) => setCustomMaxPrices({ ...customMaxPrices, [idx]: e.target.value })}
+                                                      value={customMaxPrices[dpaIdx] || ''}
+                                                      onChange={(e) => setCustomMaxPrices({ ...customMaxPrices, [dpaIdx]: e.target.value })}
                                                       placeholder={`< ${p.price || p.paguDpa}`}
                                                       className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] focus:ring-1 focus:ring-indigo-500"
                                                       disabled={isLoading}
@@ -1522,12 +1799,23 @@ export default function Step3RincianHPS() {
                                               <div className="mt-3 pt-3 border-t border-slate-100">
                                                 <h5 className="text-[9px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Atribut Evaluasi Tambahan (Tampil di Cetak)</h5>
                                                 <div className="grid grid-cols-2 gap-2">
-                                                  <input 
-                                                    type="text" placeholder="Lokasi Dapur/Toko" 
+                                                  <select
                                                     value={(comparisons[p.id] && comparisons[p.id].lokasi) || ''}
-                                                    onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), lokasi: e.target.value}})}
-                                                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[9px]"
-                                                  />
+                                                    onChange={(e) => {
+                                                      const val = e.target.value;
+                                                      setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), lokasi: val}});
+                                                      handleUpdateVendorLocation(p.vendor, val);
+                                                    }}
+                                                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[9px] text-slate-800"
+                                                  >
+                                                    <option value="">-- Deteksi Otomatis --</option>
+                                                    <option value="Luar Kabupaten Probolinggo">Luar Kabupaten Probolinggo</option>
+                                                    <optgroup label="24 Kecamatan Probolinggo">
+                                                      {DAFTAR_KECAMATAN.map(kec => (
+                                                        <option key={kec} value={kec}>{kec}</option>
+                                                      ))}
+                                                    </optgroup>
+                                                  </select>
                                                   <input 
                                                     type="text" placeholder="Jarak & Waktu Tempuh" 
                                                     value={(comparisons[p.id] && comparisons[p.id].jarak) || ''}
@@ -1620,8 +1908,11 @@ export default function Step3RincianHPS() {
                   
                   <div className="flex gap-4 overflow-x-auto pb-3 pt-1">
                     {surveyData.products.map((p, idx) => {
+                      const items = getPackageItems(selectedPack);
+                      const originalIdx = items.findIndex(item => item.name === p.name);
+                      const dpaIdx = originalIdx !== -1 ? originalIdx : idx;
                       const isFailed = !p.success || p.vendor === 'TIDAK DITEMUKAN';
-                      const keyword = customKeywords[idx] !== undefined ? customKeywords[idx] : p.name;
+                      const keyword = customKeywords[dpaIdx] !== undefined ? customKeywords[dpaIdx] : p.name;
                       const isLoading = loadingProductIndex === idx;
                       const isEditing = expandedEditCardIndex === idx || isFailed;
 
@@ -1709,14 +2000,14 @@ export default function Step3RincianHPS() {
                                 <input
                                   type="text"
                                   value={keyword}
-                                  onChange={(e) => setCustomKeywords({ ...customKeywords, [idx]: e.target.value })}
+                                  onChange={(e) => setCustomKeywords({ ...customKeywords, [dpaIdx]: e.target.value })}
                                   placeholder="Contoh: Laptop i5"
                                   className="flex-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                                   disabled={isLoading}
                                 />
                                 <button
                                   type="button"
-                                  onClick={() => runSingleItemSurvey(idx, keyword)}
+                                  onClick={() => runSingleItemSurvey(dpaIdx, keyword)}
                                   disabled={isLoading || !keyword.trim()}
                                   className="bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 text-white font-semibold px-3 py-1.5 rounded-lg text-[9px] transition-all flex items-center gap-1 active:scale-95 shrink-0"
                                 >
@@ -1728,8 +2019,8 @@ export default function Step3RincianHPS() {
                                 <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Target Penyedia / URL e-Katalog (Opsional)</label>
                                 <input
                                   type="text"
-                                  value={customTargets[idx] || ''}
-                                  onChange={(e) => setCustomTargets({ ...customTargets, [idx]: e.target.value })}
+                                  value={customTargets[dpaIdx] || ''}
+                                  onChange={(e) => setCustomTargets({ ...customTargets, [dpaIdx]: e.target.value })}
                                   placeholder="Contoh: CV Maju Jaya ATAU https://katalog.inaproc.id/..."
                                   className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                                   disabled={isLoading}
@@ -1739,8 +2030,8 @@ export default function Step3RincianHPS() {
                                 <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Harga Minimal (Opsional)</label>
                                 <input
                                   type="number"
-                                  value={customMinPrices[idx] || ''}
-                                  onChange={(e) => setCustomMinPrices({ ...customMinPrices, [idx]: e.target.value })}
+                                  value={customMinPrices[dpaIdx] || ''}
+                                  onChange={(e) => setCustomMinPrices({ ...customMinPrices, [dpaIdx]: e.target.value })}
                                   placeholder={`> ${(p.price || p.paguDpa) * 0.5}`}
                                   className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] focus:ring-1 focus:ring-indigo-500"
                                   disabled={isLoading}
@@ -1750,8 +2041,8 @@ export default function Step3RincianHPS() {
                                 <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Harga Maksimal (Opsional)</label>
                                 <input
                                   type="number"
-                                  value={customMaxPrices[idx] || ''}
-                                  onChange={(e) => setCustomMaxPrices({ ...customMaxPrices, [idx]: e.target.value })}
+                                  value={customMaxPrices[dpaIdx] || ''}
+                                  onChange={(e) => setCustomMaxPrices({ ...customMaxPrices, [dpaIdx]: e.target.value })}
                                   placeholder={`< ${p.price || p.paguDpa}`}
                                   className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] focus:ring-1 focus:ring-indigo-500"
                                   disabled={isLoading}
@@ -1802,6 +2093,17 @@ export default function Step3RincianHPS() {
                                   >
                                     💡 Template Alasan: Satu Pintu (&gt;80%)
                                   </button>
+                                  {getPacketCategory(selectedPack?.packName || '').startsWith('Mamin') && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setJustifications({ ...justifications, [p.id]: "Pemilihan penyedia ini disesuaikan dengan ketentuan Surat Edaran Bupati Probolinggo Nomor 000.3/2747/426.42/2025 tentang E-Purchasing Katalog Elektronik untuk pemenuhan aspek pemerataan penyedia lokal dan efisiensi pengiriman Mamin di lingkungan Pemerintah Kabupaten Probolinggo." });
+                                      }}
+                                      className="text-[9px] font-bold text-amber-750 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded w-full text-center transition-colors border border-amber-200"
+                                    >
+                                      📋 Template: SE Mamin (Pemerataan)
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -1855,12 +2157,23 @@ export default function Step3RincianHPS() {
                                   </div>
                                   <div className="mt-2 pt-2 border-t border-slate-200/50">
                                     <div className="grid grid-cols-2 gap-1.5">
-                                      <input 
-                                        type="text" placeholder="Lokasi Dapur/Toko" 
+                                      <select
                                         value={(comparisons[p.id] && comparisons[p.id].lokasi) || ''}
-                                        onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), lokasi: e.target.value}})}
-                                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-[9px]"
-                                      />
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), lokasi: val}});
+                                          handleUpdateVendorLocation(p.vendor, val);
+                                        }}
+                                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-[9px] text-slate-800"
+                                      >
+                                        <option value="">-- Deteksi Otomatis --</option>
+                                        <option value="Luar Kabupaten Probolinggo">Luar Kabupaten Probolinggo</option>
+                                        <optgroup label="24 Kecamatan Probolinggo">
+                                          {DAFTAR_KECAMATAN.map(kec => (
+                                            <option key={kec} value={kec}>{kec}</option>
+                                          ))}
+                                        </optgroup>
+                                      </select>
                                       <input 
                                         type="text" placeholder="Jarak & Waktu Tempuh" 
                                         value={(comparisons[p.id] && comparisons[p.id].jarak) || ''}
@@ -2362,9 +2675,6 @@ export default function Step3RincianHPS() {
           
           <DocPreviewModal 
             isHpsExemptSelected={isHpsExemptSelected} 
-            comparisons={comparisons}
-            justifications={justifications}
-            autoComparator={autoComparator}
           />
     </>
   );

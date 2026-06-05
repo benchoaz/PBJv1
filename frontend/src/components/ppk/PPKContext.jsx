@@ -47,6 +47,9 @@ export function PPKProvider({ children }) {
   const [sirupPackages, setSirupPackages] = useState(() => { const s = localStorage.getItem('pbj_sirup_packages'); return s ? JSON.parse(s) : []; });
   const [namaAcara, setNamaAcara] = useState(() => localStorage.getItem('pbj_nama_acara') || '');
   const [tanggalSurat, setTanggalSurat] = useState(() => localStorage.getItem('pbj_tanggal_surat') || new Date().toISOString().split('T')[0]);
+  const [comparisons, setComparisons] = useState(() => { const s = localStorage.getItem('pbj_comparisons'); return s ? JSON.parse(s) : {}; });
+  const [justifications, setJustifications] = useState(() => { const s = localStorage.getItem('pbj_justifications'); return s ? JSON.parse(s) : {}; });
+  const [autoComparator, setAutoComparator] = useState(() => localStorage.getItem('pbj_auto_comparator') === 'true');
   
   // Loading states
   const [isUpdating, setIsUpdating] = useState(false);
@@ -82,6 +85,9 @@ export function PPKProvider({ children }) {
   useEffect(() => { localStorage.setItem('pbj_nama_acara', namaAcara); }, [namaAcara]);
   useEffect(() => { localStorage.setItem('pbj_tanggal_surat', tanggalSurat); }, [tanggalSurat]);
   useEffect(() => { if (surveyData) localStorage.setItem('pbj_survey_data', JSON.stringify(surveyData)); }, [surveyData]);
+  useEffect(() => { localStorage.setItem('pbj_comparisons', JSON.stringify(comparisons)); }, [comparisons]);
+  useEffect(() => { localStorage.setItem('pbj_justifications', JSON.stringify(justifications)); }, [justifications]);
+  useEffect(() => { localStorage.setItem('pbj_auto_comparator', autoComparator.toString()); }, [autoComparator]);
 
   
   // Helper to match DPA Account
@@ -189,8 +195,14 @@ export function PPKProvider({ children }) {
     localStorage.removeItem('pbj_tanggal_surat');
     localStorage.removeItem('pbj_current_project_id');
     localStorage.removeItem('pbj_status');
+    localStorage.removeItem('pbj_comparisons');
+    localStorage.removeItem('pbj_justifications');
+    localStorage.removeItem('pbj_auto_comparator');
     
     setDpaName(null);
+    setComparisons({});
+    setJustifications({});
+    setAutoComparator(false);
     setScrapedData([]);
     setMatchedDpaTypes([]);
     setSelectedPack(null);
@@ -229,6 +241,9 @@ export function PPKProvider({ children }) {
       if (parsed.techSpecs) setTechSpecs(parsed.techSpecs);
       if (parsed.hpsPrices) setHpsPrices(parsed.hpsPrices);
       if (parsed.tanggalSurat) setTanggalSurat(parsed.tanggalSurat);
+      if (parsed.comparisons) setComparisons(parsed.comparisons);
+      if (parsed.justifications) setJustifications(parsed.justifications);
+      if (parsed.autoComparator !== undefined) setAutoComparator(parsed.autoComparator);
     } catch(e) {
       console.error('Failed to load project data:', e);
     }
@@ -276,6 +291,9 @@ description: JSON.stringify({
           tanggalSurat,
           selectedTplId,
           selectedNdTplId,
+          comparisons,
+          justifications,
+          autoComparator,
           items: getPackageItems(selectedPack)
         })
       };
@@ -330,9 +348,12 @@ description: JSON.stringify({
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [step, surveyData, dpaRincian, hpsPrices, dppSpecs, isHpsExemptSelected]);
+  }, [step, surveyData, dpaRincian, hpsPrices, dppSpecs, isHpsExemptSelected, comparisons, justifications, autoComparator]);
 
   const value = {
+    comparisons, setComparisons,
+    justifications, setJustifications,
+    autoComparator, setAutoComparator,
     docSettings, setDocSettings,
     step, setStep,
     dpaName, setDpaName,

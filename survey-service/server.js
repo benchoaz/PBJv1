@@ -509,11 +509,26 @@ async function searchItem(page, item, index) {
             await page.screenshot({ path: searchFile, fullPage: false });
             console.log(`    ✅ Berhasil menemukan ${candidates.length} produk dengan query: "${query}"`);
             
-            // Break if we don't need comparator or if it's already a global search
-            if (!item.autoComparator || scenario.type === 'global') {
+            // Break if we don't need comparator or if we have found at least one candidate from a different vendor
+            let hasComparator = false;
+            if (item.autoComparator && searchData.length > 0) {
+              const baseVendor = item.targetVendor 
+                ? item.targetVendor.toLowerCase().trim() 
+                : searchData[0].vendor.toLowerCase().trim();
+              const baseSlug = item._resolvedVendorSlug 
+                ? item._resolvedVendorSlug.toLowerCase().trim() 
+                : baseVendor.replace(/[^a-z0-9]/g, '-');
+              hasComparator = searchData.some(c => {
+                const vendorLower = c.vendor.toLowerCase().trim();
+                return vendorLower !== baseVendor && 
+                       (!baseSlug || !vendorLower.includes(baseSlug.replace(/-/g, ' ')));
+              });
+            }
+
+            if (!item.autoComparator || (scenario.type === 'global' && hasComparator)) {
               break;
             } else {
-               console.log(`    ℹ️ Auto Comparator aktif, lanjut mencari referensi global...`);
+               console.log(`    ℹ️ Auto Comparator aktif (Comparator ditemukan: ${hasComparator}), lanjut mencari referensi lain...`);
             }
           }
         } else {
@@ -615,7 +630,7 @@ async function searchItem(page, item, index) {
       const otherCandidates = searchData.filter(c => 
         c !== bestCandidate && 
         c.price && 
-        c.price > bestCandidate.price &&
+        c.price >= bestCandidate.price &&
         c.vendor !== bestCandidate.vendor
       );
       
@@ -716,6 +731,7 @@ async function searchItem(page, item, index) {
         const detailData = await page.evaluate(() => {
           let price = null;
           let vendor = null;
+          let location = null;
 
           const allText = document.body.innerText;
           const rpMatch = allText.match(/Rp\s*([\d.,]+)/);
@@ -725,14 +741,42 @@ async function searchItem(page, item, index) {
             if (parsed >= 100) price = parsed;
           }
 
-          // Coba cari vendor UMKK (Dihapus karena sering salah menangkap menu 'Produk Hukum' di Header INAPROC V6)
-          // Kita akan menggunakan vendor asli dari Slug URL yang sudah sangat akurat.
+          // Ekstrak Alamat Lengkap Perusahaan / Toko dari halaman detail
+          // Biasanya ada label 'Alamat Perusahaan' atau sejenisnya di Profil Penyedia
+          const textLines = allText.split('\n').map(l => l.trim()).filter(Boolean);
+          const addressIndex = textLines.findIndex(line => 
+            line.toLowerCase().includes('alamat perusahaan') || 
+            line.toLowerCase().includes('alamat toko')
+          );
+          
+          if (addressIndex !== -1 && addressIndex + 1 < textLines.length) {
+            // Ambil baris berikutnya yang berisi teks alamat lengkap
+            const potentialAddress = textLines[addressIndex + 1];
+            if (potentialAddress.length > 5) {
+              location = potentialAddress.replace(/^:\s*/, '').trim();
+            }
+          }
 
-          return { price, vendor };
+          if (!location) {
+            // Fallback: Cari baris yang mengandung 'kecamatan' atau 'kabupaten'
+            const subdistrictLine = textLines.find(line => 
+              (line.toLowerCase().includes('kecamatan') || line.toLowerCase().includes('kabupaten')) && 
+              line.toLowerCase().includes('probolinggo')
+            );
+            if (subdistrictLine) {
+              location = subdistrictLine.replace(/^:\s*/, '').trim();
+            }
+          }
+
+          return { price, vendor, location };
         });
 
         if (detailData.price) finalPrice = detailData.price;
         if (detailData.vendor) finalVendor = detailData.vendor;
+        if (detailData.location) {
+          bestCandidate.location = detailData.location;
+          console.log(`  → Menemukan alamat detail penyedia: ${detailData.location}`);
+        }
         console.log(`  → Detail terverifikasi: harga=${finalPrice}, vendor=${finalVendor}`);
 
       } catch (err) {

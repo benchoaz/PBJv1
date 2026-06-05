@@ -46,6 +46,7 @@ func main() {
 		&models.Project{}, // Added Project here
 		&models.ProjectItem{},
 		&models.ProjectItemSurvey{},
+		&models.VendorLocation{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate models: %v", err)
@@ -80,6 +81,7 @@ func main() {
 	pbjHandler := handlers.NewPBJHandler(gormDB)
 	userHandler := handlers.NewUserHandler(gormDB)
 	settingHandler := handlers.NewSettingHandler(gormDB)
+	vendorLocationHandler := handlers.NewVendorLocationHandler(gormDB)
 
 	mux := http.NewServeMux()
 
@@ -101,6 +103,11 @@ func main() {
 	// Setting Routes
 	mux.HandleFunc("GET /api/settings/{key}", settingHandler.GetSetting)
 	mux.HandleFunc("POST /api/settings", settingHandler.SetSetting)
+
+	// Vendor Location Routes
+	mux.HandleFunc("OPTIONS /api/vendor-locations", vendorLocationHandler.Options)
+	mux.HandleFunc("GET /api/vendor-locations", vendorLocationHandler.GetAll)
+	mux.HandleFunc("POST /api/vendor-locations", vendorLocationHandler.SetLocation)
 
 	mux.HandleFunc("GET /api/projects", projectHandler.GetAll)
 	mux.HandleFunc("GET /api/projects/{id}", projectHandler.GetByID)
