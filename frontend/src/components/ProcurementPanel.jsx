@@ -87,7 +87,7 @@ export default function ProcurementPanel() {
               qty: item.qty || item.jumlah || 1,
               unit: item.unit || item.satuan || 'Unit',
               price: item.price || item.harga || 0,       // harga satuan dari DPP PPK
-              paguDpa: item.dpa_price || item.price || 0, // batas pagu dari DPA
+              paguDpa: item.dpa_price || item.paguDpa || item.price || 0, // batas pagu dari DPA
               // Harga tayang AWAL dari DPP PPK (ditampilkan di kolom Harga Tayang)
               dppTayang: item.price || 0,
               dppVendor: item.vendor || '',
@@ -95,7 +95,7 @@ export default function ProcurementPanel() {
               katalogPrice: selectedSurvey ? selectedSurvey.price : undefined,
               vendor: selectedSurvey ? selectedSurvey.vendor_name : (item.vendor || ''),
               tayang: selectedSurvey ? selectedSurvey.price : (item.price || 0),
-              link: selectedSurvey ? selectedSurvey.url : '',
+              link: selectedSurvey ? selectedSurvey.url : (item.link || ''),
               specs: item.specs || '',
               surveys: item.surveys || [],
             };
@@ -1183,26 +1183,30 @@ export default function ProcurementPanel() {
           onClick={() => setActiveTab('incoming')}
           className={`px-4 py-2 rounded-lg text-[11px] font-semibold transition-all duration-200 flex items-center gap-2 ${activeTab === 'incoming' ? 'bg-slate-100 text-slate-800 border border-slate-200 shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-200'}`}
         >
-          <span>📬 Usulan DPP Masuk</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 opacity-90"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>
+          <span>Usulan DPP Masuk</span>
           {submittedPack && <span className={`px-1.5 py-0.5 text-[9px] rounded-full font-black ${activeTab === 'incoming' ? 'bg-slate-300 text-slate-800' : 'bg-slate-100 border border-slate-200 text-slate-500'}`}>1</span>}
         </button>
         <button 
           onClick={() => setActiveTab('search')}
-          className={`px-4 py-2 rounded-lg text-[11px] font-semibold transition-all duration-200 ${activeTab === 'search' ? 'bg-slate-100 text-slate-800 border border-slate-200 shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-200'}`}
+          className={`px-4 py-2 rounded-lg text-[11px] font-semibold transition-all duration-200 flex items-center gap-2 ${activeTab === 'search' ? 'bg-slate-100 text-slate-800 border border-slate-200 shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-200'}`}
         >
-          🤝 Tabel Negosiasi e-Purchasing
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 opacity-90"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          Tabel Negosiasi e-Purchasing
         </button>
         <button 
           onClick={() => setActiveTab('docs')}
-          className={`px-4 py-2 rounded-lg text-[11px] font-semibold transition-all duration-200 ${activeTab === 'docs' ? 'bg-slate-100 text-slate-800 border border-slate-200 shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-200'}`}
+          className={`px-4 py-2 rounded-lg text-[11px] font-semibold transition-all duration-200 flex items-center gap-2 ${activeTab === 'docs' ? 'bg-slate-100 text-slate-800 border border-slate-200 shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-200'}`}
         >
-          📂 Arsip Dokumen Hasil Pemilihan (BAHP)
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 opacity-90"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          Arsip Dokumen Hasil Pemilihan (BAHP)
         </button>
         <button 
           onClick={() => setActiveTab('inaproc_docs')}
-          className={`px-4 py-2 rounded-lg text-[11px] font-semibold transition-all duration-200 ${activeTab === 'inaproc_docs' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/50 border border-transparent hover:border-indigo-100'}`}
+          className={`px-4 py-2 rounded-lg text-[11px] font-semibold transition-all duration-200 flex items-center gap-2 ${activeTab === 'inaproc_docs' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/50 border border-transparent hover:border-indigo-100'}`}
         >
-          📥 Unggah Arsip Inaproc (BAST/SP)
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 opacity-90"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          Unggah Arsip Inaproc (BAST/SP)
         </button>
       </div>
 
@@ -1528,7 +1532,8 @@ export default function ProcurementPanel() {
                     <th className="p-3 min-w-[180px]">Deskripsi Komoditas</th>
                     <th className="p-3 text-center w-16">Vol</th>
                     <th className="p-3 text-right w-28">Pagu DPA</th>
-                    <th className="p-3 w-32 text-right">Harga Tayang</th>
+                    <th className="p-3 text-right w-32">Harga Tayang</th>
+                    <th className="p-3 text-right w-36">Harga Nego (Satuan)</th>
                     <th className="p-3 min-w-[130px]">Nama Penyedia</th>
                     <th className="p-3 text-right w-32">Total Akhir</th>
                     <th className="p-3 text-center w-28">Status</th>
@@ -1582,19 +1587,22 @@ export default function ProcurementPanel() {
                           <div className="font-mono font-bold text-slate-700 text-xs">Rp {paguSatuan.toLocaleString('id-ID')}</div>
                           <div className="text-[9px] text-rose-500 font-bold mt-0.5 uppercase">Batas Maksimal</div>
                         </td>
+                        <td className="p-4 text-right">
+                          <div className="font-mono font-bold text-slate-700 text-xs">Rp {(tayang || 0).toLocaleString('id-ID')}</div>
+                          <div className={`text-[9px] font-bold mt-1 ${isFromDpp ? 'text-amber-600' : 'text-blue-600'}`}>
+                            {isFromDpp ? '📋 Dari DPP PPK' : '🔍 Dari e-Katalog'}
+                          </div>
+                        </td>
                         <td className="p-4">
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-mono">Rp</span>
+                          <div className="relative w-32">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-mono">Rp</span>
                             <input 
                               type="number" 
-                              className="w-full text-xs p-2.5 pl-8 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white shadow-sm text-right font-mono"
+                              className="w-full text-xs p-2.5 pl-7 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white shadow-sm text-right font-mono font-bold"
                               placeholder="0"
-                              value={tayang}
-                              onChange={e => handleNegotiationChange(item.no, 'tayang', e.target.value)}
+                              value={negoPrice}
+                              onChange={e => handleNegotiationChange(item.no, 'price', e.target.value)}
                             />
-                          </div>
-                          <div className={`text-[9px] font-bold mt-1 text-center ${isFromDpp ? 'text-amber-600' : 'text-blue-600'}`}>
-                            {isFromDpp ? '📋 Dari DPP PPK' : '🔍 Dari e-Katalog'}
                           </div>
                         </td>
                         <td className="p-4">
@@ -2519,16 +2527,24 @@ export default function ProcurementPanel() {
                 if (!confirm('Anda yakin ingin menyegel paket ini? Status paket di Dashboard PPK akan berubah menjadi "Selesai (Arsip Lengkap)".')) return;
                 
                 try {
-                  // Simulate fetching the correct projectId from localStorage
-                  // In real app we would have the projectId in submittedPack or from URL
-                  const savedPackStr = localStorage.getItem('pbj_submitted_package');
-                  const pack = JSON.parse(savedPackStr);
+                  const targetId = submittedPack?.id;
+                  if (targetId) {
+                    const res = await fetch(`/api/projects/${targetId}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: 'Selesai (Arsip Lengkap)' })
+                    });
+                    if (!res.ok) throw new Error('Gagal memperbarui status paket di server');
+                  }
                   
-                  // In this mock context we don't have the explicit projectId.
-                  // But we simulate success.
                   alert('🎉 Luar Biasa! Pekerjaan selesai! Dokumen arsip lengkap Inaproc telah diunggah dan dikembalikan ke PPK untuk keperluan audit BPK.');
+                  
+                  // Clear local states
                   localStorage.removeItem('pbj_submitted_package');
-                  window.location.href = '/'; // Go back to PPK Dashboard to see it green
+                  localStorage.removeItem('pbj_negotiated_items');
+                  localStorage.removeItem('pbj_pp_checked_items');
+                  
+                  window.location.href = '/'; 
                 } catch (e) {
                   alert('Gagal menyelesaikan paket: ' + e.message);
                 }
