@@ -490,7 +490,8 @@ export default function Step3RincianHPS() {
           link: r.link,
           img: r.img,
           searchImg: r.searchImg,
-          success: r.success
+          success: r.success,
+          location: r.location || r.location_name || r.address || ''
         })),
         timestamp: new Date().toLocaleString('id-ID')
       });
@@ -585,7 +586,8 @@ export default function Step3RincianHPS() {
           price: singleRes.price,
           link: singleRes.link,
           img: singleRes.img,
-          success: singleRes.success
+          success: singleRes.success,
+          location: singleRes.location || singleRes.location_name || singleRes.address || ''
         };
         const updatedData = { ...surveyData, products: updatedProducts };
         setSurveyData(updatedData);
