@@ -100,7 +100,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, onNavClick }) {
     { path: '/', label: 'Daftar Paket', Icon: Icons.FolderOpen, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/tickets', label: 'Tickets', Icon: Icons.Ticket, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/ppk/persiapan', label: 'PPK Persiapan', Icon: Icons.ClipboardEdit, roles: ['Admin', 'PPK'] },
-    { path: '/pp/panel', label: 'Tabel Negosiasi', Icon: Icons.Repeat, roles: ['Admin', 'PP'] },
+    { path: '/pp/panel', label: 'Panel Pejabat Pengadaan', Icon: Icons.Repeat, roles: ['Admin', 'PP'] },
     { path: '/admin/ocr', label: 'API AI OCR', Icon: Icons.ScanText, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/admin/templates', label: 'Template Surat', Icon: Icons.FileText, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/users', label: 'Users', Icon: Icons.Users, roles: ['Admin'] },
