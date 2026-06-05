@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { AuthProvider } from './hooks/useAuth'
 import Header from './components/Header'
@@ -29,12 +30,53 @@ function ProtectedRoute({ children, allowedRoles }) {
 function App() {
   const location = useLocation();
   const isLoginPage = location.pathname === '/login';
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
   return (
     <AuthProvider>
-      <div className={`min-h-screen flex bg-white relative ${isLoginPage ? 'bg-white' : ''}`}>
-        {!isLoginPage && <Header />}
-        <main className={`flex-1 min-w-0 ${isLoginPage ? 'p-0 h-screen overflow-hidden' : 'p-8 lg:p-12 overflow-y-auto'}`}>
+      <div className={`min-h-screen flex bg-slate-50 relative`}>
+        {!isLoginPage && (
+          <>
+            {/* Mobile overlay */}
+            {sidebarOpen && (
+              <div
+                className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+                onClick={closeSidebar}
+              />
+            )}
+            <Header
+              sidebarOpen={sidebarOpen}
+              setSidebarOpen={setSidebarOpen}
+              onNavClick={closeSidebar}
+            />
+          </>
+        )}
+
+        {/* Mobile top bar (hamburger) */}
+        {!isLoginPage && (
+          <div className="lg:hidden fixed top-0 left-0 right-0 z-30 h-14 bg-white border-b border-slate-200 flex items-center px-4 shadow-sm print:hidden">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+              aria-label="Buka Menu"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
+            <span className="ml-3 text-sm font-bold text-slate-800">PBJ SAE</span>
+          </div>
+        )}
+
+        <main className={`flex-1 min-w-0 ${
+          isLoginPage
+            ? 'p-0 h-screen overflow-hidden'
+            : 'pt-14 lg:pt-0 p-4 sm:p-6 lg:p-8 xl:p-10 overflow-y-auto min-h-screen'
+        }`}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<ProtectedRoute><ProjectList /></ProtectedRoute>} />

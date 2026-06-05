@@ -165,7 +165,7 @@ export default function Login() {
 
   return (
     <div 
-      className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-cover bg-center overflow-y-auto font-sans relative"
+      className="min-h-screen w-full flex flex-col items-center justify-start sm:justify-center p-3 sm:p-4 bg-cover bg-center overflow-y-auto font-sans relative"
       style={{ 
         backgroundImage: "url('/bromo-bg2.jpg')",
         backgroundAttachment: 'fixed'
@@ -214,7 +214,7 @@ export default function Login() {
       `}</style>
 
       {/* MAIN CONTAINER (Centered Card) */}
-      <div className="w-full max-w-[460px] custom-glass rounded-3xl p-7 lg:p-8 shadow-2xl z-10 transition-all duration-300 transform hover:scale-[1.005]">
+      <div className="w-full max-w-[460px] custom-glass rounded-2xl sm:rounded-3xl p-5 sm:p-7 lg:p-8 shadow-2xl z-10 transition-all duration-300 mt-4 sm:mt-0">
         
         {/* Government Emblem */}
         <div className="flex justify-center mb-3">
@@ -230,7 +230,7 @@ export default function Login() {
           <span className="text-[10px] lg:text-[11px] font-extrabold tracking-[0.16em] text-slate-800 uppercase block mb-1">
             Pemerintah Kabupaten Probolinggo
           </span>
-          <h1 className="text-3xl font-black tracking-wide mb-0.5 flex justify-center items-center gap-1.5">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-wide mb-0.5 flex justify-center items-center gap-1.5">
             <span className="text-[#0f2942]">PBJ</span>
             <span className="text-[#d97706]">SAE</span>
           </h1>
@@ -365,16 +365,16 @@ export default function Login() {
       </div>
 
       {/* SECONDARY CONTAINER: Premium Interactive Quick-Fill Demo Cards */}
-      <div className="w-full max-w-[460px] custom-glass-sub rounded-2xl p-4.5 mt-4 shadow-xl z-10 text-center flex flex-col gap-2">
+      <div className="w-full max-w-[460px] custom-glass-sub rounded-2xl p-3.5 sm:p-4.5 mt-3 sm:mt-4 shadow-xl z-10 text-center flex flex-col gap-2 mb-6 sm:mb-0">
         <div className="flex items-center justify-between px-1 mb-1">
           <span className="text-[10px] font-extrabold text-[#0f2942] uppercase tracking-wider flex items-center gap-1">
             <Sparkles size={12} className="text-amber-600" />
-            <span>Akses Cepat (Akun Demo)</span>
+            <span>Akses Cepat (Demo)</span>
           </span>
-          <span className="text-[9px] text-slate-500 font-bold">Klik kartu untuk mengisi</span>
+          <span className="text-[9px] text-slate-500 font-bold hidden sm:block">Klik kartu untuk mengisi</span>
         </div>
         
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
           {demoAccounts.map((account) => {
             const isActive = activeDemo === account.id;
             return (

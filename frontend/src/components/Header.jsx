@@ -1,7 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
-// Modern Lucide-style inline SVG icons (no extra deps needed beyond lucide-react already installed)
 const Icons = {
   FolderOpen: () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -67,9 +66,15 @@ const Icons = {
       <line x1="15" x2="3" y1="12" y2="12"/>
     </svg>
   ),
+  X: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/>
+      <line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  ),
 }
 
-export default function Header() {
+export default function Header({ sidebarOpen, setSidebarOpen, onNavClick }) {
   const { user, logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
@@ -101,17 +106,27 @@ export default function Header() {
     { path: '/users', label: 'Users', Icon: Icons.Users, roles: ['Admin'] },
   ]
 
-  return (
-    <aside className="w-64 h-screen bg-white border-r border-slate-100 sticky top-0 flex flex-col justify-between py-6 px-4 shadow-[1px_0_20px_rgba(0,0,0,0.04)] shrink-0 print:hidden overflow-y-auto custom-scrollbar">
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full justify-between py-6 px-4">
       <div className="space-y-7">
         {/* Brand Logo */}
-        <Link to="/" className="flex items-center gap-3 px-3 py-1 mb-2">
-          <img src="/img/image-pbj.svg" alt="Logo PBJ" className="w-14 h-14 drop-shadow-md" />
-          <div>
-            <div className="text-[13px] font-bold text-slate-800 leading-tight tracking-tight">PBJ System</div>
-            <div className="text-[9px] text-slate-400 font-medium tracking-widest uppercase">e-Procurement</div>
-          </div>
-        </Link>
+        <div className="flex items-center justify-between px-3 py-1 mb-2">
+          <Link to="/" onClick={onNavClick} className="flex items-center gap-3">
+            <img src="/img/image-pbj.svg" alt="Logo PBJ" className="w-12 h-12 drop-shadow-md" />
+            <div>
+              <div className="text-[13px] font-bold text-slate-800 leading-tight tracking-tight">PBJ System</div>
+              <div className="text-[9px] text-slate-400 font-medium tracking-widest uppercase">e-Procurement</div>
+            </div>
+          </Link>
+          {/* Close button — only visible on mobile */}
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-colors"
+            aria-label="Tutup Menu"
+          >
+            <Icons.X />
+          </button>
+        </div>
 
         {/* User Card */}
         {user && (
@@ -156,6 +171,7 @@ export default function Header() {
                   <Link
                     key={item.path}
                     to={item.path}
+                    onClick={onNavClick}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-150 ${
                       isActive(item.path)
                         ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/25'
@@ -192,6 +208,7 @@ export default function Header() {
         ) : (
           <Link
             to="/login"
+            onClick={onNavClick}
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] font-semibold text-indigo-600 hover:bg-indigo-50 transition-all duration-150"
           >
             <Icons.Login />
@@ -202,6 +219,24 @@ export default function Header() {
           <span className="text-[9px] text-slate-300 font-medium">PBJ System v1.0 · 2026</span>
         </div>
       </div>
-    </aside>
+    </div>
+  )
+
+  return (
+    <>
+      {/* Desktop sidebar — always visible on lg+ */}
+      <aside className="hidden lg:flex w-64 h-screen bg-white border-r border-slate-100 sticky top-0 flex-col justify-between shadow-[1px_0_20px_rgba(0,0,0,0.04)] shrink-0 print:hidden overflow-y-auto">
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile drawer — slides in from left */}
+      <aside
+        className={`lg:hidden fixed top-0 left-0 h-full w-72 bg-white shadow-2xl z-50 flex flex-col transition-transform duration-300 ease-in-out print:hidden ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <SidebarContent />
+      </aside>
+    </>
   )
 }
