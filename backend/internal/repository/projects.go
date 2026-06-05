@@ -40,9 +40,14 @@ func (r *ProjectRepository) GetAll(filter *models.ProjectFilter) ([]*models.Proj
 		argPos++
 	}
 	if filter.IdSatker != "" {
-		query += fmt.Sprintf(" AND id_satker = $%d", argPos)
-		args = append(args, filter.IdSatker)
-		argPos++
+		parts := strings.Split(filter.IdSatker, ",")
+		var placeholders []string
+		for _, part := range parts {
+			placeholders = append(placeholders, fmt.Sprintf("$%d", argPos))
+			args = append(args, strings.TrimSpace(part))
+			argPos++
+		}
+		query += fmt.Sprintf(" AND id_satker IN (%s)", strings.Join(placeholders, ", "))
 	}
 	if filter.Status != "" {
 		query += fmt.Sprintf(" AND status = $%d", argPos)
@@ -154,6 +159,21 @@ func (r *ProjectRepository) Create(input *models.ProjectCreate) (*models.Project
 		status = "baru"
 	}
 
+	var itemsRaw interface{}
+	var hasItems bool
+	if input.Description != "" {
+		var parsed map[string]interface{}
+		if err := json.Unmarshal([]byte(input.Description), &parsed); err == nil {
+			if raw, ok := parsed["items"]; ok {
+				itemsRaw = raw
+				hasItems = true
+				delete(parsed, "items")
+				newDescBytes, _ := json.Marshal(parsed)
+				input.Description = string(newDescBytes)
+			}
+		}
+	}
+
 	query := `INSERT INTO projects (name, description, budget, ministry, province, id_satker, source_url, status, start_date, end_date, created_at, updated_at)
 	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
 	          RETURNING id, created_at, updated_at`
@@ -165,6 +185,19 @@ func (r *ProjectRepository) Create(input *models.ProjectCreate) (*models.Project
 		input.StartDate, input.EndDate).Scan(&id, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("inserting project: %w", err)
+	}
+
+	if hasItems {
+		itemsBytes, _ := json.Marshal(itemsRaw)
+		var items []models.ProjectItem
+		if err := json.Unmarshal(itemsBytes, &items); err == nil {
+			for i := range items {
+				items[i].ProjectID = id
+			}
+			if len(items) > 0 {
+				r.gorm.Create(&items)
+			}
+		}
 	}
 
 	return r.GetByID(id)
@@ -276,9 +309,14 @@ func (r *ProjectRepository) Count(filter *models.ProjectFilter) (int, error) {
 		argPos++
 	}
 	if filter.IdSatker != "" {
-		query += fmt.Sprintf(" AND id_satker = $%d", argPos)
-		args = append(args, filter.IdSatker)
-		argPos++
+		parts := strings.Split(filter.IdSatker, ",")
+		var placeholders []string
+		for _, part := range parts {
+			placeholders = append(placeholders, fmt.Sprintf("$%d", argPos))
+			args = append(args, strings.TrimSpace(part))
+			argPos++
+		}
+		query += fmt.Sprintf(" AND id_satker IN (%s)", strings.Join(placeholders, ", "))
 	}
 	if filter.Status != "" {
 		query += fmt.Sprintf(" AND status = $%d", argPos)

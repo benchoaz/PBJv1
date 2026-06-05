@@ -46,7 +46,7 @@ func InitSchema(db *DB) error {
 		return nil
 	}
 
-	schema, err := os.ReadFile(schemaPath)
+	_, err := os.ReadFile(schemaPath)
 	if err != nil {
 		return fmt.Errorf("failed to read schema file: %w", err)
 	}

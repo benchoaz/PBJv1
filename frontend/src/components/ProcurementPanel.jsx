@@ -1170,9 +1170,10 @@ export default function ProcurementPanel() {
         {submittedPack && (
           <button 
             onClick={handleResetPackage} 
-            className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm"
+            className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2"
           >
-            🔄 Reset Sesi Pengadaan
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            Reset Sesi Pengadaan
           </button>
         )}
       </div>
@@ -1223,7 +1224,9 @@ export default function ProcurementPanel() {
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Aktif & Sah (TTE)
                   </span>
                   <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wide flex items-center gap-1.5">
-                    <span className="w-4 h-4 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">📦</span> Paket Terkirim dari PPK
+                    <span className="w-4 h-4 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><polygon points="12 22.08 12 12 3 6.92 3 17.08 12 22.08"/><polygon points="12 12 21 6.92 21 17.08 12 22.08"/><polygon points="12 2 21 6.92 12 12 3 6.92 12 2"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                    </span> Paket Terkirim dari PPK
                   </span>
                 </div>
                 <h3 className="text-xl font-bold text-slate-800">{submittedPack.packName}</h3>
@@ -1257,7 +1260,10 @@ export default function ProcurementPanel() {
                 
                 {/* DPA Detailed Rincian Table */}
                 <div className="mt-6 bg-slate-50/50 border border-slate-200 rounded-xl p-5 w-full">
-                  <div className="text-[10px] text-slate-600 font-bold uppercase tracking-wider mb-3">📋 Rincian Barang Tersinkronisasi (Centang barang yang akan diproses):</div>
+                  <div className="text-[10px] text-slate-600 font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                    Rincian Barang Tersinkronisasi (Centang barang yang akan diproses):
+                  </div>
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-slate-200 font-bold text-slate-500 text-[10px] uppercase">
@@ -1302,8 +1308,9 @@ export default function ProcurementPanel() {
                           <td className="py-3 font-medium">
                             {item.name?.includes('[Konsolidasi]') ? (
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[9px] uppercase tracking-wider border border-slate-200">
-                                  🔒 Konsolidasi
+                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[9px] uppercase tracking-wider border border-slate-200 flex items-center gap-1">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                  Konsolidasi
                                 </span>
                                 <span className="text-slate-800">{item.name.replace('[Konsolidasi]', '').trim()}</span>
                               </div>
@@ -1327,21 +1334,24 @@ export default function ProcurementPanel() {
                     onClick={() => alert(`Membuka Dokumen DPA: ${submittedPack.dpaName}`)}
                     className="text-[11px] text-slate-600 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 transition-all font-medium flex items-center gap-1.5"
                   >
-                    <span>📄</span> DPA Asli
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    DPA Asli
                   </button>
                   {submittedPack.hpsValue !== 'Dikecualikan (Bebas HPS)' && parseFloat(submittedPack.hpsValue) !== 0 && submittedPack.hpsValue !== '0' && (
                     <button 
                       onClick={() => alert(`Membuka Surat Penetapan HPS dengan Nilai Rp ${parseFloat(submittedPack.hpsValue).toLocaleString('id-ID')} yang telah ditandatangani secara elektronik (TTE) oleh ${submittedPack.senderName}.`)}
                       className="text-[11px] text-slate-700 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-300 transition-all font-bold flex items-center gap-1.5"
                     >
-                      <span>📜</span> Surat Penetapan HPS (TTE)
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                      Surat Penetapan HPS (TTE)
                     </button>
                   )}
                   <button 
                     onClick={() => setShowDppModal(true)}
                     className="text-[11px] text-slate-700 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-300 transition-all font-bold flex items-center gap-1.5"
                   >
-                    <span>📁</span> Dokumen DPP PPK
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    Dokumen DPP PPK
                   </button>
                 </div>
               </div>
@@ -1373,7 +1383,7 @@ export default function ProcurementPanel() {
                       <h6 className="font-bold mt-4 mb-1">B. Maksud dan Tujuan</h6>
                       <div className="text-justify whitespace-pre-wrap pl-4">{submittedPack.dppSpecs?.maksudTujuan || '-'}</div>
                       
-                      <h6 className="font-bold mt-4 mb-2">C. Spesifikasi Jenis, Jumlah, dan Mutu Barang</h6>
+                      <h6 className="font-bold mt-4 mb-2">C. Spesifikasi Jenis, Jumlah, and Mutu Barang</h6>
                       <table className="w-full border-collapse border border-slate-800 text-sm mt-2">
                         <thead>
                           <tr>
@@ -1422,7 +1432,8 @@ export default function ProcurementPanel() {
                     }} 
                     className="bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 shadow-sm w-full md:w-auto text-[11px] py-2.5 px-6 rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
                   >
-                    ❌ Tolak (Revisi PPK)
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-rose-600"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    Tolak (Revisi PPK)
                   </button>
                   <button 
                     onClick={() => {
@@ -1434,19 +1445,23 @@ export default function ProcurementPanel() {
                     }} 
                     className="bg-indigo-600 hover:bg-indigo-700 border border-indigo-700 text-white shadow-sm w-full md:w-80 text-[11px] py-2.5 px-6 rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
                   >
-                    ✅ Terima & Lanjutkan Pencarian
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-white"><polyline points="20 6 9 17 4 12"/></svg>
+                    Terima & Lanjutkan Pencarian
                   </button>
                 </div>
               </div>
             </div>
           ) : (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center max-w-2xl mx-auto mt-4">
-              <span className="text-4xl block mb-3">📬</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto text-slate-400 mb-3"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7"/><path d="M22 13a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4"/><path d="M22 13H2"/><path d="M12 8v4"/><path d="m8 10 4-4 4 4"/></svg>
               <h3 className="text-lg font-bold text-slate-800 mb-1">Belum Ada Paket Usulan Real</h3>
               <p className="text-xs text-slate-500 leading-relaxed mb-4">Sistem mendeteksi belum ada paket aktif yang dikirimkan oleh PPK melalui dashboard Persiapan Pengadaan saat ini.</p>
               
               <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-left space-y-2 mb-6">
-                <strong>💡 Cara Simulasi Alur Penuh (End-to-End):</strong>
+                <strong>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-650 inline-block mr-1"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .5 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+                  Cara Simulasi Alur Penuh (End-to-End):
+                </strong>
                 <ol className="list-decimal pl-4 space-y-1 font-mono text-[10px] text-slate-600">
                   <li>Logout dari PP, kemudian login sebagai PPK (NIP: <span className="font-bold">198001012005011001</span>).</li>
                   <li>Upload DPA, sinkronkan SIRUP, pilih paket RUP, tentukan HPS, lakukan TTE, lalu klik **"Kirim DPP ke PP"**.</li>
@@ -1475,9 +1490,10 @@ export default function ProcurementPanel() {
                     setSubmittedPack(mockPack)
                     localStorage.setItem('pbj_submitted_package', JSON.stringify(mockPack))
                   }}
-                  className="btn-secondary text-xs px-5 py-2.5 font-bold"
+                  className="btn-secondary text-xs px-5 py-2.5 font-bold flex items-center justify-center gap-1.5 mx-auto"
                 >
-                  🛠️ Muat Paket Contoh
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                  Muat Paket Contoh
                 </button>
               </div>
             </div>
@@ -1489,7 +1505,8 @@ export default function ProcurementPanel() {
         <div className="space-y-6 animate-slide-up mb-8">
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
             <h2 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
-              <span>🤝</span> Tabel Negosiasi e-Purchasing
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-650"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Tabel Negosiasi e-Purchasing
             </h2>
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
               <p className="text-sm text-slate-500 max-w-2xl">
@@ -1503,7 +1520,12 @@ export default function ProcurementPanel() {
                   className="bg-teal-600 hover:bg-teal-700 text-white shadow-sm text-xs py-2.5 px-4 rounded-lg font-bold flex items-center gap-2 transition-all disabled:opacity-50"
                   title="Cari harga terbaik untuk semua produk tanpa mencari pembanding"
                 >
-                  {isSearching && !autoComparatorEnabled ? '⏳ Memproses...' : '🚀 Cari Semua'}
+                  {isSearching && !autoComparatorEnabled ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                  )}
+                  {isSearching && !autoComparatorEnabled ? 'Memproses...' : 'Cari Semua'}
                 </button>
                 {/* Tombol 2: Cari + Pembanding Massal */}
                 <button 
@@ -1512,14 +1534,19 @@ export default function ProcurementPanel() {
                   className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm text-xs py-2.5 px-4 rounded-lg font-bold flex items-center gap-2 transition-all disabled:opacity-50"
                   title="Cari harga terbaik DAN sekalian cari 1-2 produk pembanding dari penyedia lain (untuk BAHP). Proses lebih lama."
                 >
-                  {isSearching && autoComparatorEnabled ? '⏳ Memproses...' : '⚖️ Cari + Pembanding Massal'}
+                  {isSearching && autoComparatorEnabled ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><line x1="5" y1="7" x2="19" y2="7"/><path d="M5 7a7 7 0 0 0 14 0"/><path d="M17 22H7"/></svg>
+                  )}
+                  {isSearching && autoComparatorEnabled ? 'Memproses...' : 'Cari + Pembanding Massal'}
                 </button>
               </div>
             </div>
             
             {isSearching && (
               <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-4 flex items-center gap-3 animate-pulse">
-                <span className="text-xl">🤖</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-700"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 <span className="text-sm font-bold">{searchProgress}</span>
               </div>
             )}
@@ -1577,7 +1604,8 @@ export default function ProcurementPanel() {
                                 : 'bg-white border-indigo-300 text-indigo-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-600'
                             }`}
                           >
-                            🔍 {expandedSearchRows[item.no] ? 'Tutup Pencarian ▲' : 'Cari Produk ▼'}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <span>{expandedSearchRows[item.no] ? 'Tutup Pencarian ▲' : 'Cari Produk ▼'}</span>
                           </button>
                         </td>
                         <td className="p-4 text-center font-semibold text-slate-700">
@@ -1589,8 +1617,18 @@ export default function ProcurementPanel() {
                         </td>
                         <td className="p-4 text-right">
                           <div className="font-mono font-bold text-slate-700 text-xs">Rp {(tayang || 0).toLocaleString('id-ID')}</div>
-                          <div className={`text-[9px] font-bold mt-1 ${isFromDpp ? 'text-amber-600' : 'text-blue-600'}`}>
-                            {isFromDpp ? '📋 Dari DPP PPK' : '🔍 Dari e-Katalog'}
+                          <div className={`text-[9px] font-bold mt-1 flex items-center gap-1 justify-end ${isFromDpp ? 'text-amber-600' : 'text-blue-600'}`}>
+                            {isFromDpp ? (
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                                <span>Dari DPP PPK</span>
+                              </>
+                            ) : (
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                <span>Dari e-Katalog</span>
+                              </>
+                            )}
                           </div>
                         </td>
                         <td className="p-4">
@@ -1619,8 +1657,18 @@ export default function ProcurementPanel() {
                             Rp {totalAkhir.toLocaleString('id-ID')}
                           </div>
                           {totalAkhir > 0 && (
-                            <div className={`text-[9px] font-bold mt-1 px-1.5 py-0.5 inline-block rounded uppercase tracking-wider ${isOverbudget ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'}`}>
-                              {isOverbudget ? '⚠️ Overbudget' : '✓ Aman (Hemat)'}
+                            <div className={`text-[9px] font-bold mt-1 px-1.5 py-0.5 inline-flex items-center gap-1 rounded uppercase tracking-wider ${isOverbudget ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'}`}>
+                              {isOverbudget ? (
+                                <>
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-rose-600"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                  <span>Overbudget</span>
+                                </>
+                              ) : (
+                                <>
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-600"><polyline points="20 6 9 17 4 12"/></svg>
+                                  <span>Aman (Hemat)</span>
+                                </>
+                              )}
                             </div>
                           )}
                         </td>
@@ -1629,9 +1677,9 @@ export default function ProcurementPanel() {
                           {(() => {
                             const itemStatus = nego.itemStatus || 'Tersedia';
                             const statusConfig = {
-                              'Tersedia':       { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', emoji: '✅' },
-                              'Stok Kurang':    { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   emoji: '⚠️' },
-                              'Tidak Tersedia': { bg: 'bg-rose-50',    text: 'text-rose-700',    border: 'border-rose-200',    emoji: '❌' },
+                              'Tersedia':       { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', emoji: '' },
+                              'Stok Kurang':    { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   emoji: '' },
+                              'Tidak Tersedia': { bg: 'bg-rose-50',    text: 'text-rose-700',    border: 'border-rose-200',    emoji: '' },
                             };
                             const cfg = statusConfig[itemStatus] || statusConfig['Tersedia'];
                             return (
@@ -1641,9 +1689,9 @@ export default function ProcurementPanel() {
                                   onChange={e => handleNegotiationChange(item.no, 'itemStatus', e.target.value)}
                                   className={`text-[10px] font-bold px-2 py-1 rounded-lg border cursor-pointer ${cfg.bg} ${cfg.text} ${cfg.border} focus:outline-none`}
                                 >
-                                  <option value="Tersedia">✅ Tersedia</option>
-                                  <option value="Stok Kurang">⚠️ Stok Kurang</option>
-                                  <option value="Tidak Tersedia">❌ Tidak Tersedia</option>
+                                  <option value="Tersedia">✓ Tersedia</option>
+                                  <option value="Stok Kurang">! Stok Kurang</option>
+                                  <option value="Tidak Tersedia">✕ Tidak Tersedia</option>
                                 </select>
                                 {(itemStatus === 'Stok Kurang' || itemStatus === 'Tidak Tersedia') && (
                                   <input
@@ -1688,11 +1736,26 @@ export default function ProcurementPanel() {
                                     alert('Error menghubungi AI Asisten: ' + e.message);
                                 }
                                 handleNegotiationChange(item.no, 'isAiLoading', false);
-                            }}
+                             }}
                             disabled={nego.isAiLoading}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1 mx-auto ${nego.hasScreenshot ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100' : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'}`}
                           >
-                            {nego.isAiLoading ? '⏳ Mencari...' : (nego.hasScreenshot ? '✓ AI Selesai' : '🤖 Cari Pembanding & Bukti (AI)')}
+                            {nego.isAiLoading ? (
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                <span>Mencari...</span>
+                              </>
+                            ) : nego.hasScreenshot ? (
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-700"><polyline points="20 6 9 17 4 12"/></svg>
+                                <span>AI Selesai</span>
+                              </>
+                            ) : (
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 22 22 22 12 2"/></svg>
+                                <span>Cari Pembanding & Bukti (AI)</span>
+                              </>
+                            )}
                           </button>
                         </td>
                       </tr>
@@ -1701,7 +1764,10 @@ export default function ProcurementPanel() {
                         <tr className="bg-purple-50/40 border-b border-purple-100">
                           <td colSpan="10" className="px-4 py-3">
                             <div className="flex items-center gap-2 mb-2">
-                              <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">⚖️ Pembanding e-Katalog (Auto)</span>
+                              <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><line x1="5" y1="7" x2="19" y2="7"/><path d="M5 7a7 7 0 0 0 14 0"/><path d="M17 22H7"/></svg>
+                                Pembanding e-Katalog (Auto)
+                              </span>
                               <span className="text-[10px] text-slate-500">Ditemukan otomatis untuk BAHP — penyedia berbeda, harga lebih tinggi</span>
                             </div>
                             <div className="flex flex-wrap gap-3">
@@ -1714,7 +1780,10 @@ export default function ProcurementPanel() {
                                     <div className="text-[11px] font-mono font-black text-rose-600">Rp {(comp.price || 0).toLocaleString('id-ID')}</div>
                                   </div>
                                   {comp.link && (
-                                    <a href={comp.link} target="_blank" rel="noopener noreferrer" className="shrink-0 text-purple-500 hover:text-purple-700 text-[10px] font-bold border border-purple-200 rounded px-1.5 py-0.5 hover:bg-purple-50 transition-all">🔗 Buka</a>
+                                    <a href={comp.link} target="_blank" rel="noopener noreferrer" className="shrink-0 text-purple-500 hover:text-purple-700 text-[10px] font-bold border border-purple-200 rounded px-1.5 py-0.5 hover:bg-purple-50 transition-all flex items-center gap-1">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                      Buka
+                                    </a>
                                   )}
                                 </div>
                               ))}
@@ -1728,7 +1797,8 @@ export default function ProcurementPanel() {
                             <div className="bg-white border border-indigo-100 rounded-xl p-5 shadow-sm">
                               <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2 text-indigo-700 font-bold text-sm">
-                                  <span>🔍</span> Pengaturan Pencarian — {item.name}
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-700 shrink-0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                  <span>Pengaturan Pencarian — {item.name}</span>
                                 </div>
                                 <button onClick={() => handleToggleSearchRow(item.no, item)} className="text-slate-400 hover:text-slate-600 text-xs">✕ Tutup</button>
                               </div>
@@ -1771,7 +1841,7 @@ export default function ProcurementPanel() {
                                   />
                                 </div>
                                 <div className="md:col-span-2">
-                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">🔗 Link e-Katalog / Referensi</label>
+                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Link e-Katalog / Referensi</label>
                                   <div className="flex items-center gap-2">
                                     <input 
                                       type="text" 
@@ -1787,7 +1857,8 @@ export default function ProcurementPanel() {
                                         rel="noopener noreferrer"
                                         className="shrink-0 bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-100 text-[10px] font-bold px-3 py-2 rounded flex items-center gap-1 transition-all"
                                       >
-                                        🔗 Buka
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                        Buka
                                       </a>
                                     )}
                                   </div>
@@ -1796,7 +1867,10 @@ export default function ProcurementPanel() {
 
                               {/* ── Nego & Ongkir Inputs ─────────────────── */}
                               <div className="mt-4 pt-4 border-t border-slate-100">
-                                <div className="text-[10px] font-bold text-slate-500 uppercase mb-3">💰 Harga Negosiasi</div>
+                                <div className="text-[10px] font-bold text-slate-500 uppercase mb-3 flex items-center gap-1">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                  <span>Harga Negosiasi</span>
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                   <div>
                                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nego Satuan (Rp)</label>
@@ -1828,7 +1902,12 @@ export default function ProcurementPanel() {
                                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Total Akhir</label>
                                     <div className={`text-sm font-black p-2 rounded text-right font-mono ${isOverbudget ? 'bg-rose-50 text-rose-600' : totalAkhir > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-400'}`}>
                                       Rp {totalAkhir.toLocaleString('id-ID')}
-                                      {isOverbudget && <span className="block text-[9px] font-bold mt-0.5">⚠️ Overbudget!</span>}
+                                      {isOverbudget && (
+                                        <span className="block text-[9px] font-bold mt-0.5 flex items-center gap-1 justify-end">
+                                          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-rose-600"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                          <span>Overbudget!</span>
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -1837,7 +1916,7 @@ export default function ProcurementPanel() {
                               <div className="mt-4">
                                 {isSearching && (
                                   <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-3 flex items-center gap-3">
-                                    <div className="animate-spin text-xl">⚙️</div>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin text-indigo-700"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                                     <div>
                                       <div className="text-xs font-bold text-indigo-700">{searchProgress || 'Puppeteer AI sedang menelusuri e-Katalog LKPP...'}</div>
                                       <div className="text-[10px] text-indigo-500 mt-0.5">Proses ini memerlukan waktu 20-60 detik. Mohon jangan tutup halaman.</div>
@@ -1851,7 +1930,12 @@ export default function ProcurementPanel() {
                                     className="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-wait"
                                     title="Cari harga terbaik untuk produk ini saja"
                                   >
-                                    {isSearching && !autoComparatorEnabled ? '⏳ Mencari...' : '🚀 Mulai Cari di e-Katalog'}
+                                    {isSearching && !autoComparatorEnabled ? (
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                    ) : (
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                                    )}
+                                    <span>{isSearching && !autoComparatorEnabled ? 'Mencari...' : 'Mulai Cari di e-Katalog'}</span>
                                   </button>
                                   <button 
                                     onClick={() => { setAutoComparatorEnabled(true); handleSearchSingleItem(item); }}
@@ -1859,7 +1943,12 @@ export default function ProcurementPanel() {
                                     className="bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-wait"
                                     title="Cari harga terbaik + sekalian cari 1-2 produk pembanding dari penyedia lain untuk BAHP"
                                   >
-                                    {isSearching && autoComparatorEnabled ? '⏳ Mencari...' : '⚖️ Cari + Pembanding'}
+                                    {isSearching && autoComparatorEnabled ? (
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                    ) : (
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><line x1="5" y1="7" x2="19" y2="7"/><path d="M5 7a7 7 0 0 0 14 0"/><path d="M17 22H7"/></svg>
+                                    )}
+                                    <span>{isSearching && autoComparatorEnabled ? 'Mencari...' : 'Cari + Pembanding'}</span>
                                   </button>
                                 </div>
                               </div>
@@ -1885,7 +1974,7 @@ export default function ProcurementPanel() {
               return (
                 <div className="mt-4 bg-amber-50 border-2 border-amber-300 rounded-2xl p-5">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xl">⚠️</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 shrink-0"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                     <h3 className="font-bold text-amber-800 text-sm">Ada {problemItems.length} Produk Bermasalah — Diperlukan Catatan Penyimpangan DPP</h3>
                   </div>
                   <ul className="text-xs text-amber-700 mb-3 space-y-1 list-disc list-inside">
@@ -1907,11 +1996,24 @@ export default function ProcurementPanel() {
                       disabled={isRefiningException}
                       className="self-end bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 disabled:opacity-50"
                     >
-                      {isRefiningException ? '⏳ Memproses...' : '🤖 Konsultasi & Perbaiki dengan AI'}
+                      {isRefiningException ? (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                          <span>Memproses...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 22 22 22 12 2"/></svg>
+                          <span>Konsultasi & Perbaiki dengan AI</span>
+                        </>
+                      )}
                     </button>
                     {exceptionAdvice && (
-                      <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-[10px] text-indigo-800 font-sans">
-                        <strong>💡 Nasihat Hukum AI:</strong><br/>{exceptionAdvice}
+                      <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-[10px] text-indigo-800 font-sans flex items-start gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-650 shrink-0 mt-0.5"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .5 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+                        <div>
+                          <strong>Nasihat Hukum AI:</strong><br/>{exceptionAdvice}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1929,14 +2031,16 @@ export default function ProcurementPanel() {
                 onClick={() => setShowFinalizeModal(true)}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-8 py-3 rounded-xl flex items-center gap-2 shadow-md transition-all text-sm"
               >
-                📋 Finalisasi Semua & Buat BAHP Draft
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                Finalisasi Semua & Buat BAHP Draft
               </button>
             </div>
 
             {/* --- MOVED VALIDATION FORMS --- */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mt-6">
               <h2 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
-                <span>📋</span> Validasi & Pengaturan Negosiasi
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-800"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                Validasi & Pengaturan Negosiasi
               </h2>
               <p className="text-sm text-slate-500 mb-6">
                 Silakan lengkapi form validasi spesifikasi, kesepakatan pengiriman, dan penilaian vendor di bawah ini sebelum menerbitkan BAHP.
@@ -2070,10 +2174,13 @@ export default function ProcurementPanel() {
 
                   {/* Upload Capture Chat */}
                   <div className="border-t border-slate-200 pt-3">
-                    <div className="text-[10px] font-bold text-slate-700 mb-2">📱 Bukti Komunikasi / Chat Negosiasi (Opsional)</div>
+                    <div className="text-[10px] font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-500"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+                      Bukti Komunikasi / Chat Negosiasi (Opsional)
+                    </div>
                     <p className="text-[10px] text-slate-500 mb-2">Unggah tangkapan layar percakapan WhatsApp/Email/SMS dengan penyedia terkait negosiasi harga, spesifikasi, atau konfirmasi stok.</p>
                     <label className="flex items-center gap-2 cursor-pointer bg-white border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-xl p-3 transition-all group print:hidden">
-                      <span className="text-2xl">📤</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 group-hover:text-indigo-500 transition-colors"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                       <div>
                         <span className="text-[11px] font-semibold text-slate-700 group-hover:text-indigo-700">Klik untuk unggah gambar bukti chat</span>
                         <span className="text-[9px] text-slate-400 block">Format: JPG, PNG, WEBP (bisa pilih beberapa sekaligus)</span>
@@ -2121,7 +2228,11 @@ export default function ProcurementPanel() {
                         disabled={isRefiningChatNotes}
                         className="mt-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 disabled:opacity-50"
                       >
-                        {isRefiningChatNotes ? '⏳ Menyempurnakan...' : '🤖 Sempurnakan dengan AI'}
+                        {isRefiningChatNotes ? (
+                          <><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg><span>Menyempurnakan...</span></>
+                        ) : (
+                          <><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 22 22 22 12 2"/></svg><span>Sempurnakan dengan AI</span></>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -2191,9 +2302,13 @@ export default function ProcurementPanel() {
                     <button 
                       onClick={() => handleRefineGenericText(vendorRatingNote, 'Evaluasi Kinerja Penyedia', setVendorRatingNote, setIsRefiningVendorNote)} 
                       disabled={isRefiningVendorNote}
-                      className="mt-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 disabled:opacity-50"
+                      className="mt-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-50"
                     >
-                      {isRefiningVendorNote ? '⏳ Menyempurnakan...' : '🤖 Sempurnakan dengan AI'}
+                      {isRefiningVendorNote ? (
+                        <><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg><span>Menyempurnakan...</span></>
+                      ) : (
+                        <><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 22 22 22 12 2"/></svg><span>Sempurnakan dengan AI</span></>
+                      )}
                     </button>
                   </div>
 
@@ -2269,7 +2384,8 @@ export default function ProcurementPanel() {
                 }}
                 className="btn-primary text-sm font-bold py-3.5 px-8 shadow-md hover:shadow-lg transition-all flex items-center gap-2 rounded-xl"
               >
-                📜 Simpan & Terbitkan Berita Acara Pemilihan (BAHP)
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                Simpan & Terbitkan Berita Acara Pemilihan (BAHP)
               </button>
             </div>
           </div>
@@ -2400,7 +2516,8 @@ export default function ProcurementPanel() {
               </div>
               {submittedPack?.dppTemplateId && (
                 <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[9px] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  🔒 Terkunci Otomatis (Sesuai DPP PPK)
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Terkunci (Sesuai DPP PPK)
                 </span>
               )}
             </div>
@@ -2473,7 +2590,7 @@ export default function ProcurementPanel() {
       {activeTab === 'inaproc_docs' && (
         <div className="glass-panel p-8 animate-slide-up bg-white border border-slate-200 rounded-2xl shadow-sm max-w-4xl mx-auto">
           <div className="text-center mb-8 border-b border-slate-100 pb-6">
-            <span className="text-4xl block mb-3">📥</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto text-indigo-400 mb-3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">Laci Arsip Final Inaproc</h2>
             <p className="text-sm text-slate-500 mt-2">
               Silakan unggah dokumen <b>Surat Pesanan (SP), Invoice, Bukti Transfer, BAST, dan Potongan PNBP</b> asli yang diterbitkan oleh sistem e-Katalog LKPP (Inaproc) untuk menyelesaikan pengadaan ini.
@@ -2482,11 +2599,11 @@ export default function ProcurementPanel() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             {[
-              { id: 'sp', title: '📜 Surat Pesanan (SP)', desc: 'Kontrak SP yang disetujui penyedia' },
-              { id: 'invoice', title: '🧾 Invoice / Tagihan', desc: 'Faktur tagihan pembayaran' },
-              { id: 'transfer', title: '💸 Bukti Transfer', desc: 'Bukti transfer pencairan dana riil' },
-              { id: 'pnbp', title: '✂️ Tarif Potongan PNBP', desc: 'Bukti pembayaran PNBP e-Katalog' },
-              { id: 'bast', title: '🤝 BAST (Berita Acara Serah Terima)', desc: 'Dokumen serah terima Inaproc' },
+              { id: 'sp', title: 'Surat Pesanan (SP)', desc: 'Kontrak SP yang disetujui penyedia', icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-500"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> },
+              { id: 'invoice', title: 'Invoice / Tagihan', desc: 'Faktur tagihan pembayaran', icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500"><path d="M9 7H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-3"/><path d="M9 7V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-1"/><line x1="12" y1="12" x2="12.01" y2="12"/></svg> },
+              { id: 'transfer', title: 'Bukti Transfer', desc: 'Bukti transfer pencairan dana riil', icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-teal-500"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
+              { id: 'pnbp', title: 'Tarif Potongan PNBP', desc: 'Bukti pembayaran PNBP e-Katalog', icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/></svg> },
+              { id: 'bast', title: 'BAST (Berita Acara Serah Terima)', desc: 'Dokumen serah terima Inaproc', icon: <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-500"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
             ].map(item => (
               <div key={item.id} className="border border-slate-200 rounded-xl p-5 hover:border-indigo-300 transition-all bg-slate-50 relative group">
                 {inaprocDocs[item.id] && (
@@ -2494,7 +2611,7 @@ export default function ProcurementPanel() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                   </div>
                 )}
-                <h4 className="font-bold text-slate-800 text-sm">{item.title}</h4>
+                <div className="flex items-center gap-2 mb-2"><span className="shrink-0">{item.icon}</span><h4 className="font-bold text-slate-800 text-sm">{item.title}</h4></div>
                 <p className="text-[10px] text-slate-500 mt-0.5 mb-3">{item.desc}</p>
                 <div className="relative">
                   <input 
@@ -2551,7 +2668,8 @@ export default function ProcurementPanel() {
               }}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-3.5 rounded-xl shadow-xl shadow-indigo-600/20 transition-all text-sm w-full md:w-auto"
             >
-              🔒 Segel & Kembalikan Arsip Lengkap ke PPK
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Segel & Kembalikan Arsip Lengkap ke PPK
             </button>
           </div>
         </div>
@@ -2568,14 +2686,14 @@ export default function ProcurementPanel() {
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <span>📋</span> Finalisasi & Buat BAHP Draft
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-700"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Finalisasi & Buat BAHP Draft
             </h2>
             <button onClick={() => setShowFinalizeModal(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">📍 Lokasi Pengiriman <span className="text-rose-500">*</span></label>
+              <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5 flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-rose-500"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Lokasi Pengiriman <span className="text-rose-500">*</span></label>
               <input
                 type="text"
                 value={deliveryLocation}
@@ -2586,25 +2704,25 @@ export default function ProcurementPanel() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">📦 Jenis Pengadaan</label>
+              <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5 flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><polygon points="12 22.08 12 12 3 6.92 3 17.08 12 22.08"/><polygon points="12 12 21 6.92 21 17.08 12 22.08"/><polygon points="12 2 21 6.92 12 12 3 6.92 12 2"/></svg>Jenis Pengadaan</label>
               <select
                 value={packageType}
                 onChange={e => setPackageType(e.target.value)}
                 className="w-full text-sm p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white"
               >
-                <option value="ATK">📎 ATK / Alat Tulis Kantor</option>
-                <option value="Mamin">🍱 Makanan & Minuman</option>
-                <option value="Jasa">🔧 Jasa Lainnya</option>
-                <option value="Modal">💻 Belanja Modal</option>
+                <option value="ATK">ATK / Alat Tulis Kantor</option>
+                <option value="Mamin">Makanan & Minuman</option>
+                <option value="Jasa">Jasa Lainnya</option>
+                <option value="Modal">Belanja Modal</option>
               </select>
             </div>
 
             <div className="bg-slate-50 rounded-xl p-4 text-xs text-slate-600 space-y-1">
-              <div className="font-bold text-slate-700 mb-2">📊 Ringkasan Item:</div>
+              <div className="font-bold text-slate-700 mb-2 flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Ringkasan Item:</div>
               {getPackageItems(submittedPack).filter(i => checkedItems[i.no]).map(item => {
                 const nego = negotiatedItems[item.no] || {};
                 const status = nego.itemStatus || 'Tersedia';
-                const statusIcon = status === 'Tersedia' ? '✅' : status === 'Stok Kurang' ? '⚠️' : '❌';
+                const statusIcon = status === 'Tersedia' ? '✓' : status === 'Stok Kurang' ? '!' : '✕';
                 return (
                   <div key={item.no} className="flex items-center justify-between">
                     <span>{statusIcon} {item.name}</span>
@@ -2628,7 +2746,7 @@ export default function ProcurementPanel() {
                 disabled={isSubmittingBahp}
                 className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isSubmittingBahp ? '⏳ Menyimpan...' : '✅ Buat BAHP Draft'}
+                {isSubmittingBahp ? 'Menyimpan...' : 'Buat BAHP Draft'}
               </button>
             </div>
           </div>

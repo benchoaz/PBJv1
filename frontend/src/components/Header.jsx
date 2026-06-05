@@ -22,10 +22,12 @@ const Icons = {
       <path d="M13.378 15.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
     </svg>
   ),
-  Briefcase: () => (
+  Repeat: () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect width="20" height="14" x="2" y="7" rx="2" ry="2"/>
-      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+      <path d="m17 2 4 4-4 4"/>
+      <path d="M3 11v-1a4 4 0 0 1 4-4h14"/>
+      <path d="m7 22-4-4 4-4"/>
+      <path d="M21 13v1a4 4 0 0 1-4 4H3"/>
     </svg>
   ),
   ScanText: () => (
@@ -93,7 +95,7 @@ export default function Header() {
     { path: '/', label: 'Daftar Paket', Icon: Icons.FolderOpen, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/tickets', label: 'Tickets', Icon: Icons.Ticket, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/ppk/persiapan', label: 'PPK Persiapan', Icon: Icons.ClipboardEdit, roles: ['Admin', 'PPK'] },
-    { path: '/pp/panel', label: 'PP Panel', Icon: Icons.Briefcase, roles: ['Admin', 'PP'] },
+    { path: '/pp/panel', label: 'Tabel Negosiasi', Icon: Icons.Repeat, roles: ['Admin', 'PP'] },
     { path: '/admin/ocr', label: 'API AI OCR', Icon: Icons.ScanText, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/admin/templates', label: 'Template Surat', Icon: Icons.FileText, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/users', label: 'Users', Icon: Icons.Users, roles: ['Admin'] },

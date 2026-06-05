@@ -1,4 +1,26 @@
 
+// Global Fetch Interceptor to inject security headers
+const originalFetch = window.fetch;
+window.fetch = async function (url, options = {}) {
+  try {
+    const userStr = localStorage.getItem('pbj_user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      if (user && user.role) {
+        options.headers = {
+          ...options.headers,
+          'X-User-Role': user.role,
+          'X-User-Satker': user.idSatker || '',
+          'X-User-Nip': user.nip || '',
+        };
+      }
+    }
+  } catch (e) {
+    console.error('Error injecting security headers:', e);
+  }
+  return originalFetch(url, options);
+};
+
 import React from 'react'
 
 class GlobalErrorBoundary extends React.Component {

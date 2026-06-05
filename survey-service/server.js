@@ -461,12 +461,15 @@ async function searchItem(page, item, index) {
 
             const vendorSlug = segments[0];
             const vendor = vendorSlug.replace(/-/g, ' ').toUpperCase();
+            const locationLine = lines.find(line => line.includes('Kab.') || line.includes('Kota') || line.includes('Prov.'));
+            const location = locationLine ? locationLine.trim() : '';
 
             list.push({
               title,
               price,
               vendor,
-              productHref: href
+              productHref: href,
+              location: location
             });
           }
           return list;
@@ -798,6 +801,7 @@ async function searchItem(page, item, index) {
       vendor: finalVendor.toUpperCase(),
       price: finalPrice || item.fallbackPrice,
       link: detailUrl,
+      location: bestCandidate ? bestCandidate.location : '',
       img: isDetailShot 
         ? `/screenshots/${safeId}_detail.png` 
         : `/screenshots/${safeId}_search.png`,

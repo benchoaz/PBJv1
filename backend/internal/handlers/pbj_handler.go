@@ -17,6 +17,25 @@ func NewPBJHandler(db *gorm.DB) *PBJHandler {
 	return &PBJHandler{DB: db}
 }
 
+func (h *PBJHandler) hasAccessToSatker(userRole, userSatker, targetSatker string) bool {
+	if userRole == "" {
+		return false
+	}
+	if strings.ToLower(userRole) == "admin" {
+		return true
+	}
+	if userSatker == "" {
+		return false
+	}
+	satkers := strings.Split(userSatker, ",")
+	for _, s := range satkers {
+		if strings.TrimSpace(s) == strings.TrimSpace(targetSatker) {
+			return true
+		}
+	}
+	return false
+}
+
 // Enable CORS
 func (h *PBJHandler) Options(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -43,6 +62,15 @@ func (h *PBJHandler) CreateOrUpdatePackage(w http.ResponseWriter, r *http.Reques
 	if err := json.NewDecoder(r.Body).Decode(&pkg); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	userRole := r.Header.Get("X-User-Role")
+	userSatker := r.Header.Get("X-User-Satker")
+	if userRole != "" && strings.ToLower(userRole) != "admin" {
+		if !h.hasAccessToSatker(userRole, userSatker, pkg.SatkerID) {
+			http.Error(w, "Forbidden: Anda tidak memiliki akses ke satker ini", http.StatusForbidden)
+			return
+		}
 	}
 
 	// Cek apakah paket dengan sirup_id sudah ada
@@ -99,6 +127,21 @@ func (h *PBJHandler) UpdateSurvey(w http.ResponseWriter, r *http.Request) {
 	pathParts := strings.Split(r.URL.Path, "/")
 	packageID := pathParts[4]
 
+	// Enforce Satker Check
+	var pkg models.Package
+	if err := h.DB.First(&pkg, packageID).Error; err != nil {
+		http.Error(w, "Package not found", http.StatusNotFound)
+		return
+	}
+	userRole := r.Header.Get("X-User-Role")
+	userSatker := r.Header.Get("X-User-Satker")
+	if userRole != "" && strings.ToLower(userRole) != "admin" {
+		if !h.hasAccessToSatker(userRole, userSatker, pkg.SatkerID) {
+			http.Error(w, "Forbidden: Anda tidak memiliki akses ke paket satker lain", http.StatusForbidden)
+			return
+		}
+	}
+
 	// Request payload is an array of surveys
 	var payload struct {
 		Items []struct {
@@ -136,7 +179,6 @@ func (h *PBJHandler) UpdateSurvey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return updated package
-	var pkg models.Package
 	h.DB.Preload("Items").Preload("Items.Surveys").First(&pkg, packageID)
 	json.NewEncoder(w).Encode(pkg)
 }
@@ -157,6 +199,15 @@ func (h *PBJHandler) GetPackage(w http.ResponseWriter, r *http.Request) {
 	if result.Error != nil {
 		http.Error(w, "Package not found", http.StatusNotFound)
 		return
+	}
+
+	userRole := r.Header.Get("X-User-Role")
+	userSatker := r.Header.Get("X-User-Satker")
+	if userRole != "" && strings.ToLower(userRole) != "admin" {
+		if !h.hasAccessToSatker(userRole, userSatker, pkg.SatkerID) {
+			http.Error(w, "Forbidden: Anda tidak memiliki akses ke paket satker lain", http.StatusForbidden)
+			return
+		}
 	}
 
 	json.NewEncoder(w).Encode(pkg)

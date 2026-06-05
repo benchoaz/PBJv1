@@ -106,6 +106,7 @@ export function AuthProvider({ children }) {
       role: finalRole,
       nip: matchedUser.nip,
       departments: userDepartments,
+      idSatkers: userIdSatkers,
       department: activeDept,
       activeDepartment: activeDept,
       idSatker: activeIdSatker,
@@ -117,6 +118,7 @@ export function AuthProvider({ children }) {
       role: finalRole,
       nip: nip,
       departments: customDepartment ? [customDepartment] : ['Kecamatan Besuk'],
+      idSatkers: [''],
       department: customDepartment || 'Kecamatan Besuk',
       activeDepartment: customDepartment || 'Kecamatan Besuk',
       idSatker: '',
@@ -131,10 +133,13 @@ export function AuthProvider({ children }) {
   // Switch active department without re-login
   const switchDepartment = (newDept) => {
     if (!user) return
+    const idx = user.departments ? user.departments.findIndex(d => d.toLowerCase() === newDept.toLowerCase()) : -1
+    const newIdSatker = (idx >= 0 && user.idSatkers && user.idSatkers[idx]) ? user.idSatkers[idx] : user.idSatker
     const updated = {
       ...user,
       department: newDept,
-      activeDepartment: newDept
+      activeDepartment: newDept,
+      idSatker: newIdSatker
     }
     setUser(updated)
     localStorage.setItem('pbj_user', JSON.stringify(updated))

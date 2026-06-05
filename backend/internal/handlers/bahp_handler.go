@@ -21,6 +21,25 @@ func NewBahpHandler(bahpRepo *repository.BahpRepository, projectRepo *repository
 	}
 }
 
+func (h *BahpHandler) hasAccessToSatker(userRole, userSatker, targetSatker string) bool {
+	if userRole == "" {
+		return false
+	}
+	if strings.ToLower(userRole) == "admin" {
+		return true
+	}
+	if userSatker == "" {
+		return false
+	}
+	satkers := strings.Split(userSatker, ",")
+	for _, s := range satkers {
+		if strings.TrimSpace(s) == strings.TrimSpace(targetSatker) {
+			return true
+		}
+	}
+	return false
+}
+
 // Create handles POST /api/projects/{id}/bahp
 func (h *BahpHandler) Create(w http.ResponseWriter, r *http.Request) {
 	pathParts := strings.Split(r.URL.Path, "/")
@@ -34,6 +53,21 @@ func (h *BahpHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid project ID")
 		return
+	}
+
+	project, err := h.projectRepo.GetByID(projectID)
+	if err != nil || project == nil {
+		writeError(w, http.StatusNotFound, "Project not found")
+		return
+	}
+
+	userRole := r.Header.Get("X-User-Role")
+	userSatker := r.Header.Get("X-User-Satker")
+	if userRole != "" && strings.ToLower(userRole) != "admin" {
+		if !h.hasAccessToSatker(userRole, userSatker, project.IdSatker) {
+			writeError(w, http.StatusForbidden, "Forbidden: Anda tidak memiliki akses ke proyek satker lain")
+			return
+		}
 	}
 
 	var req models.BahpCreate
@@ -120,6 +154,21 @@ func (h *BahpHandler) GetByProject(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid project ID")
 		return
+	}
+
+	project, err := h.projectRepo.GetByID(projectID)
+	if err != nil || project == nil {
+		writeError(w, http.StatusNotFound, "Project not found")
+		return
+	}
+
+	userRole := r.Header.Get("X-User-Role")
+	userSatker := r.Header.Get("X-User-Satker")
+	if userRole != "" && strings.ToLower(userRole) != "admin" {
+		if !h.hasAccessToSatker(userRole, userSatker, project.IdSatker) {
+			writeError(w, http.StatusForbidden, "Forbidden: Anda tidak memiliki akses ke proyek satker lain")
+			return
+		}
 	}
 
 	bahp, err := h.bahpRepo.GetByProjectID(projectID)
