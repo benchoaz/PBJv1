@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import BahpDocument from './pp/BahpDocument'
-import { BAHP_TEMPLATE_TYPES } from './pp/BahpTemplates'
+import { BAHP_TEMPLATE_TYPES, VALIDASI_CONFIG } from './pp/BahpTemplates'
 
 export default function ProcurementPanel() {
   const { user } = useAuth()
@@ -180,6 +180,33 @@ export default function ProcurementPanel() {
       { key: 'retensi', label: 'Ketentuan retensi/jaminan pemeliharaan sebesar 5% nilai kontrak telah disepakati' },
       { key: 'sbu_aktif', label: 'Sertifikat Badan Usaha (SBU) bidang konstruksi aktif dan sesuai subklasifikasi' },
       { key: 'gambar_teknis', label: 'Telah menyepakati keharusan penyusunan shop drawing dan as-built drawing' },
+    ],
+    // ── BARU: Jasa Konsultansi Non-Konstruksi ─────────────────────────────────
+    konsultasi_non: [
+      { key: 'ppn', label: 'Harga penawaran sudah termasuk PPN 12% (Biaya Personil + Non-Personil)' },
+      { key: 'ska_skk', label: 'Tenaga ahli yang ditugaskan memiliki SKA/SKK yang valid dan sesuai bidang' },
+      { key: 'bpjs', label: 'Konsultan menjamin BPJS Ketenagakerjaan & Kesehatan untuk seluruh tenaga ahli' },
+      { key: 'kak_sesuai', label: 'Kerangka Acuan Kerja (KAK/TOR) telah dipahami dan disepakati oleh penyedia' },
+      { key: 'deliverable', label: 'Output/deliverable (laporan, data, dokumen) telah didefinisikan dan terjadwal jelas' },
+      { key: 'sbm_tarif', label: 'Tarif Harga Satuan Orang-Bulan (HSOB) tidak melebihi Standar Biaya Masukan (SBM)' },
+    ],
+    // ── BARU: Jasa Konsultansi Konstruksi ────────────────────────────────────
+    konsultasi_konstruksi: [
+      { key: 'ppn', label: 'Harga penawaran sudah termasuk PPN 12% (Biaya Personil + Non-Personil)' },
+      { key: 'sbu_konsul', label: 'Penyedia memiliki SBU Jasa Konsultansi Konstruksi yang aktif dan sesuai subklasifikasi' },
+      { key: 'ska_utama', label: 'Team Leader memiliki SKA Ahli Madya/Utama yang valid dan relevan dengan pekerjaan' },
+      { key: 'spta', label: 'SPTA (Surat Perintah Tugas Ahli) akan diterbitkan oleh Direktur/Pimpinan penyedia sebelum penugasan' },
+      { key: 'smkk_konsul', label: 'Konsultan pengawas memahami kewajiban penerapan SMKK sesuai PerMen PUPR No. 8/2023' },
+      { key: 'sbm_tarif', label: 'Tarif Harga Satuan Orang-Bulan (HSOB) tidak melebihi Standar Biaya Masukan (SBM) yang berlaku' },
+    ],
+    // ── BARU: Pengadaan Terkonsolidasi ────────────────────────────────────────
+    konsolidasi: [
+      { key: 'ppn', label: 'Harga penawaran sudah termasuk PPN 12% untuk seluruh satker peserta konsolidasi' },
+      { key: 'sk_konsolidasi', label: 'SK Penetapan Konsolidasi dari pejabat berwenang (UKPBJ/PA/KPA) telah diterbitkan' },
+      { key: 'pagu_satker', label: 'Pagu anggaran masing-masing satker peserta konsolidasi telah dikonfirmasi mencukupi' },
+      { key: 'stok_total', label: 'Penyedia mengkonfirmasi ketersediaan stok untuk total volume seluruh satker' },
+      { key: 'lokasi_kirim', label: 'Daftar lokasi pengiriman dan volume per satker telah dikonfirmasi kepada penyedia' },
+      { key: 'jadwal_bertahap', label: 'Jadwal pengiriman bertahap per satker telah disepakati dan terdokumentasi' },
     ],
   };
   const [searchProgress, setSearchProgress] = useState('');
@@ -927,41 +954,57 @@ export default function ProcurementPanel() {
       setSelectedProductType(derivedType)
       setSearchQuery(query)
 
-      // Auto-adapt BAHP template based on DPP template selected by PPK
-      if (submittedPack.dppTemplateId) {
-        let tplMap = 'atk';
-        const dppTpl = submittedPack.dppTemplateId;
-        if (dppTpl === 'TPL-006B') {
-          tplMap = 'mamin';
-        } else if (dppTpl === 'TPL-006C') {
-          tplMap = 'modal';
-        } else if (dppTpl === 'TPL-006D') {
-          tplMap = 'jasa';
-        } else if (dppTpl === 'TPL-006F') {
-          tplMap = 'pemeliharaan';
-        } else if (dppTpl === 'TPL-006G' || dppTpl === 'TPL-006E') {
-          tplMap = 'konstruksi';
+      // Auto-adapt BAHP template — Prioritas: DPP Template ID → MAK → Jenis Pengadaan → Nama Paket
+      const autoDetectTemplate = (pack) => {
+        const dppTpl   = pack.dppTemplateId || '';
+        const mak      = (pack.mak || '').replace(/\./g, '');
+        const jenis    = (pack.jenisPengadaan || '').toLowerCase();
+        const nama     = (pack.packName || '').toLowerCase();
+
+        // 1. Dari DPP Template ID (paling akurat — ditetapkan PPK)
+        if (dppTpl === 'TPL-006B')  return 'mamin';
+        if (dppTpl === 'TPL-006C')  return 'modal';
+        if (dppTpl === 'TPL-006D')  return 'jasa';
+        if (dppTpl === 'TPL-006F')  return 'pemeliharaan';
+        if (dppTpl === 'TPL-006G' || dppTpl === 'TPL-006E') return 'konstruksi';
+        if (dppTpl === 'TPL-006H')  return 'konsultasi_non';
+        if (dppTpl === 'TPL-006I')  return 'konsultasi_konstruksi';
+        if (dppTpl === 'TPL-006K')  return 'konsolidasi';
+
+        // 2. Dari MAK (Kode Akun Belanja) — sesuai BAS Permendagri 90/2019
+        // 5.1.x = Belanja Modal, 5.2.1 = ATK/Barang Persediaan, 5.2.2 = Mamin
+        // 5.2.3 = Jasa, 5.2.4 = Pemeliharaan, 5.2.5 = Perjalanan Dinas
+        if (mak.startsWith('51'))   return 'modal';         // 5.1.x Belanja Modal
+        if (mak.startsWith('522'))  return 'mamin';         // 5.2.2 Belanja Mamin
+        if (mak.startsWith('521'))  return 'atk';           // 5.2.1 Belanja ATK/Persediaan
+        if (mak.startsWith('5231')) return 'jasa';          // 5.2.3.1 Jasa Lainnya
+        if (mak.startsWith('5232')) return 'konsultasi_non'; // 5.2.3.2 Jasa Konsultansi
+        if (mak.startsWith('524'))  return 'pemeliharaan';  // 5.2.4 Pemeliharaan
+        if (mak.startsWith('526'))  return 'konstruksi';    // 5.2.6 Konstruksi
+
+        // 3. Dari field jenisPengadaan SIRUP
+        if (jenis.includes('konsultansi konstruksi'))  return 'konsultasi_konstruksi';
+        if (jenis.includes('konsultansi'))             return 'konsultasi_non';
+        if (jenis.includes('konstruksi'))              return 'konstruksi';
+        if (jenis.includes('jasa lainnya'))            return 'jasa';
+
+        // 4. Fallback dari kata kunci nama paket
+        if (nama.includes('mamin') || nama.includes('makanan') || nama.includes('katering') || nama.includes('konsumsi')) return 'mamin';
+        if (nama.includes('komputer') || nama.includes('laptop') || nama.includes('printer') || nama.includes('modal') || nama.includes('mesin') || nama.includes('kendaraan')) return 'modal';
+        if (nama.includes('konstruksi') || nama.includes('bangunan') || nama.includes('rehab') || nama.includes('gedung') || nama.includes('jalan')) return 'konstruksi';
+        if (nama.includes('pemeliharaan') || nama.includes('perawatan') || nama.includes('service ac') || nama.includes('servis')) return 'pemeliharaan';
+        if (nama.includes('konsultansi') || nama.includes('konsultan') || nama.includes('perencanaan') || nama.includes('pengawasan') || nama.includes('kajian') || nama.includes('studi') || nama.includes('audit')) {
+          return (nama.includes('konstruksi') || nama.includes('bangunan') || nama.includes('gedung')) ? 'konsultasi_konstruksi' : 'konsultasi_non';
         }
-        setBahpTemplateId(tplMap);
-        localStorage.setItem('pbj_bahp_template', tplMap);
-      } else {
-        // Fallback detection using package name
-        const nameLower = (submittedPack.packName || '').toLowerCase();
-        let tplMap = 'atk';
-        if (nameLower.includes('mamin') || nameLower.includes('makanan') || nameLower.includes('minum') || nameLower.includes('katering')) {
-          tplMap = 'mamin';
-        } else if (nameLower.includes('komputer') || nameLower.includes('laptop') || nameLower.includes('printer') || nameLower.includes('modal') || nameLower.includes('alat')) {
-          tplMap = 'modal';
-        } else if (nameLower.includes('konstruksi') || nameLower.includes('bangunan') || nameLower.includes('rehab') || nameLower.includes('gedung') || nameLower.includes('semen')) {
-          tplMap = 'konstruksi';
-        } else if (nameLower.includes('pemeliharaan') || nameLower.includes('service') || nameLower.includes('rawat')) {
-          tplMap = 'pemeliharaan';
-        } else if (nameLower.includes('jasa') || nameLower.includes('tenaga') || nameLower.includes('bersih')) {
-          tplMap = 'jasa';
-        }
-        setBahpTemplateId(tplMap);
-        localStorage.setItem('pbj_bahp_template', tplMap);
-      }
+        if (nama.includes('konsolidasi') || nama.includes('terkonsolidasi')) return 'konsolidasi';
+        if (nama.includes('jasa') || nama.includes('tenaga') || nama.includes('kebersihan') || nama.includes('keamanan')) return 'jasa';
+
+        return 'atk'; // default
+      };
+
+      const detectedTpl = autoDetectTemplate(submittedPack);
+      setBahpTemplateId(detectedTpl);
+      localStorage.setItem('pbj_bahp_template', detectedTpl);
     }
   }, [submittedPack])
 
@@ -1134,6 +1177,25 @@ export default function ProcurementPanel() {
   const [vendorRating, setVendorRating] = useState(() => parseInt(localStorage.getItem('pbj_vendor_rating') || '0'))
   const [vendorRatingNote, setVendorRatingNote] = useState(() => localStorage.getItem('pbj_vendor_rating_note') || '')
   const [vendorRatingStatus, setVendorRatingStatus] = useState(() => localStorage.getItem('pbj_vendor_rating_status') || '')
+
+  // Template-specific dynamic states
+  const [tenagaAhliList, setTenagaAhliList] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pbj_tenaga_ahli_list')) || [] } catch { return [] }
+  })
+  const [biayaPersonil, setBiayaPersonil] = useState(() => localStorage.getItem('pbj_biaya_personil') || '')
+  const [biayaNonPersonil, setBiayaNonPersonil] = useState(() => localStorage.getItem('pbj_biaya_non_personil') || '')
+
+  const [satkerPesertaList, setSatkerPesertaList] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pbj_satker_peserta_list')) || [] } catch { return [] }
+  })
+
+  const [koordinatLokasi, setKoordinatLokasi] = useState(() => localStorage.getItem('pbj_koordinat_lokasi') || '')
+  const [personilK3, setPersonilK3] = useState(() => localStorage.getItem('pbj_personil_k3') || '')
+  const [metodeKerja, setMetodeKerja] = useState(() => localStorage.getItem('pbj_metode_kerja') || '')
+
+  const [merkTipeModal, setMerkTipeModal] = useState(() => localStorage.getItem('pbj_merk_tipe_modal') || '')
+  const [nilaiTkdnModal, setNilaiTkdnModal] = useState(() => localStorage.getItem('pbj_nilai_tkdn_modal') || '')
+  const [noSeriModal, setNoSeriModal] = useState(() => localStorage.getItem('pbj_no_seri_modal') || '')
 
   const saveBAHPField = (key, value) => {
     localStorage.setItem(key, typeof value === 'object' ? JSON.stringify(value) : String(value))
@@ -2053,16 +2115,24 @@ export default function ProcurementPanel() {
 
                 {/* Checklist Spesifikasi */}
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3 font-sans print:border-slate-300">
-                  <div className="text-[10px] font-bold text-slate-700 mb-2 uppercase tracking-wide">D.1 Verifikasi Kesetaraan Spesifikasi Barang</div>
+                  <div className="text-[10px] font-bold text-slate-700 mb-1 uppercase tracking-wide">
+                    D.1 {VALIDASI_CONFIG[bahpTemplateId]?.d1Label || 'Verifikasi Kesetaraan Spesifikasi Barang'}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mb-2 leading-relaxed">
+                    {VALIDASI_CONFIG[bahpTemplateId]?.d1Desc || 'Apakah spesifikasi merek, tipe, gramatur, dan kualitas ATK sesuai DPP PPK?'}
+                  </div>
                   <div className="flex gap-6 mb-2">
-                    {['Ya, spesifikasi setara', 'Tidak, ada perbedaan spesifikasi'].map(opt => (
-                      <label key={opt} className="flex items-center gap-2 text-[11px] cursor-pointer select-none">
-                        <input type="radio" name="spec_equal" value={opt}
-                          checked={specEqual === opt}
+                    {[
+                      { val: 'Ya, spesifikasi setara', label: VALIDASI_CONFIG[bahpTemplateId]?.d1OptYes || 'Ya, spesifikasi setara' },
+                      { val: 'Tidak, ada perbedaan spesifikasi', label: VALIDASI_CONFIG[bahpTemplateId]?.d1OptNo || 'Tidak, ada perbedaan spesifikasi' }
+                    ].map(opt => (
+                      <label key={opt.val} className="flex items-center gap-2 text-[11px] cursor-pointer select-none">
+                        <input type="radio" name="spec_equal" value={opt.val}
+                          checked={specEqual === opt.val}
                           onChange={e => { setSpecEqual(e.target.value); saveBAHPField('pbj_spec_equal', e.target.value) }}
                           className="w-3.5 h-3.5 accent-indigo-600"
                         />
-                        <span className={specEqual === opt ? 'font-bold text-indigo-700' : 'text-slate-600'}>{opt}</span>
+                        <span className={specEqual === opt.val ? 'font-bold text-indigo-700' : 'text-slate-600'}>{opt.label}</span>
                       </label>
                     ))}
                   </div>
@@ -2101,6 +2171,344 @@ export default function ProcurementPanel() {
                   </div>
                 </div>
 
+                {/* ─── BARU: D.3 Input Detail Spesifik Jenis Pengadaan ─── */}
+                {['konsultasi_non', 'konsultasi_konstruksi', 'konsolidasi', 'konstruksi', 'modal'].includes(bahpTemplateId) && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3 font-sans print:border-slate-300">
+                    <div className="text-[10px] font-bold text-slate-700 mb-3 uppercase tracking-wide flex items-center gap-1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-500"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                      D.3 Pengaturan Spesifik Jenis Pengadaan: {
+                        {
+                          konsultasi_non: 'Jasa Konsultansi Sektoral',
+                          konsultasi_konstruksi: 'Jasa Konsultansi Konstruksi',
+                          konsolidasi: 'Konsolidasi Pengadaan',
+                          konstruksi: 'Pekerjaan Konstruksi',
+                          modal: 'Belanja Modal / Barang Aset'
+                        }[bahpTemplateId]
+                      }
+                    </div>
+
+                    {/* Jasa Konsultansi (Non-Konstruksi & Konstruksi) */}
+                    {(bahpTemplateId === 'konsultasi_non' || bahpTemplateId === 'konsultasi_konstruksi') && (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-600 mb-1">Total Biaya Personil (Rp)</label>
+                            <input
+                              type="number"
+                              value={biayaPersonil}
+                              onChange={e => { setBiayaPersonil(e.target.value); saveBAHPField('pbj_biaya_personil', e.target.value) }}
+                              placeholder="Contoh: 45000000"
+                              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-600 mb-1">Total Biaya Non-Personil (Rp)</label>
+                            <input
+                              type="number"
+                              value={biayaNonPersonil}
+                              onChange={e => { setBiayaNonPersonil(e.target.value); saveBAHPField('pbj_biaya_non_personil', e.target.value) }}
+                              placeholder="Contoh: 15000000"
+                              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between items-center mb-1.5">
+                            <label className="block text-[10px] font-bold text-slate-600">Daftar Tenaga Ahli Utama yang Ditugaskan</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = [...tenagaAhliList, { nama: '', posisi: '', sertifikat: '', manMonth: '', rate: '' }];
+                                setTenagaAhliList(next);
+                                saveBAHPField('pbj_tenaga_ahli_list', next);
+                              }}
+                              className="bg-indigo-500 hover:bg-indigo-655 text-white font-bold text-[9px] px-2 py-1 rounded"
+                            >
+                              + Tambah Tenaga Ahli
+                            </button>
+                          </div>
+                          
+                          {tenagaAhliList.length === 0 ? (
+                            <div className="text-[10px] text-slate-400 italic p-3 text-center bg-white border border-dashed border-slate-200 rounded-lg">Belum ada tenaga ahli. Silakan klik tombol di atas untuk menambah.</div>
+                          ) : (
+                            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                              {tenagaAhliList.map((ahli, idx) => (
+                                <div key={idx} className="flex flex-wrap md:flex-nowrap gap-2 bg-white p-2.5 border border-slate-200 rounded-lg items-end">
+                                  <div className="w-full md:w-1/4">
+                                    <label className="block text-[8px] text-slate-500 font-bold uppercase">Nama Lengkap</label>
+                                    <input
+                                      type="text"
+                                      value={ahli.nama || ''}
+                                      onChange={e => {
+                                        const next = [...tenagaAhliList];
+                                        next[idx].nama = e.target.value;
+                                        setTenagaAhliList(next);
+                                        saveBAHPField('pbj_tenaga_ahli_list', next);
+                                      }}
+                                      placeholder="Nama Ahli"
+                                      className="w-full border border-slate-200 rounded px-1.5 py-1 text-[10px]"
+                                    />
+                                  </div>
+                                  <div className="w-full md:w-1/4">
+                                    <label className="block text-[8px] text-slate-500 font-bold uppercase">Posisi / Peran</label>
+                                    <input
+                                      type="text"
+                                      value={ahli.posisi || ''}
+                                      onChange={e => {
+                                        const next = [...tenagaAhliList];
+                                        next[idx].posisi = e.target.value;
+                                        setTenagaAhliList(next);
+                                        saveBAHPField('pbj_tenaga_ahli_list', next);
+                                      }}
+                                      placeholder="Contoh: Team Leader"
+                                      className="w-full border border-slate-200 rounded px-1.5 py-1 text-[10px]"
+                                    />
+                                  </div>
+                                  <div className="w-full md:w-1/4">
+                                    <label className="block text-[8px] text-slate-500 font-bold uppercase">
+                                      {bahpTemplateId === 'konsultasi_konstruksi' ? 'Sertifikat (SKA/SKK)' : 'Sertifikat Kompetensi'}
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={ahli.sertifikat || ''}
+                                      onChange={e => {
+                                        const next = [...tenagaAhliList];
+                                        next[idx].sertifikat = e.target.value;
+                                        setTenagaAhliList(next);
+                                        saveBAHPField('pbj_tenaga_ahli_list', next);
+                                      }}
+                                      placeholder="Nomor SKA/Sertif"
+                                      className="w-full border border-slate-200 rounded px-1.5 py-1 text-[10px]"
+                                    />
+                                  </div>
+                                  <div className="w-1/2 md:w-20">
+                                    <label className="block text-[8px] text-slate-500 font-bold uppercase">Man-Month</label>
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={ahli.manMonth || ''}
+                                      onChange={e => {
+                                        const next = [...tenagaAhliList];
+                                        next[idx].manMonth = e.target.value;
+                                        setTenagaAhliList(next);
+                                        saveBAHPField('pbj_tenaga_ahli_list', next);
+                                      }}
+                                      placeholder="Bulan"
+                                      className="w-full border border-slate-200 rounded px-1.5 py-1 text-[10px]"
+                                    />
+                                  </div>
+                                  <div className="w-1/2 md:w-28">
+                                    <label className="block text-[8px] text-slate-500 font-bold uppercase">Tarif/Bulan (Rp)</label>
+                                    <input
+                                      type="number"
+                                      value={ahli.rate || ''}
+                                      onChange={e => {
+                                        const next = [...tenagaAhliList];
+                                        next[idx].rate = e.target.value;
+                                        setTenagaAhliList(next);
+                                        saveBAHPField('pbj_tenaga_ahli_list', next);
+                                      }}
+                                      placeholder="Tarif"
+                                      className="w-full border border-slate-200 rounded px-1.5 py-1 text-[10px]"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const next = tenagaAhliList.filter((_, i) => i !== idx);
+                                      setTenagaAhliList(next);
+                                      saveBAHPField('pbj_tenaga_ahli_list', next);
+                                    }}
+                                    className="bg-rose-100 text-rose-700 hover:bg-rose-200 font-bold text-[10px] px-2.5 py-1 rounded"
+                                  >
+                                    Hapus
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pengadaan Terkonsolidasi */}
+                    {bahpTemplateId === 'konsolidasi' && (
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center mb-1.5">
+                          <label className="block text-[10px] font-bold text-slate-600">Satuan Kerja Peserta Konsolidasi</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...satkerPesertaList, { namaSatker: '', pagu: '', volume: '', alamat: '' }];
+                              setSatkerPesertaList(next);
+                              saveBAHPField('pbj_satker_peserta_list', next);
+                            }}
+                            className="bg-indigo-500 hover:bg-indigo-650 text-white font-bold text-[9px] px-2 py-1 rounded"
+                          >
+                            + Tambah Satker Peserta
+                          </button>
+                        </div>
+                        
+                        {satkerPesertaList.length === 0 ? (
+                          <div className="text-[10px] text-slate-450 italic p-3 text-center bg-white border border-dashed border-slate-200 rounded-lg">Belum ada satker peserta. Silakan klik tombol di atas untuk menambah.</div>
+                        ) : (
+                          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                            {satkerPesertaList.map((satker, idx) => (
+                              <div key={idx} className="flex flex-wrap md:flex-nowrap gap-2 bg-white p-2.5 border border-slate-200 rounded-lg items-end">
+                                <div className="w-full md:w-1/4">
+                                  <label className="block text-[8px] text-slate-500 font-bold uppercase">Nama Satker / SKPD</label>
+                                  <input
+                                    type="text"
+                                    value={satker.namaSatker || ''}
+                                    onChange={e => {
+                                      const next = [...satkerPesertaList];
+                                      next[idx].namaSatker = e.target.value;
+                                      setSatkerPesertaList(next);
+                                      saveBAHPField('pbj_satker_peserta_list', next);
+                                    }}
+                                    placeholder="Nama Satker"
+                                    className="w-full border border-slate-200 rounded px-1.5 py-1 text-[10px]"
+                                  />
+                                </div>
+                                <div className="w-full md:w-1/5">
+                                  <label className="block text-[8px] text-slate-500 font-bold uppercase">Pagu (Rp)</label>
+                                  <input
+                                    type="number"
+                                    value={satker.pagu || ''}
+                                    onChange={e => {
+                                      const next = [...satkerPesertaList];
+                                      next[idx].pagu = e.target.value;
+                                      setSatkerPesertaList(next);
+                                      saveBAHPField('pbj_satker_peserta_list', next);
+                                    }}
+                                    placeholder="Pagu Satker"
+                                    className="w-full border border-slate-200 rounded px-1.5 py-1 text-[10px]"
+                                  />
+                                </div>
+                                <div className="w-full md:w-20">
+                                  <label className="block text-[8px] text-slate-500 font-bold uppercase">Volume</label>
+                                  <input
+                                    type="text"
+                                    value={satker.volume || ''}
+                                    onChange={e => {
+                                      const next = [...satkerPesertaList];
+                                      next[idx].volume = e.target.value;
+                                      setSatkerPesertaList(next);
+                                      saveBAHPField('pbj_satker_peserta_list', next);
+                                    }}
+                                    placeholder="Contoh: 100 Rim"
+                                    className="w-full border border-slate-200 rounded px-1.5 py-1 text-[10px]"
+                                  />
+                                </div>
+                                <div className="w-full md:w-1/3">
+                                  <label className="block text-[8px] text-slate-500 font-bold uppercase">Alamat Kirim</label>
+                                  <input
+                                    type="text"
+                                    value={satker.alamat || ''}
+                                    onChange={e => {
+                                      const next = [...satkerPesertaList];
+                                      next[idx].alamat = e.target.value;
+                                      setSatkerPesertaList(next);
+                                      saveBAHPField('pbj_satker_peserta_list', next);
+                                    }}
+                                    placeholder="Alamat Pengiriman"
+                                    className="w-full border border-slate-200 rounded px-1.5 py-1 text-[10px]"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = satkerPesertaList.filter((_, i) => i !== idx);
+                                    setSatkerPesertaList(next);
+                                    saveBAHPField('pbj_satker_peserta_list', next);
+                                  }}
+                                  className="bg-rose-100 text-rose-700 hover:bg-rose-200 font-bold text-[10px] px-2.5 py-1 rounded"
+                                >
+                                  Hapus
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Pekerjaan Konstruksi */}
+                    {bahpTemplateId === 'konstruksi' && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-1">Koordinat Lokasi Pekerjaan</label>
+                          <input
+                            type="text"
+                            value={koordinatLokasi}
+                            onChange={e => { setKoordinatLokasi(e.target.value); saveBAHPField('pbj_koordinat_lokasi', e.target.value) }}
+                            placeholder="Contoh: 7.8123° S, 113.4567° E"
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-1">Tenaga / Ahli K3 Konstruksi (SMKK)</label>
+                          <input
+                            type="text"
+                            value={personilK3}
+                            onChange={e => { setPersonilK3(e.target.value); saveBAHPField('pbj_personil_k3', e.target.value) }}
+                            placeholder="Contoh: Budi Santoso, S.T. - Sertifikasi K3"
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-1">Metode Pelaksanaan Pekerjaan</label>
+                          <input
+                            type="text"
+                            value={metodeKerja}
+                            onChange={e => { setMetodeKerja(e.target.value); saveBAHPField('pbj_metode_kerja', e.target.value) }}
+                            placeholder="Contoh: Metode Beton Precast & Bored Pile"
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Belanja Modal */}
+                    {bahpTemplateId === 'modal' && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-1">Merek / Tipe Utama</label>
+                          <input
+                            type="text"
+                            value={merkTipeModal}
+                            onChange={e => { setMerkTipeModal(e.target.value); saveBAHPField('pbj_merk_tipe_modal', e.target.value) }}
+                            placeholder="Contoh: Lenovo ThinkPad L14 Gen 4"
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-1">Nilai TKDN (%)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={nilaiTkdnModal}
+                            onChange={e => { setNilaiTkdnModal(e.target.value); saveBAHPField('pbj_nilai_tkdn_modal', e.target.value) }}
+                            placeholder="Contoh: 41.25"
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-1">Nomor Seri Aset / Pabrikan</label>
+                          <input
+                            type="text"
+                            value={noSeriModal}
+                            onChange={e => { setNoSeriModal(e.target.value); saveBAHPField('pbj_no_seri_modal', e.target.value) }}
+                            placeholder="Contoh: L3-XXXXX, L3-YYYYY"
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* D.3 Temuan Negosiasi — dihapus karena PP masih dalam proses negosiasi */}
                 {/* ═══════════════════════════════════════════════════════════ */}
                 {/* SEKSI E: DOKUMENTASI NEGOSIASI & KOMUNIKASI PIHAK KETIGA  */}
@@ -2112,49 +2520,21 @@ export default function ProcurementPanel() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-600 mb-1">
-                        {{
-                          atk: 'Waktu Pengiriman Disepakati',
-                          mamin: 'Waktu Pengantaran Makanan',
-                          jasa: 'Jangka Waktu Layanan Jasa',
-                          modal: 'Waktu Pengiriman & Uji Fungsi',
-                          pemeliharaan: 'Jangka Waktu Pemeliharaan',
-                          konstruksi: 'Waktu Pelaksanaan Pekerjaan (Kurva S)'
-                        }[bahpTemplateId] || 'Waktu Pengiriman Disepakati'}
+                        {VALIDASI_CONFIG[bahpTemplateId]?.deliveryLabel || 'Waktu Pengiriman Disepakati'}
                       </label>
                       <input type="text" value={deliveryAgreement}
                         onChange={e => { setDeliveryAgreement(e.target.value); saveBAHPField('pbj_delivery_agreement', e.target.value) }}
-                        placeholder={{
-                          atk: 'Contoh: 14 hari kalender sejak SP diterbitkan',
-                          mamin: 'Contoh: Setiap jam 11:30 WIB di lokasi rapat',
-                          jasa: 'Contoh: 12 Bulan sejak SPMK diterbitkan',
-                          modal: 'Contoh: Maksimal 30 hari kalender termasuk instalasi',
-                          pemeliharaan: 'Contoh: 1 Tahun sejak penandatanganan kontrak',
-                          konstruksi: 'Contoh: 90 Hari Kalender sejak SPMK'
-                        }[bahpTemplateId] || 'Contoh: 14 hari kalender sejak SP diterbitkan'}
+                        placeholder={VALIDASI_CONFIG[bahpTemplateId]?.deliveryPlaceholder || 'Contoh: 14 hari kalender sejak SP diterbitkan'}
                         className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
                       />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-600 mb-1">
-                        {{
-                          atk: 'Ketentuan Retur / Ganti Baru',
-                          mamin: 'Ketentuan Higienitas & Penggantian Menu',
-                          jasa: 'Jaminan Layanan (SLA)',
-                          modal: 'Masa Garansi Resmi Alat / Mesin',
-                          pemeliharaan: 'Response Time & Garansi Perbaikan',
-                          konstruksi: 'Masa Pemeliharaan / Retensi Konstruksi'
-                        }[bahpTemplateId] || 'Masa Garansi Disepakati'}
+                        {VALIDASI_CONFIG[bahpTemplateId]?.warrantyLabel || 'Masa Garansi Disepakati'}
                       </label>
                       <input type="text" value={warrantyAgreement}
                         onChange={e => { setWarrantyAgreement(e.target.value); saveBAHPField('pbj_warranty_agreement', e.target.value) }}
-                        placeholder={{
-                          atk: 'Contoh: Penggantian produk rusak maksimal 3 hari kerja',
-                          mamin: 'Contoh: Makanan tidak sesuai/basi diganti dalam 1 jam',
-                          jasa: 'Contoh: SLA Kehadiran staf minimal 98%',
-                          modal: 'Contoh: 3 Tahun Garansi Sparepart & Service On-Site',
-                          pemeliharaan: 'Contoh: Garansi perbaikan 3 bulan, respon emergency 4 jam',
-                          konstruksi: 'Contoh: 180 Hari Kalender sejak PHO (Serah Terima Pertama)'
-                        }[bahpTemplateId] || 'Contoh: 1 Tahun Garansi Resmi Pabrik'}
+                        placeholder={VALIDASI_CONFIG[bahpTemplateId]?.warrantyPlaceholder || 'Contoh: 1 Tahun Garansi Resmi Pabrik'}
                         className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
                       />
                     </div>
@@ -2164,10 +2544,14 @@ export default function ProcurementPanel() {
                         onChange={e => { setPaymentTerms(e.target.value); saveBAHPField('pbj_payment_terms', e.target.value) }}
                         className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
                       >
-                        <option>Lunas setelah serah terima barang</option>
-                        <option>Termin: 50% DP, 50% setelah BAST</option>
-                        <option>Termin: 30% DP, 70% setelah BAST</option>
-                        <option>Lunas setelah cek kualitas dan BAST</option>
+                        {(VALIDASI_CONFIG[bahpTemplateId]?.paymentOptions || [
+                          'Lunas setelah serah terima barang',
+                          'Termin: 50% DP, 50% setelah BAST',
+                          'Termin: 30% DP, 70% setelah BAST',
+                          'Lunas setelah cek kualitas dan BAST'
+                        ]).map((opt, oIdx) => (
+                          <option key={oIdx} value={opt}>{opt}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -2216,10 +2600,12 @@ export default function ProcurementPanel() {
                     )}
 
                     <div className="mt-3">
-                      <label className="block text-[10px] font-bold text-slate-600 mb-1">Catatan Hasil Negosiasi (Ringkasan)</label>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                        {VALIDASI_CONFIG[bahpTemplateId]?.chatLabel || 'Catatan Hasil Negosiasi (Ringkasan)'}
+                      </label>
                       <textarea value={chatNotes}
                         onChange={e => { setChatNotes(e.target.value); saveBAHPField('pbj_chat_notes', e.target.value) }}
-                        placeholder="Contoh: Penyedia (Bapak Dedi - 0812xxx) via WA menyepakati harga Rp 8.500.000 per unit sudah termasuk ongkir dan instalasi. Garansi 1 tahun on-site dikonfirmasi..."
+                        placeholder={VALIDASI_CONFIG[bahpTemplateId]?.chatPlaceholder || 'Contoh: Penyedia (Bapak Dedi - 0812xxx) via WA menyepakati harga Rp 8.500.000 per unit sudah termasuk ongkir dan instalasi. Garansi 1 tahun on-site dikonfirmasi...'}
                         className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
                         rows={3}
                       />
@@ -2510,61 +2896,59 @@ export default function ProcurementPanel() {
 
           {/* ── Selector Jenis Template BAHP ── */}
           <div className="mb-5 bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                Jenis Pengadaan / Template BAHP
-              </div>
-              {submittedPack?.dppTemplateId && (
-                <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[9px] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                  Terkunci (Sesuai DPP PPK)
+            {submittedPack?.dppTemplateId ? (
+              <div className="flex items-center justify-between bg-indigo-50/70 border border-indigo-150 rounded-xl p-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="bg-indigo-600 text-white rounded-lg p-2 font-black text-xs shadow-sm select-none">
+                    {BAHP_TEMPLATE_TYPES.find(t => t.id === bahpTemplateId)?.icon || 'PP'}
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-extrabold uppercase text-indigo-600 tracking-wider">Template Terkunci (Sesuai DPP PPK)</div>
+                    <div className="text-sm font-bold text-slate-800">
+                      {BAHP_TEMPLATE_TYPES.find(t => t.id === bahpTemplateId)?.label || 'Jenis Pengadaan'}
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">
+                      Ditetapkan secara otomatis berdasarkan DPP PPK (Template ID: {submittedPack.dppTemplateId}). Pejabat Pengadaan tidak perlu memilih manual.
+                    </div>
+                  </div>
+                </div>
+                <span className="bg-indigo-100 text-indigo-800 text-[9px] font-extrabold px-3 py-1 rounded-full flex items-center gap-1 shrink-0 shadow-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  TERKUNCI
                 </span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {BAHP_TEMPLATE_TYPES.map(tpl => {
-                const isSelected = bahpTemplateId === tpl.id;
-                const isLocked = submittedPack?.dppTemplateId && ((
-                  submittedPack.dppTemplateId === 'TPL-006A' && tpl.id !== 'atk'
-                ) || (
-                  submittedPack.dppTemplateId === 'TPL-006B' && tpl.id !== 'mamin'
-                ) || (
-                  submittedPack.dppTemplateId === 'TPL-006C' && tpl.id !== 'modal'
-                ) || (
-                  submittedPack.dppTemplateId === 'TPL-006D' && tpl.id !== 'jasa'
-                ) || (
-                  submittedPack.dppTemplateId === 'TPL-006F' && tpl.id !== 'pemeliharaan'
-                ) || (
-                  (submittedPack.dppTemplateId === 'TPL-006G' || submittedPack.dppTemplateId === 'TPL-006E') && tpl.id !== 'konstruksi'
-                ));
-
-                return (
-                  <button
-                    key={tpl.id}
-                    disabled={!!isLocked}
-                    onClick={() => { setBahpTemplateId(tpl.id); localStorage.setItem('pbj_bahp_template', tpl.id); }}
-                    className={`text-[11px] font-bold px-3 py-2 rounded-lg border transition-all ${
-                      isSelected
-                        ? 'bg-indigo-700 text-white border-indigo-700 shadow-md'
-                        : isLocked
-                        ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed opacity-40'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50'
-                    }`}
-                    title={isLocked ? "Jenis ini dikunci karena tidak sesuai dengan DPP PPK" : tpl.sublabel}
-                  >
-                    <span className="font-black text-[10px] mr-1.5 opacity-70">{tpl.icon}</span>
-                    {tpl.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-1.5">
-              {submittedPack?.dppTemplateId ? (
-                <span>Kategori diatur secara otomatis ke <strong>{(BAHP_TEMPLATE_TYPES.find(t => t.id === bahpTemplateId)?.label || '').toUpperCase()}</strong> berdasarkan Dokumen Persiapan Pengadaan (DPP) yang disahkan PPK.</span>
-              ) : (
-                BAHP_TEMPLATE_TYPES.find(t => t.id === bahpTemplateId)?.sublabel
-              )}
-            </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                    Jenis Pengadaan / Template BAHP
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {BAHP_TEMPLATE_TYPES.map(tpl => {
+                    const isSelected = bahpTemplateId === tpl.id;
+                    return (
+                      <button
+                        key={tpl.id}
+                        onClick={() => { setBahpTemplateId(tpl.id); localStorage.setItem('pbj_bahp_template', tpl.id); }}
+                        className={`text-[11px] font-bold px-3 py-2 rounded-lg border transition-all ${
+                          isSelected
+                            ? 'bg-indigo-700 text-white border-indigo-700 shadow-md'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50'
+                        }`}
+                        title={tpl.sublabel}
+                      >
+                        <span className="font-black text-[10px] mr-1.5 opacity-70">{tpl.icon}</span>
+                        {tpl.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="text-[10px] text-slate-450 mt-1.5">
+                  {BAHP_TEMPLATE_TYPES.find(t => t.id === bahpTemplateId)?.sublabel}
+                </div>
+              </>
+            )}
           </div>
 
           {/* ── Dokumen BAHP (komponen terpisah, berbeda per template) ── */}

@@ -51,6 +51,27 @@ export default function BahpDocument({
   const tglLong  = today.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const tglShort = today.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
+  // Load template-specific dynamic fields from localStorage
+  const getStoredJson = (key, fallback) => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const tenagaAhliList    = getStoredJson('pbj_tenaga_ahli_list', []);
+  const biayaPersonil     = parseFloat(localStorage.getItem('pbj_biaya_personil') || '0');
+  const biayaNonPersonil  = parseFloat(localStorage.getItem('pbj_biaya_non_personil') || '0');
+  const satkerPesertaList = getStoredJson('pbj_satker_peserta_list', []);
+  const koordinatLokasi   = localStorage.getItem('pbj_koordinat_lokasi') || '';
+  const personilK3        = localStorage.getItem('pbj_personil_k3') || '';
+  const metodeKerja       = localStorage.getItem('pbj_metode_kerja') || '';
+  const merkTipeModal     = localStorage.getItem('pbj_merk_tipe_modal') || '';
+  const nilaiTkdnModal    = localStorage.getItem('pbj_nilai_tkdn_modal') || '';
+  const noSeriModal       = localStorage.getItem('pbj_no_seri_modal') || '';
+
   // ── Style shortcuts ───────────────────────────────────────────────────────
   const B  = 'border border-black';
   const TD = `${B} p-1.5 text-[0.85em]`;
@@ -58,12 +79,15 @@ export default function BahpDocument({
 
   // ── Seksi A: kolom tambahan khas tiap template ────────────────────────────
   const extraColDefs = {
-    atk:          [{ key: 'status_pdn', label: 'PDN/TKDN' }, { key: 'status_umkk', label: 'UMKK' }],
-    mamin:        [{ key: 'jenis_menu', label: 'Menu' }, { key: 'sertif_halal', label: 'Halal' }],
-    jasa:         [{ key: 'output', label: 'Output' }, { key: 'jangka_waktu', label: 'Jangka Waktu' }],
-    modal:        [{ key: 'merk_tipe', label: 'Merk/Tipe' }, { key: 'garansi', label: 'Garansi' }, { key: 'tkdn_pct', label: 'TKDN (%)' }],
-    pemeliharaan: [{ key: 'cakupan', label: 'Cakupan Pekerjaan' }, { key: 'garansi_kerja', label: 'Garansi Kerja' }],
-    konstruksi:   [{ key: 'sbu', label: 'SBU' }, { key: 'jadwal', label: 'Waktu (HK)' }, { key: 'k3', label: 'K3/SMKK' }],
+    atk:                   [{ key: 'status_pdn', label: 'PDN/TKDN' }, { key: 'status_umkk', label: 'UMKK' }],
+    mamin:                 [{ key: 'jenis_menu', label: 'Menu' }, { key: 'sertif_halal', label: 'Halal' }],
+    jasa:                  [{ key: 'output', label: 'Output' }, { key: 'jangka_waktu', label: 'Jangka Waktu' }],
+    modal:                 [{ key: 'merk_tipe', label: 'Merk/Tipe' }, { key: 'garansi', label: 'Garansi' }, { key: 'tkdn_pct', label: 'TKDN (%)' }],
+    pemeliharaan:          [{ key: 'cakupan', label: 'Cakupan Pekerjaan' }, { key: 'garansi_kerja', label: 'Garansi Kerja' }],
+    konstruksi:            [{ key: 'sbu', label: 'SBU' }, { key: 'jadwal', label: 'Waktu (HK)' }, { key: 'k3', label: 'K3/SMKK' }],
+    konsultasi_non:        [{ key: 'tenaga_ahli', label: 'Tenaga Ahli' }, { key: 'jangka_waktu', label: 'Jangka Waktu (Bln)' }, { key: 'output', label: 'Output' }],
+    konsultasi_konstruksi: [{ key: 'sbu', label: 'SBU Konsultansi' }, { key: 'tenaga_ahli', label: 'Tenaga Ahli' }, { key: 'spta', label: 'SPTA' }],
+    konsolidasi:           [{ key: 'status_pdn', label: 'Status PDN' }, { key: 'volume_total', label: 'Volume Total' }, { key: 'jml_satker', label: 'Jml Satker' }],
   };
   const extraCols = extraColDefs[templateId] || [];
 
@@ -362,6 +386,171 @@ export default function BahpDocument({
           </div>
         );
       })}
+
+      {/* ─── DETAIL SPESIFIK JENIS PENGADAAN (DOKUMEN BAHP) ─── */}
+
+      {/* Jasa Konsultansi (Non-Konstruksi & Konstruksi) */}
+      {['konsultasi_non', 'konsultasi_konstruksi'].includes(templateId) && (
+        <div className="mb-5">
+          <SectionTitle>Struktur Biaya & Tenaga Ahli Utama</SectionTitle>
+          <div className="mb-3 text-[0.95em]">
+            <table className="w-full border-collapse mb-3">
+              <thead>
+                <tr>
+                  <td className={TH}>Biaya Personil (Billing Rate)</td>
+                  <td className={TH}>Biaya Non-Personil (Reimbursable)</td>
+                  <td className={TH}>Total Biaya Jasa Konsultansi</td>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className={`${TD} text-center font-mono`}>Rp {biayaPersonil.toLocaleString('id-ID')}</td>
+                  <td className={`${TD} text-center font-mono`}>Rp {biayaNonPersonil.toLocaleString('id-ID')}</td>
+                  <td className={`${TD} text-center font-mono font-bold bg-gray-50`}>Rp {(biayaPersonil + biayaNonPersonil).toLocaleString('id-ID')}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="text-[0.95em] font-bold mb-1">Daftar Tenaga Ahli yang Ditugaskan:</div>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <td className={`${TH} w-8`}>No</td>
+                <td className={TH}>Nama Lengkap</td>
+                <td className={TH}>Posisi / Peran</td>
+                <td className={TH}>{templateId === 'konsultasi_konstruksi' ? 'Sertifikat (SKA/SKK)' : 'Sertifikat Kompetensi'}</td>
+                <td className={`${TH} w-20`}>Man-Month</td>
+                <td className={`${TH} text-right`}>Tarif / Bulan</td>
+                <td className={`${TH} text-right`}>Total</td>
+              </tr>
+            </thead>
+            <tbody>
+              {tenagaAhliList.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className={`${TD} text-center italic`}>Tidak ada rincian tenaga ahli yang diinputkan</td>
+                </tr>
+              ) : (
+                tenagaAhliList.map((ahli, aIdx) => {
+                  const mm = parseFloat(ahli.manMonth) || 0;
+                  const rate = parseFloat(ahli.rate) || 0;
+                  const total = mm * rate;
+                  return (
+                    <tr key={aIdx}>
+                      <td className={`${TD} text-center`}>{aIdx + 1}</td>
+                      <td className={TD}>{ahli.nama || '-'}</td>
+                      <td className={TD}>{ahli.posisi || '-'}</td>
+                      <td className={`${TD} text-center`}>{ahli.sertifikat || '-'}</td>
+                      <td className={`${TD} text-center`}>{mm} MM</td>
+                      <td className={`${TD} text-right font-mono`}>Rp {rate.toLocaleString('id-ID')}</td>
+                      <td className={`${TD} text-right font-mono font-bold`}>Rp {total.toLocaleString('id-ID')}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pengadaan Terkonsolidasi */}
+      {templateId === 'konsolidasi' && (
+        <div className="mb-5">
+          <SectionTitle>Daftar Satuan Kerja Peserta Konsolidasi</SectionTitle>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <td className={`${TH} w-8`}>No</td>
+                <td className={TH}>Nama Satker / SKPD</td>
+                <td className={`${TH} text-right`}>Pagu Anggaran</td>
+                <td className={`${TH} w-24`}>Volume Kebutuhan</td>
+                <td className={TH}>Alamat Pengiriman</td>
+              </tr>
+            </thead>
+            <tbody>
+              {satkerPesertaList.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className={`${TD} text-center italic`}>Tidak ada rincian satker peserta yang diinputkan</td>
+                </tr>
+              ) : (
+                satkerPesertaList.map((satker, sIdx) => (
+                  <tr key={sIdx}>
+                    <td className={`${TD} text-center`}>{sIdx + 1}</td>
+                    <td className={TD}>{satker.namaSatker || '-'}</td>
+                    <td className={`${TD} text-right font-mono`}>Rp {(parseFloat(satker.pagu) || 0).toLocaleString('id-ID')}</td>
+                    <td className={`${TD} text-center`}>{satker.volume || '-'}</td>
+                    <td className={TD}>{satker.alamat || '-'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pekerjaan Konstruksi */}
+      {templateId === 'konstruksi' && (koordinatLokasi || personilK3 || metodeKerja) && (
+        <div className="border border-black rounded p-3 mb-4 text-[0.95em]">
+          <div className="font-bold mb-2 uppercase text-black">Detail Spesifikasi Fisik & SMKK</div>
+          <table className="w-full text-[0.9em] border-collapse">
+            <tbody>
+              {koordinatLokasi && (
+                <tr>
+                  <td className="w-48 py-1 font-semibold align-top">Koordinat Lokasi Pekerjaan</td>
+                  <td className="w-3 py-1 align-top">:</td>
+                  <td className="py-1 align-top">{koordinatLokasi}</td>
+                </tr>
+              )}
+              {personilK3 && (
+                <tr>
+                  <td className="py-1 font-semibold align-top">Tenaga Ahli / Petugas K3 SMKK</td>
+                  <td className="py-1 align-top">:</td>
+                  <td className="py-1 align-top">{personilK3}</td>
+                </tr>
+              )}
+              {metodeKerja && (
+                <tr>
+                  <td className="py-1 font-semibold align-top">Metode Pelaksanaan Utama</td>
+                  <td className="py-1 align-top">:</td>
+                  <td className="py-1 align-top">{metodeKerja}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Belanja Modal */}
+      {templateId === 'modal' && (merkTipeModal || nilaiTkdnModal || noSeriModal) && (
+        <div className="border border-black rounded p-3 mb-4 text-[0.95em]">
+          <div className="font-bold mb-2 uppercase text-black">Spesifikasi Aset & Catatan Inventarisasi</div>
+          <table className="w-full text-[0.9em] border-collapse">
+            <tbody>
+              {merkTipeModal && (
+                <tr>
+                  <td className="w-48 py-1 font-semibold align-top">Merek / Tipe Barang</td>
+                  <td className="w-3 py-1 align-top">:</td>
+                  <td className="py-1 align-top">{merkTipeModal}</td>
+                </tr>
+              )}
+              {nilaiTkdnModal && (
+                <tr>
+                  <td className="py-1 font-semibold align-top">Nilai Komponen Dalam Negeri</td>
+                  <td className="py-1 align-top">:</td>
+                  <td className="py-1 align-top">{nilaiTkdnModal}% (Tingkat Komponen Dalam Negeri / TKDN)</td>
+                </tr>
+              )}
+              {noSeriModal && (
+                <tr>
+                  <td className="py-1 font-semibold align-top">Nomor Seri Aset / Pabrikan</td>
+                  <td className="py-1 align-top">:</td>
+                  <td className="py-1 align-top">{noSeriModal}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* ╔══════════════════════════════════════════════╗
           ║ CATATAN KHUSUS KONSTRUKSI                    ║
