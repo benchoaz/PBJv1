@@ -7,29 +7,33 @@ import (
 	"testing"
 
 	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 var testDB *sql.DB
+var testGormDB *gorm.DB
 
-func setupTestDB(t *testing.T) (*sql.DB, func()) {
+func setupTestDB(t *testing.T) (*sql.DB, *gorm.DB, func()) {
 	if testDB != nil {
 		cleanTables(testDB)
-		return testDB, func() {}
+		return testDB, testGormDB, func() {}
 	}
 
-	testDB, err := sql.Open("postgres", "host=localhost port=5432 user=postgres password=postgres dbname=pbj_test sslmode=disable")
+	db, err := sql.Open("postgres", "host=localhost port=5432 user=postgres password=postgres dbname=pbj_test sslmode=disable")
 	if err != nil {
 		t.Skipf("Skipping test: cannot connect to test database: %v", err)
-		return nil, func() {}
+		return nil, nil, func() {}
 	}
 
-	if err := testDB.Ping(); err != nil {
+	if err := db.Ping(); err != nil {
 		t.Skipf("Skipping test: cannot ping test database: %v", err)
-		testDB.Close()
-		return nil, func() {}
+		db.Close()
+		return nil, nil, func() {}
 	}
+	testDB = db
 
-	testDB.Exec("DROP TABLE IF EXISTS projects CASCADE")
+	db.Exec("DROP TABLE IF EXISTS projects CASCADE")
 
 	createTableSQL := `CREATE TABLE projects (
 		id SERIAL PRIMARY KEY,
@@ -50,22 +54,29 @@ func setupTestDB(t *testing.T) (*sql.DB, func()) {
 		t.Fatalf("Failed to create test table: %v", err)
 	}
 
-	logger := log.New(os.Stdout, "[TEST] ", log.LstdFlags)
+	dialector := postgres.New(postgres.Config{
+		Conn: testDB,
+	})
+	gormDB, err := gorm.Open(dialector, &gorm.Config{})
+	if err != nil {
+		t.Fatalf("Failed to open GORM: %v", err)
+	}
+	testGormDB = gormDB
 
-	return testDB, func() {
+	logger := log.New(os.Stdout, "[TEST] ", log.LstdFlags)
+	_ = logger
+
+	return testDB, testGormDB, func() {
 		cleanTables(testDB)
 	}
 }
+
 
 func cleanTables(db *sql.DB) {
 	db.Exec("TRUNCATE TABLE projects CASCADE")
 }
 
 func TestMain(m *testing.M) {
-	if testing.Short() {
-		os.Exit(m.Run())
-	}
-
 	exitCode := m.Run()
 
 	if testDB != nil {

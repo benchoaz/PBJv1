@@ -8,8 +8,9 @@ import (
 )
 
 func TestProjectRepository_GetAll_Empty(t *testing.T) {
-	repo, cleanup := setupTestDB(t)
+	db, gormDB, cleanup := setupTestDB(t)
 	defer cleanup()
+	repo := NewProjectRepository(db, gormDB)
 
 	filter := &models.ProjectFilter{}
 	projects, err := repo.GetAll(filter)
@@ -23,8 +24,9 @@ func TestProjectRepository_GetAll_Empty(t *testing.T) {
 }
 
 func TestProjectRepository_CreateAndGet(t *testing.T) {
-	repo, cleanup := setupTestDB(t)
+	db, gormDB, cleanup := setupTestDB(t)
 	defer cleanup()
+	repo := NewProjectRepository(db, gormDB)
 
 	now := time.Now()
 	input := &models.ProjectCreate{
@@ -66,8 +68,9 @@ func TestProjectRepository_CreateAndGet(t *testing.T) {
 }
 
 func TestProjectRepository_Update(t *testing.T) {
-	repo, cleanup := setupTestDB(t)
+	db, gormDB, cleanup := setupTestDB(t)
 	defer cleanup()
+	repo := NewProjectRepository(db, gormDB)
 
 	input := &models.ProjectCreate{
 		Name:     "Original Name",
@@ -92,8 +95,9 @@ func TestProjectRepository_Update(t *testing.T) {
 }
 
 func TestProjectRepository_Delete(t *testing.T) {
-	repo, cleanup := setupTestDB(t)
+	db, gormDB, cleanup := setupTestDB(t)
 	defer cleanup()
+	repo := NewProjectRepository(db, gormDB)
 
 	input := &models.ProjectCreate{
 		Name:     "To Delete",
@@ -116,8 +120,9 @@ func TestProjectRepository_Delete(t *testing.T) {
 }
 
 func TestProjectRepository_Filter(t *testing.T) {
-	repo, cleanup := setupTestDB(t)
+	db, gormDB, cleanup := setupTestDB(t)
 	defer cleanup()
+	repo := NewProjectRepository(db, gormDB)
 
 	repo.Create(&models.ProjectCreate{
 		Name:     "Project A", Ministry: "Finance", Province: "Jakarta", Budget: 1000000, Status: "baru",
@@ -146,8 +151,9 @@ func TestProjectRepository_Filter(t *testing.T) {
 }
 
 func TestProjectRepository_GetByID_NotFound(t *testing.T) {
-	repo, cleanup := setupTestDB(t)
+	db, gormDB, cleanup := setupTestDB(t)
 	defer cleanup()
+	repo := NewProjectRepository(db, gormDB)
 
 	project, err := repo.GetByID(999999)
 	if err != nil {
@@ -159,8 +165,9 @@ func TestProjectRepository_GetByID_NotFound(t *testing.T) {
 }
 
 func TestProjectRepository_Count(t *testing.T) {
-	repo, cleanup := setupTestDB(t)
+	db, gormDB, cleanup := setupTestDB(t)
 	defer cleanup()
+	repo := NewProjectRepository(db, gormDB)
 
 	repo.Create(&models.ProjectCreate{
 		Name: "Project 1", Ministry: "Finance", Province: "Jakarta", Budget: 1000000, Status: "baru",
