@@ -39,8 +39,8 @@ const PROVIDERS = {
     desc: 'Multimodal berkecepatan tinggi, efisien untuk scan foto berkas/kamera.',
     url: 'https://aistudio.google.com/app/apikey',
     prefix: 'AIzaSy',
-    placeholder: 'AIzaSy...',
-    help: 'Gemini 1.5 Pro sangat baik mendeteksi tulisan tangan.'
+    placeholder: 'AIzaSy... atau AQ...',
+    help: 'Gemini 1.5 Pro sangat baik mendeteksi tulisan tangan. Mendukung format AIzaSy & AQ.'
   },
   mistral: {
     id: 'mistral',
@@ -146,7 +146,7 @@ const SAMPLE_DOCUMENTS = [
       "Pihak Kedua": "Heryanto (Direktur PT Nusantara)",
       "Tanggal": "18 [⚠️ BURAM] Maret 2026",
       "NIP PPK": "19750812 [⚠️ KABUR]",
-      "Kesesuaian Spesifikasi": "100% Sesuai Spesifikasi Teknis"
+      "Kessesuaian Spesifikasi": "100% Sesuai Spesifikasi Teknis"
     },
     message: '⚠️ Perhatian: Hasil OCR berkisar 76%. Sudut pengambilan gambar miring dan memiliki bayangan di sudut kanan bawah. Disarankan untuk memosisikan kamera tegak lurus (flat-lay) di bawah cahaya terang.'
   },
@@ -245,7 +245,16 @@ export default function OcrApiKeyManager() {
       return { valid: false, msg: 'URL Ollama harus diawali dengan http:// atau https://' };
     }
 
-    if (p.prefix && !key.startsWith(p.prefix)) {
+    if (provider === 'gemini') {
+      if (key.startsWith('AIzaSy') || key.startsWith('AQ')) {
+        // Valid Gemini prefixes
+      } else {
+        return { 
+          valid: false, 
+          msg: `Format salah! API Key Google Gemini harus diawali dengan "AIzaSy" atau "AQ"` 
+        };
+      }
+    } else if (p.prefix && !key.startsWith(p.prefix)) {
       return { 
         valid: false, 
         msg: `Format salah! API Key ${p.name} harus diawali dengan "${p.prefix}"` 

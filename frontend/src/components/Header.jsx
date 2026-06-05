@@ -13,6 +13,12 @@ const Icons = {
       <path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
     </svg>
   ),
+  TrendingUp: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+      <polyline points="16 7 22 7 22 13"/>
+    </svg>
+  ),
   ClipboardEdit: () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
@@ -97,11 +103,11 @@ export default function Header({ sidebarOpen, setSidebarOpen, onNavClick }) {
   }
 
   const menuItems = [
+    { path: '/reports/absorption', label: 'Laporan Realisasi', Icon: Icons.TrendingUp, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/', label: 'Daftar Paket', Icon: Icons.FolderOpen, roles: ['Admin', 'PPK', 'PP'] },
-    { path: '/tickets', label: 'Tickets', Icon: Icons.Ticket, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/ppk/persiapan', label: 'PPK Persiapan', Icon: Icons.ClipboardEdit, roles: ['Admin', 'PPK'] },
     { path: '/pp/panel', label: 'Panel Pejabat Pengadaan', Icon: Icons.Repeat, roles: ['Admin', 'PP'] },
-    { path: '/admin/ocr', label: 'API AI OCR', Icon: Icons.ScanText, roles: ['Admin', 'PPK', 'PP'] },
+    { path: '/admin/ocr', label: 'Pemindai Dokumen (AI)', Icon: Icons.ScanText, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/admin/templates', label: 'Template Surat', Icon: Icons.FileText, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/users', label: 'Users', Icon: Icons.Users, roles: ['Admin'] },
   ]

@@ -82,6 +82,7 @@ func main() {
 	userHandler := handlers.NewUserHandler(gormDB)
 	settingHandler := handlers.NewSettingHandler(gormDB)
 	vendorLocationHandler := handlers.NewVendorLocationHandler(gormDB)
+	reportHandler := handlers.NewReportHandler(gormDB)
 
 	mux := http.NewServeMux()
 
@@ -115,6 +116,15 @@ func main() {
 	mux.HandleFunc("PUT /api/projects/{id}", projectHandler.Update)
 	mux.HandleFunc("DELETE /api/projects/{id}", projectHandler.Delete)
 	mux.HandleFunc("GET /api/projects/stats", projectHandler.Stats)
+	
+	// Reports Route
+	mux.HandleFunc("GET /api/reports/absorption", reportHandler.GetAbsorptionReport)
+	mux.HandleFunc("OPTIONS /api/reports/absorption", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-User-Role, X-User-Satker")
+		w.WriteHeader(http.StatusOK)
+	})
 	
 	// BAHP Routes
 	mux.HandleFunc("POST /api/projects/{id}/bahp", bahpHandler.Create)

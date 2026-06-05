@@ -4,8 +4,7 @@ import { AuthProvider } from './hooks/useAuth'
 import Header from './components/Header'
 import ProjectList from './components/ProjectList'
 import ProjectDetail from './components/ProjectDetail'
-import TicketList from './components/TicketList'
-import TicketDetail from './components/TicketDetail'
+import RealisasiAnggaranPanel from './components/RealisasiAnggaranPanel'
 import Login from './components/Login'
 import UserManagement from './components/UserManagement'
 import ProcurementPreparation from './components/ProcurementPreparation'
@@ -81,8 +80,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<ProtectedRoute><ProjectList /></ProtectedRoute>} />
             <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
-            <Route path="/tickets" element={<ProtectedRoute><TicketList /></ProtectedRoute>} />
-            <Route path="/tickets/:id" element={<ProtectedRoute><TicketDetail /></ProtectedRoute>} />
+            <Route path="/reports/absorption" element={<ProtectedRoute><RealisasiAnggaranPanel /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute allowedRoles={['Admin']}><UserManagement /></ProtectedRoute>} />
             <Route path="/ppk/persiapan" element={<ProtectedRoute allowedRoles={['Admin', 'PPK']}><ProcurementPreparation /></ProtectedRoute>} />
             <Route path="/pp/panel" element={<ProtectedRoute allowedRoles={['Admin', 'PP']}><ProcurementPanel /></ProtectedRoute>} />
