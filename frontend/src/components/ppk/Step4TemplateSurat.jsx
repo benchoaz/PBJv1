@@ -334,7 +334,7 @@ export default function Step4TemplateSurat() {
  <tbody>
  {getPackageItems(selectedPack).map((item, idx) => {
  const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
- const surveyProduct = surveyData?.products?.[idx];
+ const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
  const displayName = surveyProduct?.name || item.name;
  return (
  <tr key={item.no}>
@@ -557,13 +557,11 @@ export default function Step4TemplateSurat() {
  </thead>
  <tbody>
  {getPackageItems(selectedPack).map((item, idx) => {
- const surveyProduct = surveyData?.products?.[idx];
- const displayName = surveyProduct?.name || item.name;
  return (
  <tr key={item.no}>
  <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
- <td className="border border-slate-900 p-1">{displayName}</td>
- <td className="border border-slate-900 p-1">Sesuai Kebutuhan DPA</td>
+ <td className="border border-slate-900 p-1">{item.name}</td>
+ <td className="border border-slate-900 p-1">{item.spesifikasi || 'Sesuai Kebutuhan DPA'}</td>
  <td className="border border-slate-900 p-1 text-center">{item.qty}</td>
  <td className="border border-slate-900 p-1 text-center">{item.unit}</td>
  </tr>
@@ -682,7 +680,7 @@ export default function Step4TemplateSurat() {
  {getPackageItems(selectedPack).map((item, idx) => {
  const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
  // ✅ FIX: Use updated name from surveyData if available (e.g. user changed keyword)
- const surveyProduct = surveyData?.products?.[idx];
+ const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
  const displayName = surveyProduct?.name || item.name;
  return (
  <tr key={item.no}>

@@ -80,7 +80,8 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
     dpaAccounts,
     selectedNdTplId,
     selectedTplId,
-    tanggalSurat
+    tanggalSurat,
+    getPackageItems
   } = usePPK();
 
   const formatTanggalIndo = (tglStr) => {
@@ -110,135 +111,6 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
     if (name.includes('jasa') || name.includes('pemeliharaan') || name.includes('service')) return 'Jasa';
     return 'ATK';
   };
-
-    const areAccountsCompatible = (dpaAcc, sirupMak) => {
-    if (!dpaAcc || !sirupMak) return true
-
-    // Temukan index angka 5 yang merupakan bagian awal kode rekening belanja (5.x.xx...)
-    const indexFive = sirupMak.indexOf('5.')
-    let cleanSirup = ''
-    if (indexFive !== -1) {
-      // Ambil dari angka 5 ke belakang
-      const makAccountPart = sirupMak.substring(indexFive)
-      cleanSirup = makAccountPart.replace(/[^0-9]/g, '')
-    } else {
-      cleanSirup = sirupMak.replace(/[^0-9]/g, '')
-    }
-
-    const cleanDpa = dpaAcc.replace(/[^0-9]/g, '')
-    if (!cleanDpa || !cleanSirup) return true
-
-    // Cocokkan apakah kode DPA terkandung di dalam bagian rekening MAK
-    if (cleanSirup.includes(cleanDpa) || cleanDpa.includes(cleanSirup)) return true
-
-    // Bandingkan kategori utama (6 digit pertama, misal 520205 vs 520210)
-    const prefixDpa = cleanDpa.substring(0, 6)
-    const prefixSirup = cleanSirup.substring(0, 6)
-    if (prefixDpa && prefixSirup && prefixDpa === prefixSirup) return true
-
-    return false
-  }
-
-  const isPackageMatchedWithDpa = (pack) => {
-    if (!pack || !dpaAccounts || dpaAccounts.length === 0) return false
-
-    // Stop words to filter out common terms from government accounts
-    const stopWords = ['belanja', 'dan', 'untuk', 'kegiatan', 'bahan', 'alat', 'kantor', 'sub', 'penyediaan', 'jasa', 'modal']
-
-    return dpaAccounts.some(acc => {
-      // If MAK and account are incompatible, they cannot be a match!
-      if (pack.mak && acc.account && !areAccountsCompatible(acc.account, pack.mak)) {
-        return false
-      }
-
-      // 1. Direct Pagu Match (common in regional budget systems)
-      const paguDifference = Math.abs(acc.pagu - pack.pagu)
-      if (paguDifference < 1000) return true
-
-      // 2. Dynamic Keyword Matching
-      const accWords = acc.name.toLowerCase().split(/[\s/.,()-]+/)
-      const keywords = accWords.filter(w => w.length > 2 && !stopWords.includes(w))
-
-      const packNameLower = (pack.packName || '').toLowerCase()
-      const hasKeywordMatch = keywords.some(kw => packNameLower.includes(kw))
-
-      // If we have keyword overlap and the package pagu is valid, it's a match!
-      if (hasKeywordMatch && pack.pagu <= acc.pagu) {
-        return true
-      }
-
-      return false
-    })
-  }
-
-  const getMatchingDpaAccount = (pack) => {
-    if (!pack || !dpaAccounts || dpaAccounts.length === 0) return null
-
-    const stopWords = ['belanja', 'dan', 'untuk', 'kegiatan', 'bahan', 'alat', 'kantor', 'sub', 'penyediaan', 'jasa', 'modal']
-
-    return dpaAccounts.find(acc => {
-      // If MAK and account are incompatible, they cannot be a match!
-      if (pack.mak && acc.account && !areAccountsCompatible(acc.account, pack.mak)) {
-        return false
-      }
-
-      // 1. Direct Pagu Match (common in regional budget systems)
-      const paguDifference = Math.abs(acc.pagu - pack.pagu)
-      if (paguDifference < 1000) return true
-
-      // 2. Dynamic Keyword Matching
-      const accWords = acc.name.toLowerCase().split(/[\s/.,()-]+/)
-      const keywords = accWords.filter(w => w.length > 2 && !stopWords.includes(w))
-
-      const packNameLower = (pack.packName || '').toLowerCase()
-      const hasKeywordMatch = keywords.some(kw => packNameLower.includes(kw))
-
-      if (hasKeywordMatch && pack.pagu <= acc.pagu) {
-        return true
-      }
-
-      return false
-    })
-  }
-
-  /**
-   * getPackageItems — ambil rincian item dari DPA Ground Truth (hasil parser + koreksi PPK).
-   * Prioritas: (1) dpaRincian[kode_rekening cocok], (2) dpaRincian['manual_nosirup_xxx'],
-   * (3) item placeholder agar tabel tidak kosong.
-   */
-  const getPackageItems = (pack) => {
-    if (!pack) return []
-
-    // Cari kode rekening DPA yang cocok dengan paket ini (by pagu atau keyword)
-    const matchedAcc = getMatchingDpaAccount(pack)
-    const kodeRekening = matchedAcc?.account
-
-    // 1. Ambil rincian dari DPA Ground Truth berdasarkan kode rekening
-    if (kodeRekening && dpaRincian[kodeRekening] && dpaRincian[kodeRekening].length > 0) {
-      return dpaRincian[kodeRekening].map((r, i) => ({
-        no: i + 1,
-        name: r.nama,
-        qty: r.volume,
-        unit: r.satuan,
-        price: r.harga_satuan,
-      }))
-    }
-
-    // 2. Coba kunci noSirup langsung
-    const keyNoSirup = `nosirup_${pack.noSirup}`
-    if (dpaRincian[keyNoSirup] && dpaRincian[keyNoSirup].length > 0) {
-      return dpaRincian[keyNoSirup].map((r, i) => ({
-        no: i + 1, name: r.nama, qty: r.volume, unit: r.satuan, price: r.harga_satuan,
-      }))
-    }
-
-    // 3. Placeholder — PPK perlu isi manual rincian
-    return [
-      { no: 1, name: '⚠️ Rincian belum tersedia — klik "Edit Rincian" pada tabel DPA di atas', qty: 1, unit: 'Paket', price: pack.pagu }
-    ]
-  }
-
-
 
   const handleExportWord = async () => {
     const printSheet = document.getElementById('print-sheet');
@@ -730,7 +602,7 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
  <tbody>
  {getPackageItems(selectedPack).map((item, idx) => {
  const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
- const surveyProduct = surveyData?.products?.[idx];
+ const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
  const displayName = surveyProduct?.name || item.name;
  return (
  <tr key={item.no}>
@@ -991,29 +863,28 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
 
     <div className="font-bold uppercase mt-8 mb-2 text-center">BAB II. SPESIFIKASI TEKNIS E-PURCHASING</div>
     
-    <div className="font-bold mt-5 mb-1">A. Tautan (Link) Produk & Spesifikasi Mutu</div>
+    <div className="font-bold mt-5 mb-1">A. Identitas Barang & Spesifikasi Mutu</div>
     <table className="w-full border-collapse border border-slate-900 mb-2">
       <thead>
         <tr className="bg-slate-100 font-bold text-center">
           <td className="border border-slate-900 p-1 w-8">No</td>
-          <td className="border border-slate-900 p-1">Identitas/Jenis Barang & Merek</td>
+          <td className="border border-slate-900 p-1">Identitas / Nama Barang & Spesifikasi Mutu</td>
           <td className="border border-slate-900 p-1 w-16">Kuantitas</td>
           <td className="border border-slate-900 p-1 w-16">Satuan</td>
         </tr>
       </thead>
       <tbody>
         {getPackageItems(selectedPack).map((item, idx) => {
-          const surveyProduct = surveyData?.products?.[idx];
-          const displayName = surveyProduct?.name || item.name;
-          const brandText = surveyProduct ? (surveyProduct.vendor || 'Sesuai Katalog') : 'Sesuai Kebutuhan DPA';
-          const linkHref = surveyProduct ? surveyProduct.link : '#';
           return (
             <tr key={item.no}>
               <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
               <td className="border border-slate-900 p-1">
-                <strong>{displayName}</strong><br/>
-                Merek/Penyedia: {brandText}<br/>
-                <a href={linkHref} target="_blank" className="text-blue-600 break-all text-[10px]">{linkHref}</a>
+                <strong>{item.name}</strong>
+                {item.spesifikasi && (
+                  <div style={{ marginTop: '4px', fontSize: '11px', color: '#334155' }}>
+                    Spesifikasi: {item.spesifikasi}
+                  </div>
+                )}
               </td>
               <td className="border border-slate-900 p-1 text-center">{item.qty}</td>
               <td className="border border-slate-900 p-1 text-center">{item.unit}</td>
@@ -1061,15 +932,16 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
           <tr className="bg-slate-100 font-bold text-center">
             <td className="border border-slate-900 p-1 w-8">No</td>
             <td className="border border-slate-900 p-1">Uraian Barang</td>
-            <td className="border border-slate-900 p-1 w-32 text-right">Harga DPA</td>
-            <td className="border border-slate-900 p-1 w-32 text-right">Harga Tayang e-Katalog</td>
+            <td className="border border-slate-900 p-1 w-24 text-right">Harga DPA</td>
+            <td className="border border-slate-900 p-1 w-24 text-right">Harga Tayang e-Katalog</td>
+            <td className="border border-slate-900 p-1">Penyedia & Tautan e-Katalog</td>
           </tr>
         )}
       </thead>
       <tbody>
         {getPackageItems(selectedPack).map((item, idx) => {
           const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
-          const surveyProduct = surveyData?.products?.[idx];
+          const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
           const displayName = surveyProduct?.name || item.name;
           const hargaTayang = surveyProduct?.price ? surveyProduct.price : 0;
           const compKey = 'ITEM-' + idx;
@@ -1106,12 +978,24 @@ export default function DocPreviewModal({ isHpsExemptSelected, comparisons, just
               </tr>
             );
           } else {
+            const brandText = surveyProduct ? (surveyProduct.vendor || 'Sesuai Katalog') : 'Sesuai Kebutuhan DPA';
+            const linkHref = surveyProduct ? surveyProduct.link : '';
             return (
               <tr key={item.no}>
                 <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
-                <td className="border border-slate-900 p-1">{displayName}</td>
+                <td className="border border-slate-900 p-1">{item.name}</td>
                 <td className="border border-slate-900 p-1 text-right">Rp {(item.price || 0).toLocaleString('id-ID')}</td>
                 <td className="border border-slate-900 p-1 text-right">Rp {(hargaTayang || 0).toLocaleString('id-ID')}</td>
+                <td className="border border-slate-900 p-1 text-sm">
+                  {surveyProduct && surveyProduct.success && surveyProduct.vendor !== 'TIDAK DITEMUKAN' ? (
+                    <>
+                      <strong>{brandText}</strong><br/>
+                      <a href={linkHref} target="_blank" className="text-blue-600 break-all text-[10px]">{linkHref}</a>
+                    </>
+                  ) : (
+                    <span className="text-slate-400 italic">Belum disurvei / tidak ditemukan</span>
+                  )}
+                </td>
               </tr>
             );
           }

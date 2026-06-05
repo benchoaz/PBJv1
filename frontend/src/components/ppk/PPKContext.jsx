@@ -131,19 +131,41 @@ export function PPKProvider({ children }) {
 
     if (kodeRekening && dpaRincian[kodeRekening] && dpaRincian[kodeRekening].length > 0) {
       return dpaRincian[kodeRekening].map((r, i) => ({
-        no: i + 1, name: r.nama, qty: r.volume, unit: r.satuan, price: r.harga_satuan,
+        no: i + 1,
+        name: r.nama,
+        qty: r.volume,
+        unit: r.satuan,
+        price: r.harga_satuan,
+        dpa_price: r.harga_satuan,
+        paguDpa: r.harga_satuan,
+        spesifikasi: r.spesifikasi || r.specs || '',
       }));
     }
 
     const keyNoSirup = `nosirup_${pack.noSirup}`;
     if (dpaRincian[keyNoSirup] && dpaRincian[keyNoSirup].length > 0) {
       return dpaRincian[keyNoSirup].map((r, i) => ({
-        no: i + 1, name: r.nama, qty: r.volume, unit: r.satuan, price: r.harga_satuan,
+        no: i + 1,
+        name: r.nama,
+        qty: r.volume,
+        unit: r.satuan,
+        price: r.harga_satuan,
+        dpa_price: r.harga_satuan,
+        paguDpa: r.harga_satuan,
+        spesifikasi: r.spesifikasi || r.specs || '',
       }));
     }
 
     return [
-      { no: 1, name: '⚠️ Rincian belum tersedia — klik "Edit Rincian" pada tabel DPA di atas', qty: 1, unit: 'Paket', price: pack.pagu }
+      {
+        no: 1,
+        name: '⚠️ Rincian belum tersedia — klik "Edit Rincian" pada tabel DPA di atas',
+        qty: 1,
+        unit: 'Paket',
+        price: pack.pagu,
+        dpa_price: pack.pagu,
+        paguDpa: pack.pagu,
+      }
     ];
   };
 

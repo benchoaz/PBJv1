@@ -161,6 +161,15 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
+	// AI Generate Spec endpoint
+	mux.HandleFunc("POST /api/ai/generate-spec", handlers.GenerateSpec)
+	mux.HandleFunc("OPTIONS /api/ai/generate-spec", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-AI-Provider, X-AI-Key")
+		w.WriteHeader(http.StatusOK)
+	})
+
 	addr := ":8080"
 	if port := os.Getenv("PORT"); port != "" {
 		addr = ":" + port

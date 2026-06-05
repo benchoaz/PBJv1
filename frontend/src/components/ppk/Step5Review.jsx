@@ -93,13 +93,14 @@ export default function Step5Review() {
                       return qty > 0;
                     })
                     .map((item, idx) => {
-                      const surveyProduct = surveyData?.products?.[idx];
+                      const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
                       const unitHpsPrice = surveyProduct?.price !== undefined ? surveyProduct.price : item.price;
                       return {
                         ...item,
                         qty: item.qty === '' ? 0 : (item.qty || 0),
                         name: surveyProduct?.name || item.name,
                         price: unitHpsPrice,
+                        dpa_price: item.price,
                         paguDpa: item.price,
                         katalogPrice: surveyProduct?.price || unitHpsPrice,
                         vendor: surveyProduct?.vendor || '',

@@ -83,6 +83,37 @@ export default function Step3RincianHPS() {
   const [expandedEditCardIndex, setExpandedEditCardIndex] = useState(null);
   const [expandedSurveyRows, setExpandedSurveyRows] = useState({});
   const [cancelJobId, setCancelJobId] = useState(null);
+  const [aiLoadingSpecIndex, setAiLoadingSpecIndex] = useState(null);
+
+  const handleAiSpecAssist = async (item, idx) => {
+    setAiLoadingSpecIndex(idx);
+    try {
+      const response = await fetch('/api/ai/generate-spec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_name: item.name })
+      });
+      if (!response.ok) throw new Error('Gagal menghubungi server AI');
+      const data = await response.json();
+      if (data.success && data.specifications) {
+        const matchedAcc = getMatchingDpaAccount(selectedPack);
+        const kodeRekening = matchedAcc?.account || `nosirup_${selectedPack?.noSirup}`;
+        if (kodeRekening && dpaRincian[kodeRekening]) {
+          const newRincian = { ...dpaRincian };
+          const newArr = [...newRincian[kodeRekening]];
+          newArr[idx] = { ...newArr[idx], spesifikasi: data.specifications };
+          newRincian[kodeRekening] = newArr;
+          setDpaRincian(newRincian);
+          setIsSigned(false);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Gagal menghasilkan spesifikasi otomatis: ' + e.message);
+    } finally {
+      setAiLoadingSpecIndex(null);
+    }
+  };
 
   const [useAiMode, setUseAiMode] = useState(true);
   const [globalPriceTolerance, setGlobalPriceTolerance] = useState(8);
@@ -1140,9 +1171,42 @@ export default function Step3RincianHPS() {
                               <React.Fragment key={item.no || idx}>
                               <tr className={`border-b border-slate-100 hover:bg-slate-50/60 transition-colors ${isOverbudget ? 'bg-rose-50/50' : ''}`}>
                                 <td className="py-3 px-3 text-center text-slate-400 font-bold">{idx + 1}</td>
-                                <td className="py-3 px-2 font-bold text-slate-800">
-                                  {item.name}
-                                  <span className="text-[10px] text-slate-450 block font-normal mt-0.5">Satuan: {item.unit}</span>
+                                <td className="py-3 px-2 text-slate-800">
+                                  <div className="font-bold">{item.name}</div>
+                                  <span className="text-[10px] text-slate-450 block font-normal mt-0.5 mb-2">Satuan: {item.unit}</span>
+                                  
+                                  {/* Input Parameter Teknis Produk */}
+                                  <div className="flex flex-col gap-1 mt-1.5 max-w-xs">
+                                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Parameter Teknis / Spesifikasi Mutu:</span>
+                                    <div className="flex gap-1.5 items-center">
+                                      <textarea
+                                        value={item.spesifikasi || ''}
+                                        onChange={(e) => {
+                                          const matchedAcc = getMatchingDpaAccount(selectedPack);
+                                          const kodeRekening = matchedAcc?.account || `nosirup_${selectedPack?.noSirup}`;
+                                          if (kodeRekening && dpaRincian[kodeRekening]) {
+                                            const newRincian = { ...dpaRincian };
+                                            const newArr = [...newRincian[kodeRekening]];
+                                            newArr[idx] = { ...newArr[idx], spesifikasi: e.target.value };
+                                            newRincian[kodeRekening] = newArr;
+                                            setDpaRincian(newRincian);
+                                            setIsSigned(false);
+                                          }
+                                        }}
+                                        placeholder="Contoh: Ukuran 0.8 mm, tinta hitam, nyaman digenggam..."
+                                        className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y min-h-[36px]"
+                                      />
+                                      <button
+                                        type="button"
+                                        disabled={aiLoadingSpecIndex === idx}
+                                        onClick={() => handleAiSpecAssist(item, idx)}
+                                        className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-850 font-bold border border-indigo-200 rounded text-[9px] flex items-center gap-1 transition-all h-fit self-end shrink-0"
+                                        title="Dapatkan rekomendasi spesifikasi dari AI"
+                                      >
+                                        {aiLoadingSpecIndex === idx ? '⏳' : '✨'} AI Bantu
+                                      </button>
+                                    </div>
+                                  </div>
                                 </td>
                                 <td className="py-3 px-2">
                                   {surveyItem && surveyItem.success && surveyItem.vendor !== 'TIDAK DITEMUKAN' ? (
@@ -1150,7 +1214,12 @@ export default function Step3RincianHPS() {
                                       <span className="text-[10px] font-bold text-slate-700 truncate max-w-[150px]" title={surveyItem.vendor}>🏪 {surveyItem.vendor}</span>
                                       {(() => {
                                         const location = surveyItem.location || surveyItem.location_name || surveyItem.address || '';
-                                        const isOutside = location && searchLocations && !searchLocations.split(',').some(loc => location.toLowerCase().includes(loc.trim().toLowerCase()));
+                                        const cleanStr = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                        const isOutside = location && searchLocations && !searchLocations.split(',').some(loc => {
+                                          const cleanLoc = cleanStr(loc);
+                                          const cleanLocation = cleanStr(location);
+                                          return cleanLocation.includes(cleanLoc) || cleanLoc.includes(cleanLocation);
+                                        });
                                         if (isOutside) {
                                           return (
                                             <span className="text-[8px] font-bold text-rose-700 bg-rose-50 px-1 py-0.5 rounded border border-rose-200 w-fit mt-0.5" title={`Produk ditemukan di ${location}, di luar target wilayah: ${searchLocations}`}>
@@ -1170,6 +1239,11 @@ export default function Step3RincianHPS() {
                                       {surveyItem.isFallbackScreenshot && (
                                         <span className="text-[8px] font-bold text-amber-600 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 w-fit mt-0.5" title="Menggunakan screenshot hasil pencarian karena halaman detail error/diblokir">⚠️ Mode Pencarian</span>
                                       )}
+                                    </div>
+                                  ) : surveyItem ? (
+                                    <div className="flex flex-col gap-1 max-w-[150px]">
+                                      <span className="text-[9px] text-rose-700 font-bold bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded w-fit">❌ Tidak Ditemukan</span>
+                                      <span className="text-[9px] text-rose-500 font-semibold leading-tight block">Wajib atur Qty menjadi 0 agar dikecualikan dari paket</span>
                                     </div>
                                   ) : (
                                     <span className="text-[9px] text-slate-400 italic bg-slate-100 px-1.5 py-0.5 rounded">Belum disurvei</span>
@@ -2254,7 +2328,7 @@ export default function Step3RincianHPS() {
                 if (confirm('Anda yakin ingin menyerahkan dan mengunci dokumen ini untuk PP?')) {
                   const finalizedItems = getPackageItems(selectedPack).map((item, idx) => {
                     const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
-                    const surveyProduct = surveyData?.products?.[idx];
+                    const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
                     return {
                       ...item,
                       name: surveyProduct?.name || item.name,
