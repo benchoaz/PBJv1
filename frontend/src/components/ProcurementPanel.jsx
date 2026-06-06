@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import BahpDocument from './pp/BahpDocument'
 import { BAHP_TEMPLATE_TYPES, VALIDASI_CONFIG } from './pp/BahpTemplates'
+import { dialog } from '../utils/dialog'
 
 export default function ProcurementPanel() {
   const { user } = useAuth()
@@ -114,7 +115,7 @@ export default function ProcurementPanel() {
             dpaName: parsedData?.dpaName || 'DPA_Document.pdf',
             senderName: parsedData?.senderName || parsedData?.currentUser?.name || incomingPack.created_by || 'PPK',
             senderNip: parsedData?.senderNip || parsedData?.currentUser?.nip || '197909102002121004',
-            senderDepartment: parsedData?.senderDepartment || parsedData?.currentUser?.department || 'Kecamatan Besuk',
+            senderDepartment: parsedData?.senderDepartment || parsedData?.currentUser?.department || user?.department || 'Kecamatan Besuk',
             sentDate: new Date(incomingPack.updated_at || incomingPack.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
             items: mappedItems,
             dppTemplateId: parsedData?.selectedTplId || ''
@@ -210,6 +211,31 @@ export default function ProcurementPanel() {
     ],
   };
   const [searchProgress, setSearchProgress] = useState('');
+  const [currentJobId, setCurrentJobId] = useState(null);
+
+  const handleCancelSearch = async () => {
+    if (!currentJobId) return;
+    const confirmed = await dialog.confirm('Apakah Bapak yakin ingin menghentikan pencarian survei ini?');
+    if (!confirmed) return;
+    
+    try {
+      setSearchProgress('Membatalkan survei... Mohon tunggu.');
+      const res = await fetch(`http://localhost:3001/api/survey/cancel/${currentJobId}`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        setIsSearching(false);
+        setSearchProgress('');
+        setCurrentJobId(null);
+        dialog.toast('Pencarian berhasil dihentikan.', 'success');
+      } else {
+        dialog.error('Gagal mengirim perintah pembatalan ke server.');
+      }
+    } catch (e) {
+      console.error('Failed to cancel survey:', e);
+      dialog.error('Error saat membatalkan pencarian.');
+    }
+  };
   // Finalization state
   const [showFinalizeModal, setShowFinalizeModal] = useState(false);
   const [deliveryLocation, setDeliveryLocation] = useState('');
@@ -239,6 +265,19 @@ export default function ProcurementPanel() {
     const next = { ...docSettings, showKop: !docSettings.showKop };
     setDocSettings(next);
     localStorage.setItem('pbj_doc_settings', JSON.stringify(next));
+  };
+
+  const handleTtdUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64Str = event.target.result;
+      const newSettings = { ...docSettings, ttdPp: base64Str };
+      setDocSettings(newSettings);
+      localStorage.setItem('pbj_doc_settings', JSON.stringify(newSettings));
+    };
+    reader.readAsDataURL(file);
   };
 
   // Re-sync docSettings whenever tab switches to BAHP tab (to catch updates from Admin/Template panel)
@@ -280,10 +319,11 @@ export default function ProcurementPanel() {
     }));
   };
 
-  const executePuppeteerSearch = async (itemsToSearch) => {
+  const executePuppeteerSearch = async (itemsToSearch, forceAutoComparator = null) => {
     if (itemsToSearch.length === 0) return;
     setIsSearching(true);
     setSearchProgress(`Menganalisis e-Katalog untuk ${itemsToSearch.length} produk... Mohon tunggu.`);
+    const useAutoComparator = forceAutoComparator !== null ? forceAutoComparator : autoComparatorEnabled;
     try {
       // Step 1: Post to queue, get jobId
       const response = await fetch('http://localhost:3001/api/survey/run', {
@@ -294,7 +334,7 @@ export default function ProcurementPanel() {
           useAi: true,
           locations: [],
           ignorePriceLimit: false,
-          autoComparator: autoComparatorEnabled
+          autoComparator: useAutoComparator
         })
       });
 
@@ -302,6 +342,7 @@ export default function ProcurementPanel() {
       const runRes = await response.json();
       if (!runRes.jobId) throw new Error('Tidak mendapatkan Job ID dari server');
       
+      setCurrentJobId(runRes.jobId);
       setSearchProgress(`Job diterima (ID: ${runRes.jobId}). Puppeteer mulai bekerja...`);
 
       // Step 2: Poll for completion
@@ -360,16 +401,17 @@ export default function ProcurementPanel() {
       // Update all negotiated items at ONCE to avoid stale closure issues
       setNegotiatedItems(updatedNego);
       localStorage.setItem('pbj_negotiated_items', JSON.stringify(updatedNego));
-      alert(`✅ Pencarian selesai! ${successCount} dari ${itemsToSearch.length} produk berhasil diperbarui.`);
+      dialog.success(`Pencarian selesai! ${successCount} dari ${itemsToSearch.length} produk berhasil diperbarui.`);
     } catch (e) {
-      alert('❌ Error: ' + e.message);
+      dialog.error(e.message);
     } finally {
       setIsSearching(false);
       setSearchProgress('');
+      setCurrentJobId(null);
     }
   };
 
-  const handleSearchSingleItem = (item) => {
+  const handleSearchSingleItem = (item, forceAutoComparator = null) => {
     const params = searchParams[item.no] || {};
     const payloadItem = {
       name: params.query || item.name,
@@ -385,10 +427,10 @@ export default function ProcurementPanel() {
       explicitMinPrice: params.minPrice && parseInt(params.minPrice) > 0 ? parseInt(params.minPrice) : null,
       explicitMaxPrice: params.maxPrice && parseInt(params.maxPrice) > 0 ? parseInt(params.maxPrice) : null
     };
-    executePuppeteerSearch([payloadItem]);
+    executePuppeteerSearch([payloadItem], forceAutoComparator);
   };
 
-  const handleSearchAll = () => {
+  const handleSearchAll = (forceAutoComparator = null) => {
     const activeItems = getPackageItems(submittedPack).filter(i => checkedItems[i.no]);
     const payloadItems = activeItems.map(item => {
       const params = searchParams[item.no] || {};
@@ -404,7 +446,59 @@ export default function ProcurementPanel() {
         explicitMaxPrice: params.maxPrice && parseInt(params.maxPrice) > 0 ? parseInt(params.maxPrice) : null
       };
     });
-    executePuppeteerSearch(payloadItems);
+    executePuppeteerSearch(payloadItems, forceAutoComparator);
+  };
+
+  const executeSealPackage = async () => {
+    try {
+      const targetId = submittedPack?.id;
+      if (targetId) {
+        let updatedDescription = '';
+        try {
+          let currentDesc = {};
+          try {
+            currentDesc = JSON.parse(submittedPack.description || '{}');
+          } catch(e) {}
+          
+          currentDesc.ppEvaluation = {
+            vendorRating: localStorage.getItem('pbj_vendor_rating') || '0',
+            vendorRatingStatus: localStorage.getItem('pbj_vendor_rating_status') || '',
+            vendorRatingNote: localStorage.getItem('pbj_vendor_rating_note') || '',
+            qualityRating: localStorage.getItem('pbj_quality_rating') || '0',
+            deliveryRating: localStorage.getItem('pbj_delivery_rating') || '0',
+            communicationRating: localStorage.getItem('pbj_communication_rating') || '0',
+            specEqual: localStorage.getItem('pbj_spec_equal') || '',
+            specEqualNote: localStorage.getItem('pbj_spec_equal_note') || '',
+            deliveryAgreement: localStorage.getItem('pbj_delivery_agreement') || '',
+            koordinatLokasi: localStorage.getItem('pbj_koordinat_lokasi') || '',
+          };
+          updatedDescription = JSON.stringify(currentDesc);
+        } catch(e) {
+          console.error('Failed to serialize PP evaluation:', e);
+        }
+
+        const res = await fetch(`/api/projects/${targetId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            status: 'Selesai (Arsip Lengkap)',
+            ...(updatedDescription ? { description: updatedDescription } : {})
+          })
+        });
+        if (!res.ok) throw new Error('Gagal memperbarui status paket di server');
+      }
+      
+      await dialog.success('Luar Biasa! Pekerjaan selesai! Dokumen arsip lengkap Inaproc telah diunggah dan dikembalikan ke PPK untuk keperluan audit BPK.');
+      
+      // Clear local states
+      localStorage.removeItem('pbj_submitted_package');
+      localStorage.removeItem('pbj_negotiated_items');
+      localStorage.removeItem('pbj_pp_checked_items');
+      
+      window.location.href = '/'; 
+    } catch (e) {
+      dialog.error('Gagal menyelesaikan paket: ' + e.message);
+    }
   };
 
   const handleFinalizeBahp = async () => {
@@ -572,7 +666,7 @@ export default function ProcurementPanel() {
           has_exceptions: hasExceptions,
           exception_notes: exceptionNotes,
           items: items,
-          unit_name: submittedPack ? submittedPack.senderDepartment : 'Kecamatan Besuk',
+          unit_name: submittedPack ? submittedPack.senderDepartment : (user?.department || 'Kecamatan Besuk'),
           document_date: new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
         })
       });
@@ -1174,9 +1268,29 @@ export default function ProcurementPanel() {
   const [deliveryAgreement, setDeliveryAgreement] = useState(() => localStorage.getItem('pbj_delivery_agreement') || '')
   const [warrantyAgreement, setWarrantyAgreement] = useState(() => localStorage.getItem('pbj_warranty_agreement') || '')
   const [paymentTerms, setPaymentTerms] = useState(() => localStorage.getItem('pbj_payment_terms') || 'Lunas setelah serah terima barang')
-  const [vendorRating, setVendorRating] = useState(() => parseInt(localStorage.getItem('pbj_vendor_rating') || '0'))
+  const [vendorRating, setVendorRating] = useState(() => parseFloat(localStorage.getItem('pbj_vendor_rating') || '0'))
   const [vendorRatingNote, setVendorRatingNote] = useState(() => localStorage.getItem('pbj_vendor_rating_note') || '')
   const [vendorRatingStatus, setVendorRatingStatus] = useState(() => localStorage.getItem('pbj_vendor_rating_status') || '')
+  const [qualityRating, setQualityRating] = useState(() => parseInt(localStorage.getItem('pbj_quality_rating') || '0'))
+  const [deliveryRating, setDeliveryRating] = useState(() => parseInt(localStorage.getItem('pbj_delivery_rating') || '0'))
+  const [communicationRating, setCommunicationRating] = useState(() => parseInt(localStorage.getItem('pbj_communication_rating') || '0'))
+  const [showForcedRatingModal, setShowForcedRatingModal] = useState(false)
+
+  const updateOverallRating = (q, d, c) => {
+    if (q > 0 && d > 0 && c > 0) {
+      const avg = ((q + d + c) / 3).toFixed(1);
+      const parsedAvg = parseFloat(avg);
+      setVendorRating(parsedAvg);
+      saveBAHPField('pbj_vendor_rating', parsedAvg);
+      
+      let status = 'Cukup';
+      if (parsedAvg >= 4.5) status = 'Sangat Baik';
+      else if (parsedAvg >= 3.5) status = 'Baik';
+      else if (parsedAvg < 2.5) status = 'Kurang Baik';
+      setVendorRatingStatus(status);
+      saveBAHPField('pbj_vendor_rating_status', status);
+    }
+  }
 
   // Template-specific dynamic states
   const [tenagaAhliList, setTenagaAhliList] = useState(() => {
@@ -1546,7 +1660,7 @@ export default function ProcurementPanel() {
                       dpaName: 'DPA TA. 2026 KEC. BESUK-90-95.pdf',
                       senderName: 'Handik Hariyanto, S.Kom., M.Si',
                       senderNip: '197909102002121004',
-                      senderDepartment: 'Kantor Kecamatan Besuk',
+                      senderDepartment: user?.department || 'Kantor Kecamatan Besuk',
                       sentDate: '17 Mei 2026'
                     }
                     setSubmittedPack(mockPack)
@@ -1577,7 +1691,7 @@ export default function ProcurementPanel() {
               <div className="flex flex-wrap items-center gap-2">
                 {/* Tombol 1: Cari saja tanpa pembanding */}
                 <button 
-                  onClick={() => { setAutoComparatorEnabled(false); setTimeout(handleSearchAll, 0); }}
+                  onClick={() => { setAutoComparatorEnabled(false); handleSearchAll(false); }}
                   disabled={isSearching}
                   className="bg-teal-600 hover:bg-teal-700 text-white shadow-sm text-xs py-2.5 px-4 rounded-lg font-bold flex items-center gap-2 transition-all disabled:opacity-50"
                   title="Cari harga terbaik untuk semua produk tanpa mencari pembanding"
@@ -1591,7 +1705,7 @@ export default function ProcurementPanel() {
                 </button>
                 {/* Tombol 2: Cari + Pembanding Massal */}
                 <button 
-                  onClick={() => { setAutoComparatorEnabled(true); setTimeout(handleSearchAll, 0); }}
+                  onClick={() => { setAutoComparatorEnabled(true); handleSearchAll(true); }}
                   disabled={isSearching}
                   className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm text-xs py-2.5 px-4 rounded-lg font-bold flex items-center gap-2 transition-all disabled:opacity-50"
                   title="Cari harga terbaik DAN sekalian cari 1-2 produk pembanding dari penyedia lain (untuk BAHP). Proses lebih lama."
@@ -1607,9 +1721,20 @@ export default function ProcurementPanel() {
             </div>
             
             {isSearching && (
-              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-4 flex items-center gap-3 animate-pulse">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-700"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <span className="text-sm font-bold">{searchProgress}</span>
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl mb-4 flex items-center justify-between gap-3 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-700"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <span className="text-sm font-bold">{searchProgress}</span>
+                </div>
+                {currentJobId && (
+                  <button 
+                    onClick={handleCancelSearch}
+                    className="bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors border border-rose-200 flex items-center gap-1 active:scale-95 flex-shrink-0"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                    <span>Hentikan</span>
+                  </button>
+                )}
               </div>
             )}
             
@@ -1987,7 +2112,7 @@ export default function ProcurementPanel() {
                                 )}
                                 <div className="flex justify-end gap-2">
                                   <button 
-                                    onClick={() => { setAutoComparatorEnabled(false); handleSearchSingleItem(item); }}
+                                    onClick={() => { setAutoComparatorEnabled(false); handleSearchSingleItem(item, false); }}
                                     disabled={isSearching}
                                     className="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-wait"
                                     title="Cari harga terbaik untuk produk ini saja"
@@ -2000,7 +2125,7 @@ export default function ProcurementPanel() {
                                     <span>{isSearching && !autoComparatorEnabled ? 'Mencari...' : 'Mulai Cari di e-Katalog'}</span>
                                   </button>
                                   <button 
-                                    onClick={() => { setAutoComparatorEnabled(true); handleSearchSingleItem(item); }}
+                                    onClick={() => { setAutoComparatorEnabled(true); handleSearchSingleItem(item, true); }}
                                     disabled={isSearching}
                                     className="bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold px-5 py-2.5 rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-wait"
                                     title="Cari harga terbaik + sekalian cari 1-2 produk pembanding dari penyedia lain untuk BAHP"
@@ -2170,6 +2295,30 @@ export default function ProcurementPanel() {
                     ))}
                   </div>
                 </div>
+
+                {/* Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK) untuk Mamin */}
+                {bahpTemplateId === 'mamin' && (
+                  <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-4 mb-3 font-sans print:border-slate-300">
+                    <div className="text-[11px] font-bold text-amber-800 mb-2 uppercase tracking-wide flex items-center gap-1.5">
+                      <span>💡</span>
+                      Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)
+                    </div>
+                    <div className="text-slate-700 text-xs space-y-2.5">
+                      <div>
+                        <span className="font-bold text-amber-900 block mb-0.5">1. Penerapan Metode Rotasi Kerja/Order (Penyedia Ganda)</span>
+                        <p className="leading-relaxed text-[11px] text-justify">Mengingat terdapat lebih dari 1 (satu) penyedia Mamin dalam wilayah kecamatan yang sama, Pejabat Pengadaan (PP) dan PPK disarankan menerapkan sistem rotasi kerja secara bergiliran pada paket belanja berikutnya. Langkah ini penting untuk mencegah monopoli usaha, mendukung pemerataan ekonomi bagi seluruh UMKK lokal, serta memelihara iklim kemitraan yang sehat.</p>
+                      </div>
+                      <div>
+                        <span className="font-bold text-amber-900 block mb-0.5">2. Penyesuaian Spesifikasi Sajian (Menu Matching)</span>
+                        <p className="leading-relaxed text-[11px] text-justify">Pemilihan penyedia harus disesuaikan dengan kapasitas dan kekhasan menu sajian yang ditawarkan oleh penyedia (misal: nasi kotak, prasmanan, atau snack box) agar selaras dengan kebutuhan jenis kegiatan kedinasan.</p>
+                      </div>
+                      <div>
+                        <span className="font-bold text-amber-900 block mb-0.5">3. Penentuan Lokasi Pengiriman Riil (Alamat Pengiriman Fleksibel)</span>
+                        <p className="leading-relaxed text-[11px] text-justify">Apabila pengantaran makanan ditujukan ke tempat lain di luar kantor instansi/kecamatan (seperti aula desa atau lokasi lapangan), maka pemilihan katering harus memprioritaskan penyedia yang memiliki jarak terdekat ke titik pengiriman riil tersebut demi menjaga kesegaran hidangan, efisiensi waktu, serta meminimalisir biaya pengiriman (ongkir).</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* ─── BARU: D.3 Input Detail Spesifik Jenis Pengadaan ─── */}
                 {['konsultasi_non', 'konsultasi_konstruksi', 'konsolidasi', 'konstruksi', 'modal'].includes(bahpTemplateId) && (
@@ -2627,52 +2776,72 @@ export default function ProcurementPanel() {
                 {/* ═══════════════════════════════════════════════════════════ */}
                 {/* SEKSI F: PENILAIAN KINERJA LAYANAN PENYEDIA               */}
                 {/* ═══════════════════════════════════════════════════════════ */}
-                <div className="font-bold text-[11px] uppercase tracking-wide border-b border-slate-200 pb-1 mt-8 text-indigo-850">F. Penilaian Kinerja Layanan Penyedia</div>
-                <p className="font-sans text-[10px] text-slate-600 mb-3">Penilaian diberikan oleh Pejabat Pengadaan (PP) atas responsivitas dan profesionalisme Penyedia selama proses klarifikasi dan negosiasi e-Purchasing. Hasil penilaian ini selanjutnya dilaporkan melalui <strong>SIKAP (Sistem Informasi Kinerja Penyedia) LKPP</strong> sesuai <strong>Pasal 88 Perpres 12/2021</strong> sebagai rekam jejak kinerja penyedia secara nasional:</p>
+                <div className="font-bold text-[11px] uppercase tracking-wide border-b border-slate-200 pb-1 mt-8 text-indigo-850">F. Ulasan Transaksi & Evaluasi Teknis Penyedia</div>
+                <p className="font-sans text-[10px] text-slate-600 mb-3">Ulasan diberikan oleh Pejabat Pengadaan (PP) atas responsivitas, ketepatan, dan kualitas Penyedia selama negosiasi e-Purchasing. Penilaian ini berfungsi sebagai database rekam jejak penyedia untuk PP lain serta bahan rekomendasi penilaian kinerja oleh PPK sesuai <strong>Pasal 11 Perpres 12/2021</strong>:</p>
 
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 font-sans print:border-slate-300">
-                  <div className="flex flex-col md:flex-row gap-6">
-                    {/* Rating Bintang */}
-                    <div>
-                      <div className="text-[10px] font-bold text-slate-700 mb-2">Nilai Responsivitas Penyedia</div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    {/* Rating Kualitas */}
+                    <div className="bg-white p-3 rounded-xl border border-slate-150 shadow-sm">
+                      <div className="text-[10px] font-bold text-slate-700 mb-1">1. Kualitas Produk & Layanan</div>
                       <div className="flex gap-1">
                         {[1,2,3,4,5].map(star => (
                           <button key={star}
-                            onClick={() => { setVendorRating(star); saveBAHPField('pbj_vendor_rating', star) }}
-                            className={`text-2xl transition-all hover:scale-110 print:cursor-default ${vendorRating >= star ? 'text-amber-400' : 'text-slate-300'}`}
+                            onClick={() => {
+                              setQualityRating(star);
+                              saveBAHPField('pbj_quality_rating', star);
+                              updateOverallRating(star, deliveryRating, communicationRating);
+                            }}
+                            className={`text-2xl transition-all hover:scale-110 print:cursor-default ${qualityRating >= star ? 'text-amber-400' : 'text-slate-250'}`}
                           >★</button>
                         ))}
                       </div>
-                      {vendorRating > 0 && (
-                        <div className="text-[10px] mt-1 font-semibold text-amber-600">
-                          {vendorRating === 5 ? 'Sangat Baik - Sangat Responsif' :
-                           vendorRating === 4 ? 'Baik - Responsif & Kooperatif' :
-                           vendorRating === 3 ? 'Cukup - Respon Normal' :
-                           vendorRating === 2 ? 'Kurang - Lambat Merespon' :
-                           'Buruk - Tidak Kooperatif'}
-                        </div>
-                      )}
                     </div>
 
-                    {/* Status Penilaian */}
-                    <div className="flex-1">
-                      <div className="text-[10px] font-bold text-slate-700 mb-2">Status Penilaian Keseluruhan</div>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { val: 'Sangat Baik', color: 'emerald' },
-                          { val: 'Baik', color: 'indigo' },
-                          { val: 'Cukup', color: 'amber' },
-                          { val: 'Kurang Baik', color: 'rose' },
-                        ].map(opt => (
-                          <button key={opt.val}
-                            onClick={() => { setVendorRatingStatus(opt.val); saveBAHPField('pbj_vendor_rating_status', opt.val) }}
-                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
-                              vendorRatingStatus === opt.val
-                                ? `bg-${opt.color}-100 border-${opt.color}-400 text-${opt.color}-800`
-                                : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
-                            }`}
-                          >{opt.val}</button>
+                    {/* Rating Waktu */}
+                    <div className="bg-white p-3 rounded-xl border border-slate-150 shadow-sm">
+                      <div className="text-[10px] font-bold text-slate-700 mb-1">2. Ketepatan Waktu Pengiriman</div>
+                      <div className="flex gap-1">
+                        {[1,2,3,4,5].map(star => (
+                          <button key={star}
+                            onClick={() => {
+                              setDeliveryRating(star);
+                              saveBAHPField('pbj_delivery_rating', star);
+                              updateOverallRating(qualityRating, star, communicationRating);
+                            }}
+                            className={`text-2xl transition-all hover:scale-110 print:cursor-default ${deliveryRating >= star ? 'text-amber-400' : 'text-slate-250'}`}
+                          >★</button>
                         ))}
+                      </div>
+                    </div>
+
+                    {/* Rating Komunikasi */}
+                    <div className="bg-white p-3 rounded-xl border border-slate-150 shadow-sm">
+                      <div className="text-[10px] font-bold text-slate-700 mb-1">3. Komunikasi & Responsivitas</div>
+                      <div className="flex gap-1">
+                        {[1,2,3,4,5].map(star => (
+                          <button key={star}
+                            onClick={() => {
+                              setCommunicationRating(star);
+                              saveBAHPField('pbj_communication_rating', star);
+                              updateOverallRating(qualityRating, deliveryRating, star);
+                            }}
+                            className={`text-2xl transition-all hover:scale-110 print:cursor-default ${communicationRating >= star ? 'text-amber-400' : 'text-slate-250'}`}
+                          >★</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-white border border-slate-150 rounded-xl p-3 mb-4 shadow-sm">
+                    <div className="flex items-center gap-4">
+                      <div className="text-center bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-2">
+                        <div className="text-[9px] uppercase font-bold text-indigo-500">Skor Indeks</div>
+                        <div className="text-xl font-bold text-indigo-700">{vendorRating > 0 ? vendorRating.toFixed(1) : '0.0'}</div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-bold text-slate-800">Status Kinerja: <span className="text-indigo-600 font-semibold">{vendorRatingStatus || '-'}</span></div>
+                        <div className="text-[10px] text-slate-400">Dihitung otomatis dari rata-rata 3 aspek evaluasi</div>
                       </div>
                     </div>
                   </div>
@@ -2681,7 +2850,7 @@ export default function ProcurementPanel() {
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">Catatan Evaluasi Kinerja Penyedia</label>
                     <textarea value={vendorRatingNote}
                       onChange={e => { setVendorRatingNote(e.target.value); saveBAHPField('pbj_vendor_rating_note', e.target.value) }}
-                      placeholder="Contoh: Penyedia merespons pertanyaan dalam waktu &lt;1 jam. Konfirmasi stok dan ketersediaan pengiriman sangat cepat. Direkomendasikan untuk pengadaan berikutnya."
+                      placeholder="Contoh: Makanan higienis dan tepat rasa. Pengiriman tepat waktu. Penyedia sangat kooperatif selama negosiasi."
                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400"
                       rows={3}
                     />
@@ -2701,13 +2870,79 @@ export default function ProcurementPanel() {
                   {/* Summary badge for print */}
                   {vendorRating > 0 && vendorRatingStatus && (
                     <div className="mt-3 flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-3">
-                      <div className="text-2xl">{'★'.repeat(vendorRating)}{'☆'.repeat(5-vendorRating)}</div>
+                      <div className="text-xl font-bold text-amber-500">★ {vendorRating.toFixed(1)}</div>
                       <div>
                         <div className="text-[11px] font-bold text-slate-800">Status: {vendorRatingStatus}</div>
                         <div className="text-[10px] text-slate-500">{vendorRatingNote || 'Tidak ada catatan tambahan.'}</div>
                       </div>
                     </div>
                   )}
+
+                  {/* TTD Pejabat Pengadaan (PP) Upload Box */}
+                  <div className="mt-4 border-t border-slate-200 pt-4">
+                    <label className="block text-[10px] font-bold text-slate-700 mb-2 uppercase tracking-wide">✍️ Tanda Tangan Pejabat Pengadaan (PP)</label>
+                    <div className="flex gap-4 mb-3">
+                      {[
+                        { val: 'scan', label: 'Wet/Scan TTD' },
+                        { val: 'tte', label: 'TTE Elektronik (BSrE BSSN)' }
+                      ].map(opt => (
+                        <label key={opt.val} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                          <input
+                            type="radio"
+                            name="sig_method_pp_panel"
+                            value={opt.val}
+                            checked={(docSettings.signatureMethodPp || 'scan') === opt.val}
+                            onChange={(e) => {
+                              const next = { ...docSettings, signatureMethodPp: e.target.value };
+                              setDocSettings(next);
+                              localStorage.setItem('pbj_doc_settings', JSON.stringify(next));
+                            }}
+                            className="accent-indigo-600"
+                          />
+                          <span className={(docSettings.signatureMethodPp || 'scan') === opt.val ? 'font-bold text-indigo-700' : 'text-slate-600'}>{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    {(docSettings.signatureMethodPp || 'scan') === 'scan' ? (
+                      <div className="flex flex-col sm:flex-row gap-4 items-center bg-white border border-slate-200 rounded-xl p-4">
+                        <div className="flex-1">
+                          <p className="text-[10px] text-slate-500 mb-2">Unggah file scan tanda tangan Anda (format PNG/JPG transparan direkomendasikan) agar otomatis dibubuhkan pada dokumen cetak BAHP.</p>
+                          <label className="inline-flex items-center gap-2 cursor-pointer bg-slate-50 hover:bg-indigo-50 border border-slate-350 hover:border-indigo-400 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 hover:text-indigo-700 transition-all select-none">
+                            <span>📤 Unggah TTD</span>
+                            <input type="file" accept="image/*" onChange={handleTtdUpload} className="hidden" />
+                          </label>
+                        </div>
+                        {docSettings.ttdPp ? (
+                          <div className="flex flex-col items-center gap-1.5 border border-slate-100 rounded-lg p-2 bg-slate-50/50">
+                            <img src={docSettings.ttdPp} alt="Pratinjau TTD PP" className="max-h-12 object-contain mix-blend-multiply" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = { ...docSettings, ttdPp: '' };
+                                setDocSettings(next);
+                                localStorage.setItem('pbj_doc_settings', JSON.stringify(next));
+                              }}
+                              className="text-[9px] font-bold text-rose-600 hover:underline"
+                            >
+                              ✕ Hapus TTD
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="w-32 h-12 border border-dashed border-slate-200 rounded-lg flex items-center justify-center text-[9px] text-slate-400 font-medium italic">
+                            Belum ada TTD
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-indigo-50 border border-indigo-150 rounded-xl p-4 text-xs text-indigo-700 font-sans">
+                        <div className="font-bold flex items-center gap-2 uppercase text-[10px] text-indigo-800 mb-1">
+                          <span>🛡️</span> Sertifikat Digital BSrE BSSN Aktif
+                        </div>
+                        <p className="leading-relaxed">Sistem telah terhubung dengan Manajemen Akun Terpusat SPSE & Otoritas Sertifikasi Balai Sertifikasi Elektronik (BSrE) BSSN. Penerbitan BAHP akan ditandatangani secara elektronik (TTE) secara sah dengan enkripsi asimetris.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <p className="mt-8 text-[10px] text-slate-500 italic">
@@ -2724,15 +2959,20 @@ export default function ProcurementPanel() {
                   let hasEmpty = false;
                   activeItems.forEach(i => {
                     const n = negotiatedItems[i.no] || {};
-                    if (!n.vendor || n.tayang === undefined || n.tayang === '' || n.price === undefined || n.price === '') hasEmpty = true;
+                    const vendor = n.vendor !== undefined ? n.vendor : (i.vendor || i.dppVendor || '');
+                    const tayang = n.tayang !== undefined ? n.tayang : (i.katalogPrice !== undefined ? i.katalogPrice : (i.tayang || i.dppTayang || ''));
+                    const price = n.price !== undefined ? n.price : '';
+                    if (!vendor || tayang === undefined || tayang === '' || price === undefined || price === '') {
+                      hasEmpty = true;
+                    }
                   });
                   if (hasEmpty) {
-                    alert('Mohon lengkapi Nama Vendor, Harga Tayang Katalog, dan Harga Negosiasi Satuan untuk seluruh item yang dicentang sebelum menerbitkan BAHP.');
+                    dialog.warning('Mohon lengkapi Nama Vendor, Harga Tayang Katalog, dan Harga Negosiasi Satuan untuk seluruh item yang dicentang sebelum menerbitkan BAHP.');
                     return;
                   }
                   
                   try {
-                    const firstVendor = negotiatedItems[activeItems[0].no]?.vendor || 'Penyedia e-Katalog';
+                    const firstVendor = negotiatedItems[activeItems[0].no]?.vendor || activeItems[0]?.vendor || activeItems[0]?.dppVendor || 'Penyedia e-Katalog';
                     let totalNego = 0;
                     let totalOngkir = 0;
                     activeItems.forEach(i => {
@@ -3021,34 +3261,44 @@ export default function ProcurementPanel() {
             <p className="text-xs text-indigo-700 mb-6">Pastikan seluruh dokumen dari Inaproc sudah terunggah sebelum menyegel paket ini secara permanen.</p>
             <button 
               onClick={async () => {
+                // Check if BAHP exists and is finalized
+                try {
+                  const checkRes = await fetch(`/api/projects/${submittedPack.id}/bahp`);
+                  if (!checkRes.ok || checkRes.status === 404) {
+                    dialog.warning('Bapak belum menyimpan & menerbitkan Berita Acara Hasil Pemilihan (BAHP) untuk paket ini. Harap lengkapi tabel negosiasi dan terbitkan BAHP terlebih dahulu sebelum menyegel paket.');
+                    return;
+                  }
+                  const bahpData = await checkRes.json();
+                  if (!bahpData || !bahpData.vendor_name || (bahpData.negotiated_price === 0 && (!bahpData.items_json || bahpData.items_json === '[]' || bahpData.items_json === ''))) {
+                    dialog.warning('Dokumen BAHP yang ada saat ini masih kosong atau bernilai Rp 0. Harap lengkapi tabel negosiasi dan terbitkan ulang BAHP terlebih dahulu.');
+                    return;
+                  }
+                } catch (e) {
+                  console.error('Failed to verify BAHP status:', e);
+                }
+
                 if (!Object.values(inaprocDocs).some(doc => doc !== null)) {
-                  alert('Harap unggah minimal satu dokumen (BAST/SP) terlebih dahulu sebelum menyelesaikan paket.');
+                  dialog.warning('Harap unggah minimal satu dokumen (BAST/SP) terlebih dahulu sebelum menyelesaikan paket.');
                   return;
                 }
-                if (!confirm('Anda yakin ingin menyegel paket ini? Status paket di Dashboard PPK akan berubah menjadi "Selesai (Arsip Lengkap)".')) return;
-                
-                try {
-                  const targetId = submittedPack?.id;
-                  if (targetId) {
-                    const res = await fetch(`/api/projects/${targetId}`, {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ status: 'Selesai (Arsip Lengkap)' })
-                    });
-                    if (!res.ok) throw new Error('Gagal memperbarui status paket di server');
-                  }
-                  
-                  alert('🎉 Luar Biasa! Pekerjaan selesai! Dokumen arsip lengkap Inaproc telah diunggah dan dikembalikan ke PPK untuk keperluan audit BPK.');
-                  
-                  // Clear local states
-                  localStorage.removeItem('pbj_submitted_package');
-                  localStorage.removeItem('pbj_negotiated_items');
-                  localStorage.removeItem('pbj_pp_checked_items');
-                  
-                  window.location.href = '/'; 
-                } catch (e) {
-                  alert('Gagal menyelesaikan paket: ' + e.message);
+
+                // Check if rating evaluation is complete
+                const isRatingComplete = 
+                  localStorage.getItem('pbj_quality_rating') && localStorage.getItem('pbj_quality_rating') !== '0' &&
+                  localStorage.getItem('pbj_delivery_rating') && localStorage.getItem('pbj_delivery_rating') !== '0' &&
+                  localStorage.getItem('pbj_communication_rating') && localStorage.getItem('pbj_communication_rating') !== '0' &&
+                  localStorage.getItem('pbj_vendor_rating_note') && localStorage.getItem('pbj_vendor_rating_note').trim() !== '';
+
+                if (!isRatingComplete) {
+                  setShowForcedRatingModal(true);
+                  return;
                 }
+
+                const confirmed = await dialog.confirm('Anda yakin ingin menyegel paket ini? Status paket di Dashboard PPK akan berubah menjadi "Selesai (Arsip Lengkap)".');
+                if (!confirmed) return;
+
+                // Call helper to execute sealing
+                await executeSealPackage();
               }}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-3.5 rounded-xl shadow-xl shadow-indigo-600/20 transition-all text-sm w-full md:w-auto"
             >
@@ -3082,7 +3332,7 @@ export default function ProcurementPanel() {
                 type="text"
                 value={deliveryLocation}
                 onChange={e => setDeliveryLocation(e.target.value)}
-                placeholder="Contoh: Kantor Kecamatan Besuk, Jl. Raya Besuk No.1, Probolinggo"
+                placeholder={`Contoh: Kantor ${user?.department || 'Kecamatan'}, Jl. Raya No.1`}
                 className="w-full text-sm p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500"
               />
             </div>
@@ -3131,6 +3381,152 @@ export default function ProcurementPanel() {
                 className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSubmittingBahp ? 'Menyimpan...' : 'Buat BAHP Draft'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {showForcedRatingModal && (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl p-6 animate-scale-in">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+            <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+              ⭐ Ulasan Transaksi & Evaluasi Teknis (Wajib)
+            </h2>
+            <button onClick={() => setShowForcedRatingModal(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
+          </div>
+
+          <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+            Sebelum menyelesaikan dan menyegel paket ini secara permanen, Bapak wajib memberikan ulasan transaksi atas layanan penyedia. Ulasan ini akan menjadi referensi bagi PP lainnya serta bahan rekomendasi penilaian kinerja oleh PPK sesuai Pasal 11 Perpres 12/2021.
+          </p>
+
+
+          {(() => {
+            const activeItemsForModal = getPackageItems(submittedPack).filter(i => checkedItems[i.no]);
+            const modalVendorName = activeItemsForModal.length > 0 
+              ? (negotiatedItems[activeItemsForModal[0].no]?.vendor || activeItemsForModal[0]?.vendor || activeItemsForModal[0]?.dppVendor || 'Penyedia e-Katalog')
+              : 'Penyedia e-Katalog';
+            return (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3.5 mb-4 flex items-center gap-3 shadow-sm">
+                <span className="text-2xl">🏢</span>
+                <div>
+                  <div className="text-[9px] text-indigo-500 font-bold uppercase tracking-wider">Penyedia yang Dinilai</div>
+                  <div className="text-sm font-black text-indigo-900">{modalVendorName}</div>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="space-y-4">
+            {/* Rating Kualitas */}
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <div className="text-[11px] font-bold text-slate-700 mb-1">1. Kualitas Produk & Layanan <span className="text-rose-500">*</span></div>
+              <div className="flex gap-1">
+                {[1,2,3,4,5].map(star => (
+                  <button key={star}
+                    onClick={() => {
+                      setQualityRating(star);
+                      saveBAHPField('pbj_quality_rating', star);
+                      updateOverallRating(star, deliveryRating, communicationRating);
+                    }}
+                    className={`text-2xl transition-all hover:scale-110 ${qualityRating >= star ? 'text-amber-400' : 'text-slate-300'}`}
+                  >★</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Rating Waktu */}
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <div className="text-[11px] font-bold text-slate-700 mb-1">2. Ketepatan Waktu Pengiriman <span className="text-rose-500">*</span></div>
+              <div className="flex gap-1">
+                {[1,2,3,4,5].map(star => (
+                  <button key={star}
+                    onClick={() => {
+                      setDeliveryRating(star);
+                      saveBAHPField('pbj_delivery_rating', star);
+                      updateOverallRating(qualityRating, star, communicationRating);
+                    }}
+                    className={`text-2xl transition-all hover:scale-110 ${deliveryRating >= star ? 'text-amber-400' : 'text-slate-300'}`}
+                  >★</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Rating Komunikasi */}
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <div className="text-[11px] font-bold text-slate-700 mb-1">3. Komunikasi & Responsivitas <span className="text-rose-500">*</span></div>
+              <div className="flex gap-1">
+                {[1,2,3,4,5].map(star => (
+                  <button key={star}
+                    onClick={() => {
+                      setCommunicationRating(star);
+                      saveBAHPField('pbj_communication_rating', star);
+                      updateOverallRating(qualityRating, deliveryRating, star);
+                    }}
+                    className={`text-2xl transition-all hover:scale-110 ${communicationRating >= star ? 'text-amber-400' : 'text-slate-300'}`}
+                  >★</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Overall Summary */}
+            <div className="flex items-center justify-between bg-indigo-50/50 border border-indigo-100 rounded-xl p-3">
+              <div className="text-xs font-bold text-slate-700">Rata-Rata Indeks: <span className="text-indigo-600 font-bold ml-1">{vendorRating > 0 ? vendorRating.toFixed(1) : '0.0'} / 5.0</span></div>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                vendorRatingStatus === 'Sangat Baik' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' :
+                vendorRatingStatus === 'Baik' ? 'text-blue-700 bg-blue-50 border-blue-200' :
+                'text-amber-700 bg-amber-50 border-amber-200'
+              }`}>{vendorRatingStatus || '-'}</span>
+            </div>
+
+            {/* Catatan / Review */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Catatan Kualitatif Evaluasi <span className="text-rose-500">*</span></label>
+              <textarea
+                value={vendorRatingNote}
+                onChange={e => { setVendorRatingNote(e.target.value); saveBAHPField('pbj_vendor_rating_note', e.target.value) }}
+                placeholder="Berikan alasan ulasan... (Min. 5 karakter)"
+                className="w-full text-xs p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                rows={3}
+              />
+              <button 
+                onClick={() => handleRefineGenericText(vendorRatingNote, 'Evaluasi Kinerja Penyedia', setVendorRatingNote, setIsRefiningVendorNote)} 
+                disabled={isRefiningVendorNote}
+                className="mt-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 disabled:opacity-50"
+              >
+                {isRefiningVendorNote ? 'Menyempurnakan...' : '🪄 Sempurnakan dengan AI'}
+              </button>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setShowForcedRatingModal(false)}
+                className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-600 hover:bg-slate-50 transition-all font-semibold"
+              >
+                Batal
+              </button>
+              <button
+                onClick={async () => {
+                  if (!qualityRating || !deliveryRating || !communicationRating) {
+                    dialog.warning('Mohon berikan rating bintang pada seluruh 3 kriteria terlebih dahulu.');
+                    return;
+                  }
+                  if (!vendorRatingNote || vendorRatingNote.trim().length < 5) {
+                    dialog.warning('Mohon berikan catatan evaluasi singkat (minimal 5 karakter).');
+                    return;
+                  }
+                  setShowForcedRatingModal(false);
+                  
+                  const confirmed = await dialog.confirm('Anda yakin ingin menyimpan penilaian & menyegel paket ini?');
+                  if (confirmed) {
+                    await executeSealPackage();
+                  }
+                }}
+                className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/10"
+              >
+                Simpan & Segel Paket
               </button>
             </div>
           </div>
