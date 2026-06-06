@@ -600,7 +600,7 @@ export default function TemplateSuratManager() {
     },
     "Kecamatan Besuk": {
       singkatan: "KEC-BESUK",
-      alamat: "Jl. Raya Besuk No. 1, Besuk, Probolinggo. Telp: (0335) 511001, Email: kec.besuk@probolinggokab.go.id, Kode Pos: 67281"
+      alamat: "Jl. Raya Besuk No. 37, Besuk Kidul, Probolinggo, Email: kecamatanbesuk317@gmail.com, Kode Pos: 67283"
     },
     "Kecamatan Kraksaan": {
       singkatan: "KEC-KRAKSAAN",

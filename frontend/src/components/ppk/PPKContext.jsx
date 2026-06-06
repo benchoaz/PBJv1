@@ -39,8 +39,24 @@ export function PPKProvider({ children }) {
   const [techSpecs, setTechSpecs] = useState(() => localStorage.getItem('pbj_tech_specs') || '');
   const [dppSpecs, setDppSpecs] = useState(() => { const s = localStorage.getItem('pbj_dpp_specs'); return s ? JSON.parse(s) : { waktu: '1 (Satu) hari kerja', tempat: '', spesifikasiLayanan: '', justifikasiMerek: '', metodePemilihan: 'Negosiasi Harga' }; });
   const [packageMetadata, setPackageMetadata] = useState(() => { const s = localStorage.getItem('pbj_package_metadata'); return s ? JSON.parse(s) : { lokasi_pekerjaan: '', waktu_penyelesaian: '14 (empat belas) hari kalender', program: '', kegiatan: '', sub_kegiatan: '', nomor_dpp: '' }; });
-  const [selectedTplId, setSelectedTplId] = useState('');
-  const [selectedNdTplId, setSelectedNdTplId] = useState('');
+  const [selectedTplId, setSelectedTplId] = useState(() => {
+    const s = localStorage.getItem('pbj_selected_pack');
+    if (s) {
+      const pack = JSON.parse(s);
+      const packId = pack.id || pack.noSirup;
+      return localStorage.getItem(`pbj_selected_template_${packId}`) || '';
+    }
+    return '';
+  });
+  const [selectedNdTplId, setSelectedNdTplId] = useState(() => {
+    const s = localStorage.getItem('pbj_selected_pack');
+    if (s) {
+      const pack = JSON.parse(s);
+      const packId = pack.id || pack.noSirup;
+      return localStorage.getItem(`pbj_selected_nd_template_${packId}`) || '';
+    }
+    return '';
+  });
   const [matchedDpaTypes, setMatchedDpaTypes] = useState(() => { const s = localStorage.getItem('pbj_matched_dpa_types'); return s ? JSON.parse(s) : []; });
   const [dpaAccounts, setDpaAccounts] = useState(() => { const s = localStorage.getItem('pbj_dpa_accounts'); return s ? JSON.parse(s) : []; });
   const [dpaRincian, setDpaRincian] = useState(() => { const s = localStorage.getItem('pbj_dpa_rincian'); return s ? JSON.parse(s) : {}; });
@@ -72,6 +88,15 @@ export function PPKProvider({ children }) {
   useEffect(() => { localStorage.setItem('pbj_doc_settings', JSON.stringify(docSettings)); }, [docSettings]);
   useEffect(() => { localStorage.setItem('pbj_scraped_data', JSON.stringify(scrapedData)); }, [scrapedData]);
   useEffect(() => { if (selectedPack) localStorage.setItem('pbj_selected_pack', JSON.stringify(selectedPack)); else localStorage.removeItem('pbj_selected_pack'); }, [selectedPack]);
+  useEffect(() => {
+    if (selectedPack) {
+      const packId = selectedPack.id || selectedPack.noSirup;
+      const savedNd = localStorage.getItem(`pbj_selected_nd_template_${packId}`) || '';
+      const savedDpp = localStorage.getItem(`pbj_selected_template_${packId}`) || '';
+      setSelectedNdTplId(savedNd);
+      setSelectedTplId(savedDpp);
+    }
+  }, [selectedPack]);
   useEffect(() => { localStorage.setItem('pbj_hps_exempt_selected', isHpsExemptSelected.toString()); }, [isHpsExemptSelected]);
   useEffect(() => { localStorage.setItem('pbj_hps_prices', JSON.stringify(hpsPrices)); }, [hpsPrices]);
   useEffect(() => { localStorage.setItem('pbj_hps_value', hpsValue); }, [hpsValue]);
@@ -244,6 +269,8 @@ export function PPKProvider({ children }) {
       if (parsed.comparisons) setComparisons(parsed.comparisons);
       if (parsed.justifications) setJustifications(parsed.justifications);
       if (parsed.autoComparator !== undefined) setAutoComparator(parsed.autoComparator);
+      if (parsed.selectedNdTplId) setSelectedNdTplId(parsed.selectedNdTplId);
+      if (parsed.selectedTplId) setSelectedTplId(parsed.selectedTplId);
     } catch(e) {
       console.error('Failed to load project data:', e);
     }

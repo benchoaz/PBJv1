@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { usePPK } from './PPKContext';
+import { Save } from 'lucide-react';
+import { dialog } from '../../utils/dialog';
+
 
 export default function Step5Review() {
   const { 
@@ -80,13 +83,15 @@ export default function Step5Review() {
             <button
               onClick={() => handleSimpanPaket(false)}
               disabled={isUpdating}
-              className="bg-white border-2 border-slate-200 hover:border-indigo-500 text-slate-700 hover:text-indigo-600 px-6 py-2.5 rounded-xl font-bold transition-all disabled:opacity-50 pointer-events-auto shadow-sm"
+              className="bg-white border-2 border-slate-200 hover:border-indigo-500 text-slate-700 hover:text-indigo-600 px-6 py-2.5 rounded-xl font-bold transition-all disabled:opacity-50 pointer-events-auto shadow-sm flex items-center gap-1.5"
             >
-              💾 Simpan Paket
+              <Save className="w-4 h-4 text-slate-600" />
+              <span>Simpan Paket</span>
             </button>
             <button
-              onClick={() => {
-                if (confirm('Anda yakin ingin menyerahkan dan mengunci dokumen ini untuk PP?')) {
+              onClick={async () => {
+                const confirmed = await dialog.confirm('Anda yakin ingin menyerahkan dan mengunci dokumen ini untuk PP?');
+                if (confirmed) {
                   const finalizedItems = getPackageItems(selectedPack)
                     .filter(item => {
                       const qty = item.qty === '' ? 0 : (item.qty || 0);

@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { Settings, Printer, FileDown } from 'lucide-react';
 import { usePPK } from './PPKContext';
 
 
@@ -65,6 +66,23 @@ function terbilang(angka) {
     }
     return "";
   }
+
+const getTteBadge = (name, nip) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="90" viewBox="0 0 220 90" style="border: 1px solid %23cbd5e1; border-radius: 6px; background: %23f8fafc; font-family: Arial, sans-serif; margin-top: 6px; margin-bottom: 6px; display: inline-block;">
+    <rect x="0" y="0" width="220" height="90" fill="%23f8fafc" rx="6" />
+    <rect x="10" y="10" width="70" height="70" fill="white" stroke="%23334155" stroke-width="1.5" />
+    <path d="M15 15h10v10H15zm0 15h10v10H15zm15-15h10v10H30zm0 15h10v10H30zm15-15h10v10H45zm0 15h10v10H45zm15 0h10v10H60zm0-15h10v10H60z" fill="%23334155" />
+    <path d="M20 20h20v20H20zm25 25h15v15H45z" fill="%23000" />
+    <text x="90" y="22" font-size="7" font-weight="bold" fill="%230f172a" letter-spacing="0.5">TANDA TANGAN ELEKTRONIK</text>
+    <text x="90" y="32" font-size="6" font-weight="bold" fill="%23475569">Sertifikat Elektronik Diterbitkan Oleh:</text>
+    <text x="90" y="42" font-size="7" font-weight="black" fill="%231e3a8a">BSrE BSSN</text>
+    <line x1="90" y1="48" x2="210" y2="48" stroke="%23cbd5e1" stroke-width="1" />
+    <text x="90" y="58" font-size="6.5" font-weight="bold" fill="%230f172a">${name}</text>
+    <text x="90" y="68" font-size="6" fill="%23475569">NIP: ${nip}</text>
+    <text x="90" y="78" font-size="5" font-weight="bold" fill="%2316a34a">✓ VERIFIED &amp; SECURED BY BSSN</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${svg}`;
+};
 
 export default function DocPreviewModal({ isHpsExemptSelected }) {
   const {
@@ -482,19 +500,22 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
                 className="bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold text-xs px-4 py-2 rounded-xl border border-sky-300 shadow-sm transition-all flex items-center gap-1.5"
                 title="Atur Logo dan Kop Surat secara global"
               >
-                ⚙️ Pengaturan Kop & Logo
+                <Settings className="w-3.5 h-3.5" />
+                <span>Pengaturan Kop & Logo</span>
               </button>
               <button
                 onClick={() => window.print()}
                 className="bg-emerald-600 hover:bg-emerald-750 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-md shadow-emerald-600/10"
               >
-                🖨️ Cetak / Unduh PDF
+                <Printer className="w-3.5 h-3.5" />
+                <span>Cetak / Unduh PDF</span>
               </button>
               <button
                 onClick={handleExportWord}
                 className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors"
               >
-                📥 Export Word (.doc)
+                <FileDown className="w-3.5 h-3.5" />
+                <span>Export Word (.doc)</span>
               </button>
               <button
                 onClick={() => setActiveDocPreview(null)}
@@ -670,7 +691,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{tahun_anggaran}}': packageMetadata.tahun_anggaran || new Date(tanggalSurat).getFullYear(),
   '{{nama_satker}}': currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
  '{{nama_satker_kapital}}': (currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
- '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283',
+ '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : (currentUser?.department?.toLowerCase().includes('besuk') ? 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283' : 'Komplek Perkantoran Pemerintah Daerah'),
  '{{nama_pekerjaan}}': selectedPack.packName || '',
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
  '{{sumber_dana}}': `${selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date(tanggalSurat).getFullYear()}`,
@@ -693,7 +714,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{nilai_hps}}': '_______________________',
  '{{nama_penyedia_terpilih}}': '_______________________',
  '{{harga_final}}': '_______________________',
- '{{tempat_penetapan}}': 'Besuk',
+ '{{tempat_penetapan}}': currentUser?.department?.toLowerCase().includes('besuk') ? 'Besuk' : (currentUser?.department || 'Probolinggo'),
  '{{nomor_sp}}': nomorBase.replace('{nomor}', '115/SP'),
  '{{alamat_penyedia}}': '_______________________',
  '{{nilai_kontrak}}': '_______________________',
@@ -722,16 +743,25 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  // Clean up excessive empty lines before signature section
  content = content.replace(/(?:<p>\s*<br\s*\/?>\s*<\/p>|\s*<br\s*\/?>){2,}/g, '<br/>');
 
- // Inject PPK and PP Signatures
- if (docSettingsFallback && docSettingsFallback.ttdPpk && currentUser?.nip) {
-   const ppkNipLine = `NIP. ${currentUser?.nip}`;
-   const ttdPpkStyle = 'display:block; max-height:75px; max-width:200px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);';
-   content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${docSettingsFallback.ttdPpk}" alt="TTD PPK" style="${ttdPpkStyle}" />${ppkNipLine}`);
- }
- if (docSettingsFallback && docSettingsFallback.ttdPp && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
-   const ppNipLine = `NIP. ${replacements['{{nip_pejabat_pengadaan}}']}`;
-   content = content.replace(new RegExp(ppNipLine, 'g'), `<img src="${docSettingsFallback.ttdPp}" alt="TTD PP" style="display:block; max-height:75px; max-width:200px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);" />${ppNipLine}`);
- }
+  // Inject PPK and PP Signatures
+  if (docSettingsFallback?.signatureMethodPpk === 'tte' && currentUser?.nip) {
+    const ppkNipLine = `NIP. ${currentUser?.nip}`;
+    const tteBadgeSrc = getTteBadge(currentUser?.name || 'PPK', currentUser?.nip);
+    content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${tteBadgeSrc}" alt="TTE PPK" style="display:block; max-height:85px; margin-top:6px; margin-bottom:4px;" />${ppkNipLine}`);
+  } else if (docSettingsFallback && docSettingsFallback.ttdPpk && currentUser?.nip) {
+    const ppkNipLine = `NIP. ${currentUser?.nip}`;
+    const ttdPpkStyle = 'display:block; max-height:75px; max-width:200px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);';
+    content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${docSettingsFallback.ttdPpk}" alt="TTD PPK" style="${ttdPpkStyle}" />${ppkNipLine}`);
+  }
+
+  if (docSettingsFallback?.signatureMethodPp === 'tte' && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
+    const ppNipLine = `NIP. ${replacements['{{nip_pejabat_pengadaan}}']}`;
+    const tteBadgeSrc = getTteBadge(replacements['{{nama_pejabat_pengadaan}}'] || 'Pejabat Pengadaan', replacements['{{nip_pejabat_pengadaan}}']);
+    content = content.replace(new RegExp(ppNipLine, 'g'), `<img src="${tteBadgeSrc}" alt="TTE PP" style="display:block; max-height:85px; margin-top:6px; margin-bottom:4px;" />${ppNipLine}`);
+  } else if (docSettingsFallback && docSettingsFallback.ttdPp && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
+    const ppNipLine = `NIP. ${replacements['{{nip_pejabat_pengadaan}}']}`;
+    content = content.replace(new RegExp(ppNipLine, 'g'), `<img src="${docSettingsFallback.ttdPp}" alt="TTD PP" style="display:block; max-height:75px; max-width:200px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);" />${ppNipLine}`);
+  }
 
  return <div style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', textAlign: 'justify', fontSize: '12pt', fontFamily: 'Arial, sans-serif' }} dangerouslySetInnerHTML={{ __html: parseSmartColons(content) }} />;
  }
@@ -741,21 +771,27 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  ) : (
  // DOKUMEN PERSIAPAN PENGADAAN (DPP)
  <div className="space-y-4 relative">
- {/* KOP SURAT DIHAPUS - KOP SURAT GLOBAL SUDAH ADA DI ATAS */}
+{/* KOP SURAT DIHAPUS - KOP SURAT GLOBAL SUDAH ADA DI ATAS */}
 
  {(() => {
  const templatesStr = localStorage.getItem('pbj_templates');
  let templates = [];
  try { if (templatesStr) templates = JSON.parse(templatesStr); } catch (e) {}
 
- const cat = getPacketCategory(selectedPack?.packName || '');
- let tplId = 'TPL-006A';
- if (cat === 'Mamin') tplId = 'TPL-006B';
- else if (cat === 'Modal') tplId = 'TPL-006C';
- else if (cat === 'Jasa' || cat === 'Konstruksi') tplId = 'TPL-006D';
- else if (cat === 'Konsolidasi') tplId = 'TPL-006E';
+  // Prioritaskan template ID yang dikirim oleh PPK dari selectedPack
+  const pStyleTpl = selectedPack?.dppTemplateId || selectedPack?.dppSpecs?.templateId || '';
+  const cat = getPacketCategory(selectedPack?.packName || '');
+  let tplId = pStyleTpl;
+  
+  if (!tplId) {
+    tplId = 'TPL-006A';
+    if (cat.startsWith('Mamin')) tplId = 'TPL-006B';
+    else if (cat === 'Modal') tplId = 'TPL-006C';
+    else if (cat === 'Jasa' || cat === 'Konstruksi') tplId = 'TPL-006D';
+    else if (cat === 'Konsolidasi') tplId = 'TPL-006E';
+  }
 
- const template = templates.find(t => t.id === selectedTplId) || templates.find(t => t.id === tplId);
+  const template = templates.find(t => t.id === selectedTplId) || templates.find(t => t.id === tplId);
  
  if (template && template.content.includes('{{komponen_dinamis_dpp}}')) {
  // Template parsing logic
@@ -774,7 +810,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{tahun_anggaran}}': packageMetadata.tahun_anggaran || new Date(tanggalSurat).getFullYear(),
  '{{nama_satker}}': currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
  '{{nama_satker_kapital}}': (currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
- '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283',
+ '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : (currentUser?.department?.toLowerCase().includes('besuk') ? 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283' : 'Komplek Perkantoran Pemerintah Daerah'),
  '{{nama_pekerjaan}}': selectedPack.packName || '',
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
  '{{sumber_dana}}': `${selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date(tanggalSurat).getFullYear()}`,
@@ -797,7 +833,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{nilai_hps}}': '_______________________',
  '{{nama_penyedia_terpilih}}': '_______________________',
  '{{harga_final}}': '_______________________',
- '{{tempat_penetapan}}': 'Besuk',
+ '{{tempat_penetapan}}': currentUser?.department?.toLowerCase().includes('besuk') ? 'Besuk' : (currentUser?.department || 'Probolinggo'),
  '{{nomor_sp}}': nomorBase.replace('{nomor}', '115/SP'),
  '{{alamat_penyedia}}': '_______________________',
  '{{nilai_kontrak}}': '_______________________',
@@ -824,11 +860,21 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  });
 
  // Inject PPK and PP Signatures
- if (docSettingsFallback && docSettingsFallback.ttdPpk && currentUser?.nip) {
+ if (docSettingsFallback?.signatureMethodPpk === 'tte' && currentUser?.nip) {
    const ppkNipLine = `NIP. ${currentUser?.nip}`;
-   content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${docSettingsFallback.ttdPpk}" alt="TTD PPK" style="display:block; max-height:75px; max-width:200px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);" />${ppkNipLine}`);
+   const tteBadgeSrc = getTteBadge(currentUser?.name || 'PPK', currentUser?.nip);
+   content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${tteBadgeSrc}" alt="TTE PPK" style="display:block; max-height:85px; margin-top:6px; margin-bottom:4px;" />${ppkNipLine}`);
+ } else if (docSettingsFallback && docSettingsFallback.ttdPpk && currentUser?.nip) {
+   const ppkNipLine = `NIP. ${currentUser?.nip}`;
+   const ttdPpkStyle = 'display:block; max-height:75px; max-width:200px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);';
+   content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${docSettingsFallback.ttdPpk}" alt="TTD PPK" style="${ttdPpkStyle}" />${ppkNipLine}`);
  }
- if (docSettingsFallback && docSettingsFallback.ttdPp && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
+
+ if (docSettingsFallback?.signatureMethodPp === 'tte' && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
+   const ppNipLine = `NIP. ${replacements['{{nip_pejabat_pengadaan}}']}`;
+   const tteBadgeSrc = getTteBadge(replacements['{{nama_pejabat_pengadaan}}'] || 'Pejabat Pengadaan', replacements['{{nip_pejabat_pengadaan}}']);
+   content = content.replace(new RegExp(ppNipLine, 'g'), `<img src="${tteBadgeSrc}" alt="TTE PP" style="display:block; max-height:85px; margin-top:6px; margin-bottom:4px;" />${ppNipLine}`);
+ } else if (docSettingsFallback && docSettingsFallback.ttdPp && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
    const ppNipLine = `NIP. ${replacements['{{nip_pejabat_pengadaan}}']}`;
    content = content.replace(new RegExp(ppNipLine, 'g'), `<img src="${docSettingsFallback.ttdPp}" alt="TTD PP" style="display:block; max-height:75px; max-width:200px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);" />${ppNipLine}`);
  }
@@ -1113,7 +1159,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  {/* TTD PPK GLOBAL - Muncul di akhir semua dokumen (HPS, Nota Dinas, dan DPP setelah lampiran) */}
  <div className="flex justify-end mt-12 pt-6 border-t-2 border-slate-900" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
    <div className="w-max min-w-[14rem] px-4 text-center space-y-1">
-     <div>{(docSettings?.kotaSurat || 'Besuk')}, {formatTanggalIndo(tanggalSurat)}</div>
+     <div>{(docSettings?.kotaSurat || (currentUser?.department?.toLowerCase().includes('besuk') ? 'Besuk' : (currentUser?.department || 'Probolinggo')))}, {formatTanggalIndo(tanggalSurat)}</div>
      <div className="font-bold uppercase">Pejabat Pembuat Komitmen,</div>
      {docSettings.ttdPpk ? (
        <div className="flex justify-center items-center h-24 my-2">

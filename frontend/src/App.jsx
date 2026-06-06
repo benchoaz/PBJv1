@@ -11,6 +11,7 @@ import ProcurementPreparation from './components/ProcurementPreparation'
 import ProcurementPanel from './components/ProcurementPanel'
 import OcrApiKeyManager from './components/OcrApiKeyManager'
 import TemplateSuratManager from './components/TemplateSuratManager'
+import VendorPerformance from './components/VendorPerformance'
 
 import { Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
@@ -81,6 +82,7 @@ function App() {
             <Route path="/" element={<ProtectedRoute><ProjectList /></ProtectedRoute>} />
             <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
             <Route path="/reports/absorption" element={<ProtectedRoute><RealisasiAnggaranPanel /></ProtectedRoute>} />
+            <Route path="/reports/vendors" element={<ProtectedRoute><VendorPerformance /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute allowedRoles={['Admin']}><UserManagement /></ProtectedRoute>} />
             <Route path="/ppk/persiapan" element={<ProtectedRoute allowedRoles={['Admin', 'PPK']}><ProcurementPreparation /></ProtectedRoute>} />
             <Route path="/pp/panel" element={<ProtectedRoute allowedRoles={['Admin', 'PP']}><ProcurementPanel /></ProtectedRoute>} />

@@ -1,3 +1,4 @@
+import { dialog } from './utils/dialog'
 
 // Global Fetch Interceptor to inject security headers
 const originalFetch = window.fetch;
@@ -19,6 +20,11 @@ window.fetch = async function (url, options = {}) {
     console.error('Error injecting security headers:', e);
   }
   return originalFetch(url, options);
+};
+
+// Global Override for alert
+window.alert = (message) => {
+  dialog.alert(message);
 };
 
 import React from 'react'

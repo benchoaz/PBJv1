@@ -1,16 +1,21 @@
-FROM node:20-alpine
+# Stage 1: Build the application
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package requirements first for layer caching
 COPY package*.json ./
 RUN npm install
 
-# Copy project files
 COPY . .
+RUN npm run build
 
-# Expose port 3000
+# Stage 2: Serve using Nginx
+FROM nginx:alpine
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 3000
 
-# Start Vite dev server listening on all interfaces for Docker mapping
-CMD ["npm", "run", "dev", "--", "--host"]
+CMD ["nginx", "-g", "daemon off;"]
+

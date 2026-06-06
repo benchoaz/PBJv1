@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { dialog } from '../utils/dialog'
 
 const Icons = {
   FolderOpen: () => (
@@ -17,6 +18,11 @@ const Icons = {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
       <polyline points="16 7 22 7 22 13"/>
+    </svg>
+  ),
+  Star: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
     </svg>
   ),
   ClipboardEdit: () => (
@@ -88,7 +94,8 @@ export default function Header({ sidebarOpen, setSidebarOpen, onNavClick }) {
   const isActive = (path) => location.pathname === path
 
   const handleLogout = async () => {
-    if (confirm('Apakah Anda yakin ingin keluar dari sistem?')) {
+    const confirmed = await dialog.confirm('Apakah Anda yakin ingin keluar dari sistem?');
+    if (confirmed) {
       await logout()
       localStorage.removeItem('pbj_user')
       localStorage.removeItem('pbj_step')
@@ -104,6 +111,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, onNavClick }) {
 
   const menuItems = [
     { path: '/reports/absorption', label: 'Laporan Realisasi', Icon: Icons.TrendingUp, roles: ['Admin', 'PPK', 'PP'] },
+    { path: '/reports/vendors', label: 'Kinerja Penyedia', Icon: Icons.Star, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/', label: 'Daftar Paket', Icon: Icons.FolderOpen, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/ppk/persiapan', label: 'PPK Persiapan', Icon: Icons.ClipboardEdit, roles: ['Admin', 'PPK'] },
     { path: '/pp/panel', label: 'Panel Pejabat Pengadaan', Icon: Icons.Repeat, roles: ['Admin', 'PP'] },

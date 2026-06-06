@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { usePPK } from './PPKContext';
+import { Loader2, RefreshCw, Radio, FileText, AlertTriangle, CheckCircle2, Building2, ClipboardList } from 'lucide-react';
+
 
 export default function Step1PilihPaket() {
   const { 
@@ -102,9 +104,19 @@ export default function Step1PilihPaket() {
 
             <button
               onClick={() => fetchSirupPackages(satkerId)}
-              className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95"
+              className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 animate-fade-in"
             >
-              {isFetchingSirup ? '⚙️ Menarik Data...' : '↻ Tarik Ulang LKPP'}
+              {isFetchingSirup ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Menarik Data...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Tarik Ulang LKPP</span>
+                </>
+              )}
             </button>
           </div>
 
@@ -118,13 +130,13 @@ export default function Step1PilihPaket() {
             </div>
 
             {isFetchingSirup ? (
-              <div className="p-12 text-center text-slate-500 space-y-2">
-                <div className="animate-spin text-2xl inline-block">⚙️</div>
+              <div className="p-12 text-center text-slate-500 space-y-3">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto" />
                 <p className="text-xs font-semibold">Menghubungkan ke API SIRUP LKPP dan mengambil paket terbaru...</p>
               </div>
             ) : sirupPackages.length === 0 ? (
-              <div className="p-12 text-center text-slate-400">
-                <span className="text-2xl block mb-2">📡</span>
+              <div className="p-12 text-center text-slate-400 space-y-2">
+                <Radio className="w-8 h-8 text-slate-400 mx-auto" />
                 <p className="text-xs">Tidak ada data paket LKPP yang berhasil ditarik. Silakan klik tombol "Tarik Ulang LKPP" atau isi manual di bawah.</p>
               </div>
             ) : (
@@ -184,8 +196,9 @@ export default function Step1PilihPaket() {
 
           {/* Fallback Input Manual (collapsible styled border) */}
           <div className="border border-dashed border-slate-300 rounded-2xl p-5 bg-slate-50/30">
-            <h4 className="text-xs font-bold text-slate-600 uppercase mb-3 flex items-center gap-1">
-              <span>✍️</span> Opsi Alternatif: Input RUP Manual
+            <h4 className="text-xs font-bold text-slate-600 uppercase mb-3 flex items-center gap-1.5">
+              <FileText className="w-4 h-4 text-slate-500" />
+              <span>Opsi Alternatif: Input RUP Manual</span>
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
               <div>
@@ -294,9 +307,7 @@ export default function Step1PilihPaket() {
         <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-5">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
-              <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
+              <ClipboardList className="w-4 h-4 text-amber-600" />
             </div>
             <div className="flex-1">
               <label className="block text-xs font-bold text-amber-800 mb-0.5">
@@ -317,12 +328,16 @@ export default function Step1PilihPaket() {
                 }`}
               />
               <div className="flex items-center justify-between mt-2">
-                <span className={`text-[10px] font-semibold ${
-                  namaAcara.trim().length >= 10 ? 'text-emerald-600' : 'text-amber-500'
-                }`}>
-                  {namaAcara.trim().length < 10
-                    ? `⚠ Minimal 10 karakter (${namaAcara.trim().length}/10)`
-                    : `✓ Nama acara sudah diisi (${namaAcara.trim().length} karakter)`}
+                <span className="text-[10px] font-semibold">
+                  {namaAcara.trim().length < 10 ? (
+                    <span className="flex items-center gap-1 text-amber-600">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Minimal 10 karakter ({namaAcara.trim().length}/10)
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-emerald-600">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Nama acara sudah diisi ({namaAcara.trim().length} karakter)
+                    </span>
+                  )}
                 </span>
                 <div className="flex gap-2">
                   {[
@@ -354,7 +369,7 @@ export default function Step1PilihPaket() {
  <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex justify-between items-center">
  <div>
  <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
- <span>🏛️</span> Detail Rencana Umum Pengadaan (RUP) Penyedia - SIRUP LKPP
+ <Building2 className="w-5 h-5 text-slate-700" /> Detail Rencana Umum Pengadaan (RUP) Penyedia - SIRUP LKPP
  </h3>
  <p className=" text-slate-500 font-mono mt-0.5">
  https://sirup.inaproc.id/sirup/ro/penyedia/detailPaketPenyedia2020?idPaket={detailModalPack.noSirup}
@@ -393,7 +408,7 @@ export default function Step1PilihPaket() {
  {/* Row 4 */}
  <div className="grid grid-cols-3 border-b border-slate-200">
  <div className="bg-slate-50 px-4 py-2.5 font-semibold border-r border-slate-200">Satuan Kerja</div>
- <div className="col-span-2 px-4 py-2.5">{detailModalPack.satker || 'Kecamatan Besuk'}</div>
+ <div className="col-span-2 px-4 py-2.5">{detailModalPack.satker || currentUser?.department || 'Satuan Kerja'}</div>
  </div>
 
  {/* Row 5 */}
@@ -420,7 +435,7 @@ export default function Step1PilihPaket() {
  <td className="border-r border-slate-200 px-2 py-1">1.</td>
  <td className="border-r border-slate-200 px-2 py-1">Jawa Timur</td>
  <td className="border-r border-slate-200 px-2 py-1">Probolinggo (Kab.)</td>
- <td className="px-2 py-1">{detailModalPack.satker || 'Kecamatan Besuk'}</td>
+ <td className="px-2 py-1">{detailModalPack.satker || currentUser?.department || 'Satuan Kerja'}</td>
  </tr>
  </tbody>
  </table>

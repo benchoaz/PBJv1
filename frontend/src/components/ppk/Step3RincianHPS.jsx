@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { usePPK } from './PPKContext';
+import { Save, Search, RefreshCw, Camera, Sparkles, CheckCircle2, XCircle, AlertTriangle, Loader2, Check, FileText, ClipboardList, Edit3, Store, Globe, LayoutGrid } from 'lucide-react';
 import DocPreviewModal from './DocPreviewModal';
+import { dialog } from '../../utils/dialog';
 
 export default function Step3RincianHPS() {
   const DAFTAR_KECAMATAN = [
@@ -1286,7 +1288,8 @@ export default function Step3RincianHPS() {
                       }`}
                       title="Cari ulang semua barang yang sudah Anda ketikkan kata kunci barunya sekaligus"
                     >
-                      🔍 Cari Ulang
+                      <Search className="w-3.5 h-3.5 text-white" />
+                      <span>Cari Ulang</span>
                     </button>
                     {surveyData && (
                       <button
@@ -1309,7 +1312,8 @@ export default function Step3RincianHPS() {
                         className="text-[11px] font-bold px-6 py-2 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 transition-all flex items-center justify-center gap-1.5 active:scale-95 w-full"
                         title="Hapus semua hasil survei dan mulai ulang"
                       >
-                        🔄 Reset Survei
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Reset Survei</span>
                       </button>
                     )}
                   </div>
@@ -1433,7 +1437,12 @@ export default function Step3RincianHPS() {
                                         className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-850 font-bold border border-indigo-200 rounded text-[9px] flex items-center gap-1 transition-all h-fit self-end shrink-0"
                                         title="Dapatkan rekomendasi spesifikasi dari AI"
                                       >
-                                        {aiLoadingSpecIndex === idx ? '⏳' : '✨'} AI Bantu
+                                        {aiLoadingSpecIndex === idx ? (
+                                          <Loader2 className="w-3.5 h-3.5 animate-spin mr-1 inline" />
+                                        ) : (
+                                          <Sparkles className="w-3.5 h-3.5 mr-1 inline text-indigo-500" />
+                                        )}
+                                        <span>AI Bantu</span>
                                       </button>
                                     </div>
                                   </div>
@@ -1441,7 +1450,10 @@ export default function Step3RincianHPS() {
                                 <td className="py-3 px-2">
                                   {surveyItem && surveyItem.success && surveyItem.vendor !== 'TIDAK DITEMUKAN' ? (
                                     <div className="flex flex-col gap-0.5">
-                                      <span className="text-[10px] font-bold text-slate-700 truncate max-w-[150px]" title={surveyItem.vendor}>🏪 {surveyItem.vendor}</span>
+                                      <span className="text-[10px] font-bold text-slate-700 truncate max-w-[150px] flex items-center gap-1" title={surveyItem.vendor}>
+                                        <Store className="w-3 h-3 text-slate-500" />
+                                        <span>{surveyItem.vendor}</span>
+                                      </span>
                                       {(() => {
                                         const location = (comparisons[surveyItem.id] && comparisons[surveyItem.id].lokasi) 
                                            || (surveyItem.vendor && vendorLocationMap[surveyItem.vendor.toUpperCase().trim()]) 
@@ -1512,7 +1524,10 @@ export default function Step3RincianHPS() {
                                     </div>
                                   ) : surveyItem ? (
                                     <div className="flex flex-col gap-1 max-w-[150px]">
-                                      <span className="text-[9px] text-rose-700 font-bold bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded w-fit">❌ Tidak Ditemukan</span>
+                                      <span className="text-[9px] text-rose-700 font-bold bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded w-fit flex items-center gap-1">
+                                        <XCircle className="w-3 h-3 text-rose-700" />
+                                        <span>Tidak Ditemukan</span>
+                                      </span>
                                       <span className="text-[9px] text-rose-500 font-semibold leading-tight block">Wajib atur Qty menjadi 0 agar dikecualikan dari paket</span>
                                     </div>
                                   ) : (
@@ -1610,14 +1625,27 @@ export default function Step3RincianHPS() {
                                             <div className="space-y-3">
                                               <div>
                                                 <div className="flex items-center justify-between mb-1">
-                                                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider">📝 Justifikasi Pemilihan</label>
+                                                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <ClipboardList className="w-3.5 h-3.5 text-slate-500" />
+                                                    <span>Justifikasi Pemilihan</span>
+                                                  </label>
                                                   <button
                                                     type="button"
                                                     onClick={() => enhanceJustificationWithAI(p.id, justifications[p.id] || '')}
                                                     disabled={isEnhancingJustification[p.id]}
                                                     className="text-[9px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded border border-indigo-200 transition-colors flex items-center gap-1 disabled:opacity-50"
                                                   >
-                                                    {isEnhancingJustification[p.id] ? '✨ Merapikan...' : '✨ Rapikan Bahasa (AI)'}
+                                                    {isEnhancingJustification[p.id] ? (
+                                                      <>
+                                                        <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                                        <span>Merapikan...</span>
+                                                      </>
+                                                    ) : (
+                                                      <>
+                                                        <Sparkles className="w-3 h-3 mr-1 text-indigo-650" />
+                                                        <span>Rapikan Bahasa (AI)</span>
+                                                      </>
+                                                    )}
                                                   </button>
                                                 </div>
                                                 <textarea
@@ -1631,17 +1659,19 @@ export default function Step3RincianHPS() {
                                                   <button
                                                     type="button"
                                                     onClick={() => setJustifications({ ...justifications, [p.id]: "Penyedia ini dipilih karena mampu menyediakan mayoritas (>80%) dari total item barang yang dibutuhkan, sehingga sangat mengefisienkan biaya pengiriman, mempermudah administrasi kontrak, dan memastikan seluruh barang tiba dalam satu waktu." })}
-                                                    className="text-[9px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded border border-blue-200 transition-colors"
+                                                    className="text-[9px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded border border-blue-200 transition-colors flex items-center gap-1"
                                                   >
-                                                    💡 Template: Satu Pintu (&gt;80%)
+                                                    <LayoutGrid className="w-3 h-3" />
+                                                    <span>Template: Satu Pintu (&gt;80%)</span>
                                                   </button>
                                                   {getPacketCategory(selectedPack?.packName || '').startsWith('Mamin') && (
                                                     <button
                                                       type="button"
                                                       onClick={() => setJustifications({ ...justifications, [p.id]: "Pemilihan penyedia ini disesuaikan dengan ketentuan Surat Edaran Bupati Probolinggo Nomor 000.3/2747/426.42/2025 tentang E-Purchasing Katalog Elektronik untuk pemenuhan aspek pemerataan penyedia lokal dan efisiensi pengiriman Mamin di lingkungan Pemerintah Kabupaten Probolinggo." })}
-                                                      className="text-[9px] font-bold text-amber-750 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded border border-amber-200 transition-colors"
+                                                      className="text-[9px] font-bold text-amber-750 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded border border-amber-200 transition-colors flex items-center gap-1"
                                                     >
-                                                      📋 Template: SE Mamin (Pemerataan)
+                                                      <ClipboardList className="w-3 h-3" />
+                                                      <span>Template: SE Mamin (Pemerataan)</span>
                                                     </button>
                                                   )}
                                                   <button
@@ -1660,7 +1690,10 @@ export default function Step3RincianHPS() {
                                                     }}
                                                     className="text-[9px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded border border-emerald-200 transition-colors"
                                                   >
-                                                    ✨ Terapkan ke Seluruh Barang
+                                                    <span className="flex items-center gap-1">
+                                                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                                                      <span>Terapkan ke Seluruh Barang</span>
+                                                    </span>
                                                   </button>
                                                 </div>
                                               </div>
@@ -1668,18 +1701,21 @@ export default function Step3RincianHPS() {
                                               <div className="pt-2 border-t border-slate-200">
                                                 { (screenshotStatus[p.id] === 'done' || (p.img && p.img.includes('/screenshots/'))) ? (
                                                   <div className="text-[10px] font-bold text-emerald-600 flex items-center gap-1.5 bg-emerald-50 w-fit px-3 py-1.5 rounded-lg border border-emerald-200">
-                                                    ✅ Screenshot Tersimpan
+                                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                                    <span>Screenshot Tersimpan</span>
                                                   </div>
                                                 ) : screenshotStatus[p.id] === 'loading' ? (
                                                   <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1.5">
-                                                    ⏳ Menyimpan Screenshot...
+                                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
+                                                    <span>Menyimpan Screenshot...</span>
                                                   </div>
                                                 ) : (
                                                   <button
                                                     onClick={() => captureScreenshot(p)}
-                                                    className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5"
+                                                    className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
                                                   >
-                                                    📸 Sepakati & Ambil Screenshot
+                                                    <Camera className="w-3.5 h-3.5 text-white" />
+                                                    <span>Sepakati &amp; Ambil Screenshot</span>
                                                   </button>
                                                 )}
                                               </div>
@@ -1691,7 +1727,10 @@ export default function Step3RincianHPS() {
                                         <div className="flex-1 space-y-4">
                                           <div className="bg-white p-3 rounded-xl border border-slate-200/60 shadow-sm">
                                             <h4 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1">
-                                              🔍 Sesuaikan Pencarian Ulang
+                                              <span className="flex items-center gap-1.5">
+                                                <Search className="w-3.5 h-3.5 text-slate-500" />
+                                                <span>Sesuaikan Pencarian Ulang</span>
+                                              </span>
                                             </h4>
                                             <div className="space-y-2.5">
                                               <div>
@@ -1755,7 +1794,10 @@ export default function Step3RincianHPS() {
                                               
                                               {/* Spesifikasi Mutu untuk DPA raw item */}
                                               <div className="mt-3">
-                                                <label className="block text-[9px] font-bold text-slate-500 mb-0.5">📝 Spesifikasi Komposisi / Mutu (KAK)</label>
+                                                <label className="block text-[9px] font-bold text-slate-500 mb-0.5 flex items-center gap-1">
+                                                  <FileText className="w-3 h-3 text-slate-400" />
+                                                  <span>Spesifikasi Komposisi / Mutu (KAK)</span>
+                                                </label>
                                                 <textarea
                                                   value={dppSpecs?.itemSpecs?.[p.id || idx] || ''}
                                                   onChange={(e) => setDppSpecs({...dppSpecs, itemSpecs: {...(dppSpecs.itemSpecs || {}), [p.id || idx]: e.target.value}})}
@@ -1874,10 +1916,10 @@ export default function Step3RincianHPS() {
                               setHpsValue(totalHps.toString())
                               alert(`✅ Nilai HPS Resmi disetujui sebesar Rp ${totalHps.toLocaleString()} (Hasil kalkulasi survei pasar).`)
                             }}
-                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-semibold px-4 py-2 rounded-xl transition-all text-[11px] active:scale-95 flex items-center gap-1"
+                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-semibold px-4 py-2 rounded-xl transition-all text-[11px] active:scale-95 flex items-center gap-1.5 shadow-sm"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                            Gunakan Sebagai HPS Resmi
+                            <Check className="w-4 h-4 text-slate-600" />
+                            <span>Gunakan Sebagai HPS Resmi</span>
                           </button>
                         </div>
                       </div>
@@ -1890,7 +1932,8 @@ export default function Step3RincianHPS() {
                 <div className="mb-6 bg-slate-50/50 p-5 rounded-2xl border border-slate-200/80">
                   <div className="text-xs font-bold text-slate-800 mb-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 text-slate-900">
-                      <span>📊</span> Referensi Hasil Survei e-Katalog (Kategori: {surveyData.category})
+                      <FileText className="w-4 h-4 text-slate-600" />
+                      <span>Referensi Hasil Survei e-Katalog (Kategori: {surveyData.category})</span>
                     </div>
                     <div className="flex items-center gap-2 self-start">
                       <button
@@ -1898,7 +1941,8 @@ export default function Step3RincianHPS() {
                         className="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold px-3 py-1 rounded shadow-sm transition-all flex items-center gap-1 active:scale-95"
                         title="Ambil tangkapan layar untuk semua produk yang ditemukan"
                       >
-                        📸 Ambil Semua Screenshot
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Ambil Semua Screenshot</span>
                       </button>
                       <div className="text-[10px] text-slate-500 font-mono font-medium bg-slate-100 px-2 py-0.5 rounded">
                         Terakhir diupdate: {surveyData.timestamp}
@@ -1947,7 +1991,8 @@ export default function Step3RincianHPS() {
                                   className="text-slate-400 hover:text-indigo-650 font-bold text-[9px] underline transition-colors flex items-center gap-0.5"
                                   title="Ubah kata kunci pencarian"
                                 >
-                                  ✏️ Ubah
+                                  <Edit3 className="w-3 h-3 text-slate-500" />
+                                  <span>Ubah</span>
                                 </button>
                               )}
                             </div>
@@ -1963,27 +2008,32 @@ export default function Step3RincianHPS() {
                                     <span className="text-[10px] font-bold">Rp</span> {(p.price || 0).toLocaleString('id-ID')}
                                   </div>
                                   <div className="text-[10px] text-slate-500 font-medium truncate flex items-center gap-1">
-                                    <span>🏪</span> <span className="truncate" title={p.vendor}>{p.vendor}</span>
+                                    <Store className="w-3 h-3 text-slate-400" />
+                                    <span className="truncate" title={p.vendor}>{p.vendor}</span>
                                   </div>
-                                  <div className="text-[9px] text-indigo-600 hover:text-indigo-700 underline truncate pt-0.5">
-                                    <a href={p.link} target="_blank" rel="noopener noreferrer">🌐 Lihat di e-Katalog</a>
+                                  <div className="text-[9px] text-indigo-600 hover:text-indigo-700 underline truncate pt-0.5 flex items-center gap-1">
+                                    <Globe className="w-3 h-3 text-indigo-500" />
+                                    <a href={p.link} target="_blank" rel="noopener noreferrer">Lihat di e-Katalog</a>
                                   </div>
                                   
                                   <div className="mt-2 pt-2 border-t border-slate-100">
                                     { (screenshotStatus[p.id] === 'done' || (p.img && p.img.includes('/screenshots/'))) ? (
                                       <div className="text-[9px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 w-fit px-2 py-1 rounded">
-                                        ✅ Screenshot Tersimpan
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                        <span>Screenshot Tersimpan</span>
                                       </div>
                                     ) : screenshotStatus[p.id] === 'loading' ? (
                                       <div className="text-[9px] font-bold text-slate-500 flex items-center gap-1">
-                                        ⏳ Menyimpan...
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
+                                        <span>Menyimpan...</span>
                                       </div>
                                     ) : (
                                       <button
                                         onClick={() => captureScreenshot(p)}
-                                        className="text-[9px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1.5 rounded transition-colors flex items-center gap-1 w-full justify-center"
+                                        className="text-[9px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1.5 rounded transition-colors flex items-center gap-1 w-full justify-center shadow-sm"
                                       >
-                                        📸 Sepakati & Ambil Screenshot
+                                        <Camera className="w-3 h-3 text-white" />
+                                        <span>Sepakati &amp; Ambil Screenshot</span>
                                       </button>
                                     )}
                                   </div>
@@ -2055,7 +2105,10 @@ export default function Step3RincianHPS() {
                           {!isFailed && (
                             <div className="mt-4 pt-3 border-t border-dashed border-slate-200 space-y-3">
                               <div>
-                                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">📝 Spesifikasi Komposisi / Mutu (KAK)</label>
+                                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                  <FileText className="w-3 h-3 text-slate-400" />
+                                  <span>Spesifikasi Komposisi / Mutu (KAK)</span>
+                                </label>
                                 <textarea
                                   value={dppSpecs?.itemSpecs?.[p.id] || ''}
                                   onChange={(e) => setDppSpecs({...dppSpecs, itemSpecs: {...(dppSpecs.itemSpecs || {}), [p.id]: e.target.value}})}
@@ -2065,7 +2118,10 @@ export default function Step3RincianHPS() {
                               </div>
                               <div>
                                 <div className="flex items-center justify-between mb-1">
-                                  <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">📝 Justifikasi Pemilihan</label>
+                                  <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                    <ClipboardList className="w-3 h-3 text-slate-400" />
+                                    <span>Justifikasi Pemilihan</span>
+                                  </label>
                                   <button
                                     type="button"
                                     onClick={() => enhanceJustificationWithAI(p.id, justifications[p.id] || '')}
@@ -2073,7 +2129,17 @@ export default function Step3RincianHPS() {
                                     className="text-[9px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded border border-indigo-200 transition-colors flex items-center gap-1 disabled:opacity-50"
                                     title="Gunakan AI untuk merapikan kalimat ini menjadi bahasa formal PBJ"
                                   >
-                                    {isEnhancingJustification[p.id] ? '✨ Merapikan...' : '✨ Rapikan Bahasa (AI)'}
+                                    {isEnhancingJustification[p.id] ? (
+                                      <>
+                                        <Loader2 className="w-3 h-3 animate-spin mr-1 inline" />
+                                        <span>Merapikan...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Sparkles className="w-3 h-3 mr-1 inline text-indigo-650" />
+                                        <span>Rapikan Bahasa (AI)</span>
+                                      </>
+                                    )}
                                   </button>
                                 </div>
                                 <textarea
@@ -2089,9 +2155,10 @@ export default function Step3RincianHPS() {
                                     onClick={() => {
                                       setJustifications({ ...justifications, [p.id]: "Penyedia ini dipilih karena mampu menyediakan mayoritas (>80%) dari total item barang yang dibutuhkan, sehingga sangat mengefisienkan biaya pengiriman, mempermudah administrasi kontrak, dan memastikan seluruh barang tiba dalam satu waktu." });
                                     }}
-                                    className="text-[9px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded w-full text-center transition-colors border border-blue-200"
+                                    className="text-[9px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded w-full text-center transition-colors border border-blue-200 flex items-center justify-center gap-1"
                                   >
-                                    💡 Template Alasan: Satu Pintu (&gt;80%)
+                                    <LayoutGrid className="w-3 h-3" />
+                                    <span>Template: Satu Pintu (&gt;80%)</span>
                                   </button>
                                   {getPacketCategory(selectedPack?.packName || '').startsWith('Mamin') && (
                                     <button
@@ -2099,9 +2166,10 @@ export default function Step3RincianHPS() {
                                       onClick={() => {
                                         setJustifications({ ...justifications, [p.id]: "Pemilihan penyedia ini disesuaikan dengan ketentuan Surat Edaran Bupati Probolinggo Nomor 000.3/2747/426.42/2025 tentang E-Purchasing Katalog Elektronik untuk pemenuhan aspek pemerataan penyedia lokal dan efisiensi pengiriman Mamin di lingkungan Pemerintah Kabupaten Probolinggo." });
                                       }}
-                                      className="text-[9px] font-bold text-amber-750 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded w-full text-center transition-colors border border-amber-200"
+                                      className="text-[9px] font-bold text-amber-750 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded w-full text-center transition-colors border border-amber-200 flex items-center justify-center gap-1"
                                     >
-                                      📋 Template: SE Mamin (Pemerataan)
+                                      <ClipboardList className="w-3 h-3" />
+                                      <span>Template: SE Mamin (Pemerataan)</span>
                                     </button>
                                   )}
                                   <button
@@ -2120,7 +2188,10 @@ export default function Step3RincianHPS() {
                                     }}
                                     className="text-[9px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded w-full text-center transition-colors border border-emerald-200"
                                   >
-                                    ✨ Terapkan Alasan ini ke Seluruh Barang
+                                    <span className="flex items-center gap-1 justify-center">
+                                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                                      <span>Terapkan Alasan ini ke Seluruh Barang</span>
+                                    </span>
                                   </button>
                                 </div>
                               </div>
@@ -2227,7 +2298,7 @@ export default function Step3RincianHPS() {
                       className="glass-input text-xs font-semibold"
                       value={dppSpecs.tempat}
                       onChange={(e) => setDppSpecs({...dppSpecs, tempat: e.target.value})}
-                      placeholder="Kantor Kecamatan Besuk"
+                      placeholder={`Kantor ${currentUser?.department || 'Kecamatan'}`}
                       disabled={isSigned}
                     />
                   </div>
@@ -2237,31 +2308,98 @@ export default function Step3RincianHPS() {
 
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 border-t border-slate-200 pt-4">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Unggah Gambar TTD PPK</label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleTtdUpload(e, 'ppk')}
-                        className="text-xs w-full text-slate-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
-                        disabled={isSigned}
-                      />
-                      {docSettings.ttdPpk && <div className="text-emerald-600 text-xs font-bold">✓ Tersimpan</div>}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <label className="block text-[10px] font-bold text-slate-700 mb-2 uppercase tracking-wider">✍️ Metode Sertifikasi TTD PPK</label>
+                    <div className="flex gap-4 mb-3">
+                      {[
+                        { val: 'scan', label: 'Wet/Scan TTD' },
+                        { val: 'tte', label: 'TTE Elektronik (BSrE BSSN)' }
+                      ].map(opt => (
+                        <label key={opt.val} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                          <input
+                            type="radio"
+                            name="sig_method_ppk"
+                            value={opt.val}
+                            checked={(docSettings.signatureMethodPpk || 'scan') === opt.val}
+                            onChange={(e) => {
+                              const next = { ...docSettings, signatureMethodPpk: e.target.value };
+                              setDocSettings(next);
+                              localStorage.setItem('pbj_doc_settings', JSON.stringify(next));
+                            }}
+                            className="accent-indigo-600"
+                            disabled={isSigned}
+                          />
+                          <span className={(docSettings.signatureMethodPpk || 'scan') === opt.val ? 'font-bold text-indigo-700' : 'text-slate-600'}>{opt.label}</span>
+                        </label>
+                      ))}
                     </div>
+
+                    {(docSettings.signatureMethodPpk || 'scan') === 'scan' ? (
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleTtdUpload(e, 'ppk')}
+                          className="text-xs w-full text-slate-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                          disabled={isSigned}
+                        />
+                        {docSettings.ttdPpk && <div className="text-emerald-600 text-xs font-bold">✓ Tersimpan</div>}
+                      </div>
+                    ) : (
+                      <div className="bg-indigo-50 border border-indigo-150 rounded-lg p-2.5 text-[11px] text-indigo-700 font-sans">
+                        <div className="font-bold flex items-center gap-1.5 uppercase text-[9px] text-indigo-800">
+                          <span>🛡️</span> Sertifikat Digital BSrE BSSN Aktif
+                        </div>
+                        <p className="mt-1 leading-relaxed text-[10px]">Dokumen akan ditandatangani secara elektronik (TTE) menggunakan integrasi API Otoritas Sertifikat Pemerintah BSSN.</p>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Unggah Gambar TTD Pejabat Pengadaan</label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleTtdUpload(e, 'pp')}
-                        className="text-xs w-full text-slate-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
-                        disabled={isSigned}
-                      />
-                      {docSettings.ttdPp && <div className="text-emerald-600 text-xs font-bold">✓ Tersimpan</div>}
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <label className="block text-[10px] font-bold text-slate-700 mb-2 uppercase tracking-wider">✍️ Metode Sertifikasi TTD PP</label>
+                    <div className="flex gap-4 mb-3">
+                      {[
+                        { val: 'scan', label: 'Wet/Scan TTD' },
+                        { val: 'tte', label: 'TTE Elektronik (BSrE BSSN)' }
+                      ].map(opt => (
+                        <label key={opt.val} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                          <input
+                            type="radio"
+                            name="sig_method_pp"
+                            value={opt.val}
+                            checked={(docSettings.signatureMethodPp || 'scan') === opt.val}
+                            onChange={(e) => {
+                              const next = { ...docSettings, signatureMethodPp: e.target.value };
+                              setDocSettings(next);
+                              localStorage.setItem('pbj_doc_settings', JSON.stringify(next));
+                            }}
+                            className="accent-indigo-600"
+                            disabled={isSigned}
+                          />
+                          <span className={(docSettings.signatureMethodPp || 'scan') === opt.val ? 'font-bold text-indigo-700' : 'text-slate-600'}>{opt.label}</span>
+                        </label>
+                      ))}
                     </div>
+
+                    {(docSettings.signatureMethodPp || 'scan') === 'scan' ? (
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleTtdUpload(e, 'pp')}
+                          className="text-xs w-full text-slate-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                          disabled={isSigned}
+                        />
+                        {docSettings.ttdPp && <div className="text-emerald-600 text-xs font-bold">✓ Tersimpan</div>}
+                      </div>
+                    ) : (
+                      <div className="bg-indigo-50 border border-indigo-150 rounded-lg p-2.5 text-[11px] text-indigo-700 font-sans">
+                        <div className="font-bold flex items-center gap-1.5 uppercase text-[9px] text-indigo-800">
+                          <span>🛡️</span> Sertifikat Digital BSrE BSSN Aktif
+                        </div>
+                        <p className="mt-1 leading-relaxed text-[10px]">Dokumen akan ditandatangani secara elektronik (TTE) menggunakan integrasi API Otoritas Sertifikat Pemerintah BSSN.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2276,7 +2414,7 @@ export default function Step3RincianHPS() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Lokasi Pekerjaan / Tujuan</label>
-                      <input type="text" value={packageMetadata.lokasi_pekerjaan} onChange={(e) => setPackageMetadata({...packageMetadata, lokasi_pekerjaan: e.target.value})} placeholder="Contoh: Kantor Kecamatan Besuk" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                      <input type="text" value={packageMetadata.lokasi_pekerjaan} onChange={(e) => setPackageMetadata({...packageMetadata, lokasi_pekerjaan: e.target.value})} placeholder={`Contoh: Kantor ${currentUser?.department || 'Kecamatan'}`} className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Waktu Pelaksanaan</label>
@@ -2310,7 +2448,8 @@ export default function Step3RincianHPS() {
                     <div className="mb-6 p-4 border rounded-xl bg-blue-50 border-blue-200">
                       <div className="font-bold text-blue-900 text-sm mb-4 flex items-center justify-between gap-2 border-b border-blue-200/50 pb-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-lg">📋</span> Template Dokumen & Klausul (Gabungan)
+                          <ClipboardList className="w-5 h-5 text-blue-700" />
+                          <span>Template Dokumen & Klausul (Gabungan)</span>
                         </div>
                       </div>
 
@@ -2490,11 +2629,17 @@ export default function Step3RincianHPS() {
                           </div>
                           
                           {/* Justifikasi Teknis Merek */}
+                          {/* Justifikasi Teknis Merek */}
                           <div>
                             <div className="flex justify-between items-end mb-1.5">
                               <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Justifikasi Teknis Merek</label>
-                              <button onClick={() => handleAiAssist('justifikasiMerek')} disabled={aiLoadingField === 'justifikasiMerek'} className="text-[10px] bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white px-2 py-1 rounded shadow-sm flex items-center gap-1 disabled:opacity-50">
-                                ✨ {aiLoadingField === 'justifikasiMerek' ? 'Memproses...' : 'AI Assist'}
+                              <button onClick={() => handleAiAssist('justifikasiMerek')} disabled={aiLoadingField === 'justifikasiMerek'} className="text-[10px] bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white px-2 py-1 rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
+                                {aiLoadingField === 'justifikasiMerek' ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                                ) : (
+                                  <Sparkles className="w-3.5 h-3.5 text-white" />
+                                )}
+                                <span>{aiLoadingField === 'justifikasiMerek' ? 'Memproses...' : 'AI Assist'}</span>
                               </button>
                             </div>
                             <textarea 
@@ -2509,8 +2654,13 @@ export default function Step3RincianHPS() {
                           <div>
                             <div className="flex justify-between items-end mb-1.5">
                               <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Metode Pemilihan Penyedia</label>
-                              <button onClick={() => handleAiAssist('metodePemilihan')} disabled={aiLoadingField === 'metodePemilihan'} className="text-[10px] bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white px-2 py-1 rounded shadow-sm flex items-center gap-1 disabled:opacity-50">
-                                ✨ {aiLoadingField === 'metodePemilihan' ? 'Memproses...' : 'AI Assist'}
+                              <button onClick={() => handleAiAssist('metodePemilihan')} disabled={aiLoadingField === 'metodePemilihan'} className="text-[10px] bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white px-2 py-1 rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
+                                {aiLoadingField === 'metodePemilihan' ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                                ) : (
+                                  <Sparkles className="w-3.5 h-3.5 text-white" />
+                                )}
+                                <span>{aiLoadingField === 'metodePemilihan' ? 'Memproses...' : 'AI Assist'}</span>
                               </button>
                             </div>
                             <textarea 
@@ -2525,8 +2675,13 @@ export default function Step3RincianHPS() {
                           <div>
                             <div className="flex justify-between items-end mb-1.5">
                               <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Spesifikasi Layanan & Kualitas (Klausul Tambahan)</label>
-                              <button onClick={() => handleAiAssist('spesifikasiLayanan')} disabled={aiLoadingField === 'spesifikasiLayanan'} className="text-[10px] bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white px-2 py-1 rounded shadow-sm flex items-center gap-1 disabled:opacity-50">
-                                ✨ {aiLoadingField === 'spesifikasiLayanan' ? 'Memproses...' : 'AI Assist'}
+                              <button onClick={() => handleAiAssist('spesifikasiLayanan')} disabled={aiLoadingField === 'spesifikasiLayanan'} className="text-[10px] bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white px-2 py-1 rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
+                                {aiLoadingField === 'spesifikasiLayanan' ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                                ) : (
+                                  <Sparkles className="w-3.5 h-3.5 text-white" />
+                                )}
+                                <span>{aiLoadingField === 'spesifikasiLayanan' ? 'Memproses...' : 'AI Assist'}</span>
                               </button>
                             </div>
                             <textarea 
@@ -2543,7 +2698,8 @@ export default function Step3RincianHPS() {
                   {/* Badge Indikator Jenis DPP */}
                   <div className="mb-6 p-4 border rounded-xl bg-blue-50 border-blue-200">
                     <div className="font-bold text-blue-900 text-sm mb-1 flex items-center gap-2">
-                      <span className="text-lg">📋</span> Template DPP: {
+                      <ClipboardList className="w-5 h-5 text-blue-700" />
+                      <span>Template DPP: </span> {
                         getPacketCategory(selectedPack?.packName || '') === 'Mamin-Prasmanan' ? 'Mamin — Prasmanan/Katering' :
                         getPacketCategory(selectedPack?.packName || '') === 'Mamin-Bungkus' ? 'Mamin — Nasi Kotak / Bungkus' :
                         getPacketCategory(selectedPack?.packName || '') === 'Mamin-Snack' ? 'Mamin — Snack' :
@@ -2634,13 +2790,15 @@ export default function Step3RincianHPS() {
             <button
               onClick={() => handleSimpanPaket(false)}
               disabled={isUpdating}
-              className="bg-white border-2 border-slate-200 hover:border-indigo-500 text-slate-700 hover:text-indigo-600 px-6 py-2.5 rounded-xl font-bold transition-all disabled:opacity-50 pointer-events-auto shadow-sm"
+              className="bg-white border-2 border-slate-200 hover:border-indigo-500 text-slate-700 hover:text-indigo-600 px-6 py-2.5 rounded-xl font-bold transition-all disabled:opacity-50 pointer-events-auto shadow-sm flex items-center gap-1.5"
             >
-              💾 Simpan Paket
+              <Save className="w-4 h-4" />
+              <span>Simpan Paket</span>
             </button>
             <button
-              onClick={() => {
-                if (confirm('Anda yakin ingin menyerahkan dan mengunci dokumen ini untuk PP?')) {
+              onClick={async () => {
+                const confirmed = await dialog.confirm('Anda yakin ingin menyerahkan dan mengunci dokumen ini untuk PP?');
+                if (confirmed) {
                   const finalizedItems = getPackageItems(selectedPack).map((item, idx) => {
                     const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
                     const surveyProduct = surveyData?.products?.find(p => p.name === item.name);

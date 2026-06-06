@@ -83,6 +83,7 @@ func main() {
 	settingHandler := handlers.NewSettingHandler(gormDB)
 	vendorLocationHandler := handlers.NewVendorLocationHandler(gormDB)
 	reportHandler := handlers.NewReportHandler(gormDB)
+	vendorReportHandler := handlers.NewVendorReportHandler(gormDB)
 
 	mux := http.NewServeMux()
 
@@ -120,6 +121,14 @@ func main() {
 	// Reports Route
 	mux.HandleFunc("GET /api/reports/absorption", reportHandler.GetAbsorptionReport)
 	mux.HandleFunc("OPTIONS /api/reports/absorption", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-User-Role, X-User-Satker")
+		w.WriteHeader(http.StatusOK)
+	})
+	
+	mux.HandleFunc("GET /api/reports/vendor-performance", vendorReportHandler.GetVendorPerformance)
+	mux.HandleFunc("OPTIONS /api/reports/vendor-performance", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-User-Role, X-User-Satker")

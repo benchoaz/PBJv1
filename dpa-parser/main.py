@@ -18,11 +18,19 @@ from typing import Optional, List, Tuple
 from fastapi import FastAPI, File, UploadFile, HTTPException, Header
 import fitz  # PyMuPDF
 import numpy as np
-from paddleocr import PaddleOCR
-import logging
-logging.getLogger("ppocr").setLevel(logging.WARNING)
-ocr_engine = PaddleOCR(use_angle_cls=True, lang='en')
 from pdf2image import convert_from_bytes
+from PIL import Image
+
+ocr_engine = None
+
+def get_ocr_engine():
+    global ocr_engine
+    if ocr_engine is None:
+        from paddleocr import PaddleOCR
+        import logging
+        logging.getLogger("ppocr").setLevel(logging.WARNING)
+        ocr_engine = PaddleOCR(use_angle_cls=True, lang='en')
+    return ocr_engine
 from PIL import Image
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -944,7 +952,7 @@ def ocr_pdf(pdf_bytes: bytes) -> Tuple[str, float]:
         # Convert RGB to BGR for PaddleOCR (OpenCV format)
         img_array = img_array[:, :, ::-1].copy()
         
-        result = ocr_engine.ocr(img_array, cls=True)
+        result = get_ocr_engine().ocr(img_array, cls=True)
         
         page_text = []
         page_conf_sum = 0.0
@@ -982,7 +990,7 @@ def ocr_image(image_bytes: bytes) -> Tuple[str, float]:
         img_array = img_array[:, :, :3]
         img_array = img_array[:, :, ::-1].copy()
         
-    result = ocr_engine.ocr(img_array, cls=True)
+    result = get_ocr_engine().ocr(img_array, cls=True)
     page_text = []
     page_conf_sum = 0.0
     page_conf_count = 0
@@ -1042,72 +1050,105 @@ def extract_global_metadata(text: str) -> dict:
         
     lines = [l.strip() for l in text.split('\n') if l.strip()]
     
+    # Helper: kumpulkan teks lanjutan (baris berikutnya) sampai bertemu label baru atau kode rekening
+    STOP_LABELS = re.compile(
+        r'^(Program|Kegiatan|Sub\s*Kegiatan|Lokasi|Waktu\s*Pelaksanaan|'
+        r'Urusan|Bidang|Satuan\s*Kerja|Organisasi|Unit|Tahun|Anggaran|'
+        r'Sumber\s*Dana|Jumlah|Total|\d\.\d{2}|\d\.\d{2}\.\d{2}|5\.1\.|6\.1\.)',
+        re.IGNORECASE
+    )
+
+    def collect_continuation(lines, start_idx, max_lines=10):
+        """Kumpulkan baris lanjutan setelah baris 'start_idx', hingga bertemu stop condition."""
+        parts = []
+        for k in range(start_idx, min(start_idx + max_lines, len(lines))):
+            ln = lines[k]
+            # Hentikan jika baris ini adalah label baru atau kode rekening baru
+            if STOP_LABELS.match(ln):
+                break
+            # Hentikan jika ada kode MAK lengkap (x.xx.xx.xx.xx.xxxx)
+            if re.match(r'^\d\.\d{2}\.\d{2}\.\d\.\d{2}', ln):
+                break
+            parts.append(ln.lstrip(':').strip())
+        return ' '.join(parts).strip()
+
     for i, line in enumerate(lines):
         # 1. Program
-        if not meta["program"] and re.search(r'Program', line, re.IGNORECASE):
-            match = re.search(r'Program\s*(?::|\s{2,})\s*(.+)', line, re.IGNORECASE)
-            if match:
-                meta["program"] = match.group(1).strip()
+        if not meta["program"] and re.search(r'^Program\b', line, re.IGNORECASE):
+            match = re.search(r'Program\s*(?::|)\s*(.+)', line, re.IGNORECASE)
+            if match and match.group(1).strip():
+                first_part = match.group(1).strip()
+                cont = collect_continuation(lines, i + 1)
+                meta["program"] = (first_part + (' ' + cont if cont else '')).strip()
             else:
-                for j in range(i + 1, min(i + 15, len(lines))):
-                    if re.match(r'^:?\s*\d\.\d{2}\.\d{2}.*', lines[j]):
-                        meta["program"] = lines[j].replace(':', '', 1).strip()
-                        break
+                cont = collect_continuation(lines, i + 1)
+                if cont:
+                    meta["program"] = cont
                         
-        # 2. Kegiatan
-        if not meta["kegiatan"] and re.search(r'Kegiatan', line, re.IGNORECASE) and 'Sub' not in line:
-            match = re.search(r'Kegiatan\s*(?::|\s{2,})\s*(.+)', line, re.IGNORECASE)
-            if match:
-                meta["kegiatan"] = match.group(1).strip()
+        # 2. Kegiatan (hindari Sub Kegiatan)
+        if not meta["kegiatan"] and re.search(r'^Kegiatan\b', line, re.IGNORECASE) and not re.search(r'Sub', line, re.IGNORECASE):
+            match = re.search(r'Kegiatan\s*(?::|)\s*(.+)', line, re.IGNORECASE)
+            if match and match.group(1).strip():
+                first_part = match.group(1).strip()
+                cont = collect_continuation(lines, i + 1)
+                meta["kegiatan"] = (first_part + (' ' + cont if cont else '')).strip()
             else:
-                for j in range(i + 1, min(i + 15, len(lines))):
-                    if re.match(r'^:?\s*\d\.\d{2}\.\d{2}\.\d\.\d{2}\s*\-.*', lines[j]):
-                        meta["kegiatan"] = lines[j].replace(':', '', 1).strip()
-                        break
+                cont = collect_continuation(lines, i + 1)
+                if cont:
+                    meta["kegiatan"] = cont
                         
-        # 3. Sub Kegiatan
+        # 3. Sub Kegiatan — paling penting, namanya bisa sangat panjang dan multi-baris
         if not meta["sub_kegiatan"] and re.search(r'Sub\s*Kegiatan', line, re.IGNORECASE):
-            match = re.search(r'Sub\s*Kegiatan\s*(?::|\s{2,})\s*(.+)', line, re.IGNORECASE)
-            if match:
-                meta["sub_kegiatan"] = match.group(1).strip()
+            match = re.search(r'Sub\s*Kegiatan\s*(?::|)\s*(.+)', line, re.IGNORECASE)
+            if match and match.group(1).strip():
+                first_part = match.group(1).strip()
+                # Lanjutkan membaca baris berikutnya untuk nama yang multi-baris
+                cont = collect_continuation(lines, i + 1, max_lines=15)
+                meta["sub_kegiatan"] = (first_part + (' ' + cont if cont else '')).strip()
             else:
-                for j in range(i + 1, min(i + 15, len(lines))):
-                    if re.match(r'^:?\s*\d\.\d{2}\.\d{2}\.\d\.\d{2}\.\d{4}.*', lines[j]):
-                        meta["sub_kegiatan"] = lines[j].replace(':', '', 1).strip()
-                        break
+                # Label "Sub Kegiatan" di baris sendiri, nilai ada di baris berikutnya
+                cont = collect_continuation(lines, i + 1, max_lines=15)
+                if cont:
+                    meta["sub_kegiatan"] = cont
                         
         # 4. Lokasi
-        if not meta["lokasi"] and re.search(r'Lokasi', line, re.IGNORECASE):
-            match = re.search(r'Lokasi\s*(?::|\s{2,})\s*(.+)', line, re.IGNORECASE)
-            if match:
+        if not meta["lokasi"] and re.search(r'^Lokasi\b', line, re.IGNORECASE):
+            match = re.search(r'Lokasi\s*(?::|)\s*(.+)', line, re.IGNORECASE)
+            if match and match.group(1).strip():
                 meta["lokasi"] = match.group(1).strip()
             else:
-                for j in range(i + 1, min(i + 15, len(lines))):
+                for j in range(i + 1, min(i + 5, len(lines))):
                     if re.match(r'^:?\s*(Kab\.|Kota|Kecamatan|Desa|Kelurahan|Provinsi)\b', lines[j], re.IGNORECASE):
                         meta["lokasi"] = lines[j].replace(':', '', 1).strip()
                         break
                         
         # 5. Waktu Pelaksanaan
         if not meta["waktu_pelaksanaan"] and re.search(r'Waktu\s*Pelaksanaan', line, re.IGNORECASE):
-            match = re.search(r'Waktu\s*Pelaksanaan\s*(?::|\s{2,})\s*(.+)', line, re.IGNORECASE)
-            if match:
+            match = re.search(r'Waktu\s*Pelaksanaan\s*(?::|)\s*(.+)', line, re.IGNORECASE)
+            if match and match.group(1).strip():
                 meta["waktu_pelaksanaan"] = match.group(1).strip()
             else:
-                for j in range(i + 1, min(i + 15, len(lines))):
+                for j in range(i + 1, min(i + 5, len(lines))):
                     if re.search(r'(Mulai|Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember|Bulan|Hari)', lines[j], re.IGNORECASE):
                         meta["waktu_pelaksanaan"] = lines[j].replace(':', '', 1).strip()
                         break
     
-    # Fallbacks in case formatting is slightly off but regex matches directly somewhere
+    # Fallback: cari dengan regex multi-baris jika belum ketemu
     if not meta["program"]:
-        m = re.search(r'Program\s*(?::\s*|\n:?\s*)([^\n]+)', text, re.IGNORECASE)
-        if m: meta["program"] = m.group(1).strip()
+        m = re.search(r'Program\s*:?\s*([^\n]+(?:\n(?!(?:Kegiatan|Sub|Lokasi|Waktu|Urusan|\d\.\d))[^\n]+)*)', text, re.IGNORECASE)
+        if m:
+            meta["program"] = ' '.join(m.group(1).split()).strip()
     if not meta["kegiatan"]:
-        m = re.search(r'Kegiatan\s*(?::\s*|\n:?\s*)([^\n]+)', text, re.IGNORECASE)
-        if m: meta["kegiatan"] = m.group(1).strip()
+        m = re.search(r'(?<!Sub\s)Kegiatan\s*:?\s*([^\n]+(?:\n(?!(?:Sub\s*Kegiatan|Lokasi|Waktu|Urusan|\d\.\d))[^\n]+)*)', text, re.IGNORECASE)
+        if m:
+            meta["kegiatan"] = ' '.join(m.group(1).split()).strip()
     if not meta["sub_kegiatan"]:
-        m = re.search(r'Sub\s*Kegiatan\s*(?::\s*|\n:?\s*)([^\n]+)', text, re.IGNORECASE)
-        if m: meta["sub_kegiatan"] = m.group(1).strip()
+        m = re.search(
+            r'Sub\s*Kegiatan\s*:?\s*(.+?)(?=\n\s*(?:Lokasi|Waktu\s*Pelaksanaan|Sumber\s*Dana|Jumlah|Program|(?<!Sub\s)Kegiatan|5\.1\.|6\.1\.)|\Z)',
+            text, re.IGNORECASE | re.DOTALL
+        )
+        if m:
+            meta["sub_kegiatan"] = ' '.join(m.group(1).split()).strip()
     if not meta["lokasi"]:
         m = re.search(r'Lokasi\s*(?::\s*|\n:?\s*)([^\n]+)', text, re.IGNORECASE)
         if m: meta["lokasi"] = m.group(1).strip()

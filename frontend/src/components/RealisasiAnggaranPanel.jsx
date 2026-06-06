@@ -162,7 +162,7 @@ export default function RealisasiAnggaranPanel() {
           <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1.5">Efisiensi Belanja (Sisa Pagu)</div>
           <div className="text-xl font-bold text-amber-700 font-mono mt-1.5">{formatRupiah(data?.total_efisiensi)}</div>
           <div className="text-[10px] text-slate-400 mt-3 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Sisa Lebih Tender (SiLPA PBJ)
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Efisiensi Pengadaan (Paket Selesai)
           </div>
         </div>
 
@@ -194,10 +194,10 @@ export default function RealisasiAnggaranPanel() {
           <div className="space-y-4">
             {breakdown.map((item, idx) => (
               <div key={idx} className="space-y-2">
-                <div className="flex justify-between items-center text-xs font-semibold text-slate-700">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 truncate">
-                    <span className="font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">{item.mak}</span>
-                    <span className="truncate">{item.kegiatan}</span>
+                <div className="flex flex-wrap justify-between items-start gap-2 text-xs font-semibold text-slate-700">
+                  <div className="flex flex-col gap-1 flex-1 min-w-0">
+                    <span className="font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded text-[10px] self-start">{item.mak}</span>
+                    <span className="text-slate-700 leading-snug break-words">{item.kegiatan}</span>
                   </div>
                   <span className="font-mono text-indigo-700 shrink-0">{item.percentage.toFixed(2)}%</span>
                 </div>

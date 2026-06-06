@@ -617,3 +617,55 @@ export function resolveCritVal(kritKey, col, isSelected) {
     default:                return col.extra?.[kritKey]      || '—';
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. REKOMENDASI PROSEDUR PEMILIHAN PENYEDIA — saran untuk PP/PPK
+// ─────────────────────────────────────────────────────────────────────────────
+export const REKOMENDASI_PP_PPK = {
+  atk: {
+    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
+    isi: `1. Pejabat Pengadaan (PP) dan PPK disarankan melakukan komparasi harga minimal terhadap 2 (dua) atau lebih penyedia sejenis di e-Katalog untuk memastikan kewajaran harga.
+2. Memprioritaskan penyedia lokal terdekat untuk meminimalkan waktu pengiriman dan mempermudah layanan purna jual.`
+  },
+  mamin: {
+    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
+    isi: `1. Penerapan Metode Rotasi Kerja/Order: Mengingat terdapat lebih dari 1 (satu) penyedia Mamin dalam wilayah kecamatan yang sama, Pejabat Pengadaan (PP) dan PPK disarankan menerapkan sistem rotasi kerja secara bergiliran pada paket belanja berikutnya. Langkah ini penting untuk mencegah monopoli usaha, mendukung pemerataan ekonomi bagi seluruh UMKK lokal, serta memelihara iklim kemitraan yang sehat.
+2. Penyesuaian Spesifikasi Sajian (Menu Matching): Pemilihan penyedia harus disesuaikan dengan kapasitas dan kekhasan menu sajian yang ditawarkan oleh penyedia (misal: nasi kotak, prasmanan, atau snack box) agar selaras dengan kebutuhan jenis kegiatan kedinasan.
+3. Penentuan Lokasi Pengiriman Riil: Apabila pengantaran makanan ditujukan ke tempat lain di luar kantor instansi/kecamatan (seperti aula desa atau lokasi lapangan), maka pemilihan katering harus memprioritaskan penyedia yang memiliki jarak terdekat ke titik pengiriman riil tersebut demi menjaga kesegaran hidangan, efisiensi waktu, serta meminimalisir biaya pengiriman (ongkir).`
+  },
+  jasa: {
+    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
+    isi: `1. Memastikan ruang lingkup pekerjaan dalam KAK telah terdefinisi dengan jelas sebelum mengundang penyedia jasa sejenis.
+2. Memverifikasi portofolio dan pengalaman pekerjaan sejenis dari personil yang ditugaskan oleh penyedia jasa.`
+  },
+  modal: {
+    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
+    isi: `1. Selalu melakukan negosiasi harga tayang e-Katalog, terutama untuk pembelian dalam jumlah volume besar (grosir).
+2. Memastikan ketersediaan suku cadang dan garansi resmi minimal 1 tahun yang dapat diklaim melalui service center terdekat.`
+  },
+  pemeliharaan: {
+    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
+    isi: `1. Melakukan inventarisasi kerusakan awal secara mendetail agar estimasi biaya perbaikan logis dan efisien.
+2. Menggunakan penyedia yang mampu memberikan jaminan respons cepat (Response Time) apabila terjadi kendala teknis.`
+  },
+  konstruksi: {
+    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
+    isi: `1. Melakukan evaluasi mendalam terhadap metode pelaksanaan kerja dan kurva S yang diajukan kontraktor untuk mencegah keterlambatan.
+2. Memastikan seluruh personil inti kontraktor memiliki sertifikat kompetensi konstruksi yang valid.`
+  },
+  konsultasi_non: {
+    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
+    isi: `1. Melakukan klarifikasi teknis tatap muka untuk memastikan pemahaman konsultan terhadap KAK.
+2. Memastikan komponen non-personil dihitung secara wajar sesuai kebutuhan riil di lapangan.`
+  },
+  konsultasi_konstruksi: {
+    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
+    isi: `1. Memprioritaskan konsultan pengawas yang memiliki integritas tinggi dan pengalaman pengawasan proyek sejenis.
+2. Memastikan konsultan pengawas aktif menyerahkan laporan berkala mengenai progres pekerjaan fisik.`
+  },
+  konsolidasi: {
+    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
+    isi: `1. Mengkoordinasikan jadwal kebutuhan masing-masing satker agar penyedia dapat mengoptimalkan jalur distribusi.
+2. Memantau konsistensi kualitas barang yang dikirimkan ke berbagai titik lokasi satker.`
+  }
+};

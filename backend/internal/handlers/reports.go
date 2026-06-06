@@ -124,7 +124,14 @@ func (h *ReportHandler) GetAbsorptionReport(w http.ResponseWriter, r *http.Reque
 		// Calculate realization from BAHP (NegotiatedPrice + ShippingCost)
 		var realisasi float64
 		if b, ok := bahpMap[p.ID]; ok {
-			realisasi = float64(b.NegotiatedPrice + b.ShippingCost)
+			var items []models.BahpItem
+			if b.ItemsJSON != "" && json.Unmarshal([]byte(b.ItemsJSON), &items) == nil && len(items) > 0 {
+				for _, item := range items {
+					realisasi += (item.NegotiatedPrice * item.QtyConfirmed) + item.ShippingCost
+				}
+			} else {
+				realisasi = float64(b.NegotiatedPrice + b.ShippingCost)
+			}
 		} else {
 			// Fallback: if project is finished but BAHP document is not created (unlikely in prod, but possible in test data),
 			// we can fallback to the HPS or Project budget, or keep it 0. Let's use 0 or item price.

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePPK } from './PPKContext';
+import { Settings, Printer, Download, ClipboardList } from 'lucide-react';
+
 
 export default function Step4TemplateSurat() {
   const { 
@@ -31,7 +33,7 @@ export default function Step4TemplateSurat() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Lokasi Pekerjaan / Tujuan</label>
-                      <input type="text" value={packageMetadata.lokasi_pekerjaan} onChange={(e) => setPackageMetadata({...packageMetadata, lokasi_pekerjaan: e.target.value})} placeholder="Contoh: Kantor Kecamatan Besuk" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                      <input type="text" value={packageMetadata.lokasi_pekerjaan} onChange={(e) => setPackageMetadata({...packageMetadata, lokasi_pekerjaan: e.target.value})} placeholder={`Contoh: Kantor ${currentUser?.department || 'Kecamatan'}`} className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Waktu Pelaksanaan</label>
@@ -58,7 +60,9 @@ export default function Step4TemplateSurat() {
                   {/* Badge Indikator Jenis DPP */}
                   <div className="mb-6 p-4 border rounded-xl bg-blue-50 border-blue-200">
                     <div className="font-bold text-blue-900 text-sm mb-1 flex items-center gap-2">
-                      <span className="text-lg">📋</span> Template DPP: {
+                      <ClipboardList className="w-5 h-5 text-blue-700" />
+                      <span>Template DPP: </span>
+                      {
                         getPacketCategory(selectedPack?.packName || '') === 'Mamin-Prasmanan' ? 'Mamin — Prasmanan/Katering' :
                         getPacketCategory(selectedPack?.packName || '') === 'Mamin-Bungkus' ? 'Mamin — Nasi Kotak / Bungkus' :
                         getPacketCategory(selectedPack?.packName || '') === 'Mamin-Snack' ? 'Mamin — Snack' :
@@ -212,19 +216,22 @@ export default function Step4TemplateSurat() {
                 className="bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold text-xs px-4 py-2 rounded-xl border border-sky-300 shadow-sm transition-all flex items-center gap-1.5"
                 title="Atur Logo dan Kop Surat secara global"
               >
-                ⚙️ Pengaturan Kop & Logo
+                <Settings className="w-4 h-4 text-sky-800" />
+                <span>Pengaturan Kop &amp; Logo</span>
               </button>
               <button
                 onClick={() => window.print()}
                 className="bg-emerald-600 hover:bg-emerald-750 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-md shadow-emerald-600/10"
               >
-                🖨️ Cetak / Unduh PDF
+                <Printer className="w-4 h-4 text-white" />
+                <span>Cetak / Unduh PDF</span>
               </button>
               <button
                 onClick={handleExportWord}
                 className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors"
               >
-                📥 Export Word (.doc)
+                <Download className="w-4 h-4 text-white" />
+                <span>Export Word (.doc)</span>
               </button>
               <button
                 onClick={() => setActiveDocPreview(null)}
@@ -394,11 +401,16 @@ export default function Step4TemplateSurat() {
  const currentDocSettingsStr = localStorage.getItem('pbj_doc_settings');
  const docSettingsFallback = currentDocSettingsStr ? JSON.parse(currentDocSettingsStr) : null;
  const nomorBase = docSettingsFallback ? (docSettingsFallback.formatNomorSurat || '027/{nomor}/BPBJ/2026') : '027/{nomor}/BPBJ/2026';
+ 
+ const isBesuk = currentUser?.department?.toLowerCase().includes('besuk');
+ const defaultAlamat = isBesuk ? 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283' : (docSettingsFallback?.alamatLengkap || 'Komplek Perkantoran Pemerintah Daerah');
+ const defaultTempat = isBesuk ? 'Besuk' : (currentUser?.department || 'Probolinggo');
+
  // Replace variables
  const replacements = {
  '{{nama_satker}}': currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
  '{{nama_satker_kapital}}': (currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
- '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283',
+ '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : defaultAlamat,
  '{{nama_pekerjaan}}': selectedPack.packName || '',
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
  '{{sumber_dana}}': `${selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date().getFullYear()}`,
@@ -421,7 +433,7 @@ export default function Step4TemplateSurat() {
  '{{nilai_hps}}': '_______________________',
  '{{nama_penyedia_terpilih}}': '_______________________',
  '{{harga_final}}': '_______________________',
- '{{tempat_penetapan}}': 'Besuk',
+ '{{tempat_penetapan}}': defaultTempat,
  '{{nomor_sp}}': nomorBase.replace('{nomor}', '115/SP'),
  '{{alamat_penyedia}}': '_______________________',
  '{{nilai_kontrak}}': '_______________________',
@@ -481,11 +493,16 @@ export default function Step4TemplateSurat() {
  const currentDocSettingsStr = localStorage.getItem('pbj_doc_settings');
  const docSettingsFallback = currentDocSettingsStr ? JSON.parse(currentDocSettingsStr) : null;
  const nomorBase = docSettingsFallback ? (docSettingsFallback.formatNomorSurat || '027/{nomor}/BPBJ/2026') : '027/{nomor}/BPBJ/2026';
+ 
+ const isBesuk = currentUser?.department?.toLowerCase().includes('besuk');
+ const defaultAlamat = isBesuk ? 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283' : (docSettingsFallback?.alamatLengkap || 'Komplek Perkantoran Pemerintah Daerah');
+ const defaultTempat = isBesuk ? 'Besuk' : (currentUser?.department || 'Probolinggo');
+
  // Replace variables
  const replacements = {
  '{{nama_satker}}': currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
  '{{nama_satker_kapital}}': (currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
- '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283',
+ '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : defaultAlamat,
  '{{nama_pekerjaan}}': selectedPack.packName || '',
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
  '{{sumber_dana}}': `${selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date().getFullYear()}`,
@@ -508,7 +525,7 @@ export default function Step4TemplateSurat() {
  '{{nilai_hps}}': '_______________________',
  '{{nama_penyedia_terpilih}}': '_______________________',
  '{{harga_final}}': '_______________________',
- '{{tempat_penetapan}}': 'Besuk',
+ '{{tempat_penetapan}}': defaultTempat,
  '{{nomor_sp}}': nomorBase.replace('{nomor}', '115/SP'),
  '{{alamat_penyedia}}': '_______________________',
  '{{nilai_kontrak}}': '_______________________',
@@ -760,6 +777,14 @@ export default function Step4TemplateSurat() {
                   <li><strong>Kesesuaian Harga:</strong> Membandingkan nilai ekonomis porsi yang selaras dengan pagu anggaran.</li>
                   <li><strong>Kedekatan Jarak Geografis:</strong> Memilih penyedia dengan radius terdekat (satu kecamatan/wilayah kerja) untuk memastikan ketepatan waktu distribusi saat jam konsumsi acara dan menjamin makanan diterima dalam kondisi segar (higienis).</li>
                 </ul>
+                <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded text-slate-700">
+                  <strong className="text-amber-800 block mb-1">💡 Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK):</strong>
+                  <ul className="list-decimal pl-4 space-y-1.5 text-xs text-justify">
+                    <li><strong>Metode Rotasi Kerja/Order (Penyedia Ganda):</strong> Mengingat terdapat lebih dari satu penyedia Mamin dalam wilayah kecamatan yang sama, PP/PPK disarankan menerapkan sistem rotasi kerja secara bergiliran pada paket belanja berikutnya untuk mencegah monopoli usaha dan mendukung pemerataan ekonomi UMKK lokal.</li>
+                    <li><strong>Penyesuaian Spesifikasi Menu (Menu Matching):</strong> Memilih penyedia yang menu dan kapasitas produksinya paling sesuai dengan jenis acara dinas.</li>
+                    <li><strong>Penentuan Jarak Berdasarkan Lokasi Pengiriman Riil:</strong> Apabila tempat acara/pengiriman ditujukan ke lokasi lain di luar kantor instansi/kecamatan, pemilihan penyedia harus memprioritaskan katering terdekat dari <em>titik pengiriman riil tersebut</em> demi efisiensi biaya ongkir dan meminimalkan risiko makanan basi di perjalanan.</li>
+                  </ul>
+                </div>
               </>
             ) : justText ? (
               <>
@@ -969,9 +994,9 @@ export default function Step4TemplateSurat() {
  {/* Kosong untuk memberikan ruang tanda tangan di kanan */}
  </div>
  <div className="w-max min-w-[14rem] px-4 text-center space-y-2">
- <div >
- Besuk, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
- </div>
+  <div >
+  {currentUser?.department?.toLowerCase().includes('besuk') ? 'Besuk' : (currentUser?.department || 'Probolinggo')}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+  </div>
  <div className=" font-bold uppercase">
  Pejabat Pembuat Komitmen (PPK)
  </div>
