@@ -84,6 +84,7 @@ func main() {
 	vendorLocationHandler := handlers.NewVendorLocationHandler(gormDB)
 	reportHandler := handlers.NewReportHandler(gormDB)
 	vendorReportHandler := handlers.NewVendorReportHandler(gormDB)
+	sirupHandler := handlers.NewSirupHandler(gormDB)
 
 	mux := http.NewServeMux()
 
@@ -152,9 +153,13 @@ func main() {
 	mux.HandleFunc("PUT /api/pbj/packages/{id}/survey", pbjHandler.UpdateSurvey)
 	mux.HandleFunc("OPTIONS /api/pbj/packages/{id}/survey", pbjHandler.Options)
 	mux.HandleFunc("GET /api/pbj/packages/{id}", pbjHandler.GetPackage)
+	mux.HandleFunc("POST /api/pbj/upload-screenshot", handlers.UploadScreenshot)
+	mux.HandleFunc("OPTIONS /api/pbj/upload-screenshot", pbjHandler.Options)
 
 	// SIRUP LKPP live proxy endpoint
-	mux.HandleFunc("GET /api/sirup/satker/{id}", handlers.GetSirupPackages)
+	mux.HandleFunc("GET /api/sirup/satker/{id}", sirupHandler.GetSirupPackages)
+	mux.HandleFunc("POST /api/sirup/satker/{id}", sirupHandler.ImportSirupPackages)
+	mux.HandleFunc("OPTIONS /api/sirup/satker/{id}", sirupHandler.Options)
 
 	// AI Survey endpoint
 	mux.HandleFunc("POST /api/survey/run", handlers.RunSurvey)

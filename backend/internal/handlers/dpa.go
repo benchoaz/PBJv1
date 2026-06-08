@@ -79,6 +79,12 @@ func ParseDPA(w http.ResponseWriter, r *http.Request) {
 	if key := r.Header.Get("X-AI-Key"); key != "" {
 		req.Header.Set("X-AI-Key", key)
 	}
+	if escProvider := r.Header.Get("X-AI-Escalation-Provider"); escProvider != "" {
+		req.Header.Set("X-AI-Escalation-Provider", escProvider)
+	}
+	if escKey := r.Header.Get("X-AI-Escalation-Key"); escKey != "" {
+		req.Header.Set("X-AI-Escalation-Key", escKey)
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)

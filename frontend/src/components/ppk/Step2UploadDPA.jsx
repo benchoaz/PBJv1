@@ -217,33 +217,55 @@ export default function Step2UploadDPA() {
                   setDpaName(file.name)
                   setIsAnalyzingDpa(true)
                   try {
-                    // 1. Ekstrak API Key aktif dari Backend Database (Groq / Gemini / OpenAI / Claude)
+                    // 1. Ekstrak API Key aktif dari Database Satker atau fallback ke database global (Admin)
                     let activeProvider = ""
                     let activeKey = ""
+                    let escalationProvider = ""
+                    let escalationKey = ""
                     try {
-                      const res = await fetch('/api/settings/ocr_api_keys')
-                      if (res.ok) {
-                        const data = await res.json()
-                        if (data.value) {
-                          const keys = JSON.parse(data.value)
-                          // Prioritaskan Groq / Gemini sesuai tangkapan layar admin
-                          if (keys.groq) {
-                            activeProvider = "groq"
-                            activeKey = keys.groq
-                          } else if (keys.gemini) {
-                            activeProvider = "gemini"
-                            activeKey = keys.gemini
-                          } else if (keys.openai) {
-                            activeProvider = "openai"
-                            activeKey = keys.openai
-                          } else if (keys.anthropic) {
-                            activeProvider = "anthropic"
-                            activeKey = keys.anthropic
+                      const satker = currentUser?.idSatker || satkerId
+                      let keys = null
+                      if (satker) {
+                        const resSatker = await fetch(`/api/settings/ocr_api_keys_satker_${satker}`)
+                        if (resSatker.ok) {
+                          const dataSatker = await resSatker.json()
+                          if (dataSatker.value) {
+                            keys = JSON.parse(dataSatker.value)
                           }
                         }
                       }
+
+                      if (!keys) {
+                        // Fallback: ambil setting ocr_api_keys global dari database server
+                        const resGlobal = await fetch('/api/settings/ocr_api_keys')
+                        if (resGlobal.ok) {
+                          const dataGlobal = await resGlobal.json()
+                          if (dataGlobal.value) {
+                            keys = JSON.parse(dataGlobal.value)
+                          }
+                        }
+                      }
+
+                      if (keys) {
+                        const activeKeysList = [];
+                        const checkOrder = ['gemini', 'groq', 'openai', 'anthropic', 'deepseek', 'mistral', 'cohere', 'ollama'];
+                        for (const prov of checkOrder) {
+                          if (keys[prov]) {
+                            activeKeysList.push({ provider: prov, key: keys[prov] });
+                          }
+                        }
+
+                        if (activeKeysList.length > 0) {
+                          activeProvider = activeKeysList[0].provider;
+                          activeKey = activeKeysList[0].key;
+                        }
+                        if (activeKeysList.length > 1) {
+                          escalationProvider = activeKeysList[1].provider;
+                          escalationKey = activeKeysList[1].key;
+                        }
+                      }
                     } catch (errKey) {
-                      console.error('Gagal mengambil/mem-parse kunci API OCR dari database:', errKey)
+                      console.error('Gagal mengambil/mem-parse kunci API OCR:', errKey)
                     }
 
                     // 2. Persiapkan request multipart formData
@@ -255,6 +277,10 @@ export default function Step2UploadDPA() {
                     if (activeProvider && activeKey) {
                       headers['X-AI-Provider'] = activeProvider
                       headers['X-AI-Key'] = activeKey
+                    }
+                    if (escalationProvider && escalationKey) {
+                      headers['X-AI-Escalation-Provider'] = escalationProvider
+                      headers['X-AI-Escalation-Key'] = escalationKey
                     }
 
                     const response = await fetch('/api/dpa/parse', {
@@ -749,14 +775,42 @@ export default function Step2UploadDPA() {
                             try {
                               let activeProvider = ""
                               let activeKey = ""
-                              // Check both possible localStorage key names for backward compatibility
-                              const savedKeys = localStorage.getItem('pbj_ocr_api_keys') || localStorage.getItem('pbj_ai_keys')
-                              if (savedKeys) {
-                                const keys = JSON.parse(savedKeys)
-                                if (keys.groq) { activeProvider = "groq"; activeKey = keys.groq }
-                                else if (keys.gemini) { activeProvider = "gemini"; activeKey = keys.gemini }
-                                else if (keys.openai) { activeProvider = "openai"; activeKey = keys.openai }
-                                else if (keys.anthropic) { activeProvider = "anthropic"; activeKey = keys.anthropic }
+                              try {
+                                const satker = currentUser?.idSatker || satkerId
+                                let keys = null
+                                if (satker) {
+                                  const resSatker = await fetch(`/api/settings/ocr_api_keys_satker_${satker}`)
+                                  if (resSatker.ok) {
+                                    const dataSatker = await resSatker.json()
+                                    if (dataSatker.value) {
+                                      keys = JSON.parse(dataSatker.value)
+                                    }
+                                  }
+                                }
+
+                                if (!keys) {
+                                  // Fallback: ambil setting ocr_api_keys global dari database server
+                                  const resGlobal = await fetch('/api/settings/ocr_api_keys')
+                                  if (resGlobal.ok) {
+                                    const dataGlobal = await resGlobal.json()
+                                    if (dataGlobal.value) {
+                                      keys = JSON.parse(dataGlobal.value)
+                                    }
+                                  }
+                                }
+
+                                if (keys) {
+                                  if (keys.gemini) { activeProvider = "gemini"; activeKey = keys.gemini }
+                                  else if (keys.groq) { activeProvider = "groq"; activeKey = keys.groq }
+                                  else if (keys.openai) { activeProvider = "openai"; activeKey = keys.openai }
+                                  else if (keys.anthropic) { activeProvider = "anthropic"; activeKey = keys.anthropic }
+                                  else if (keys.deepseek) { activeProvider = "deepseek"; activeKey = keys.deepseek }
+                                  else if (keys.mistral) { activeProvider = "mistral"; activeKey = keys.mistral }
+                                  else if (keys.cohere) { activeProvider = "cohere"; activeKey = keys.cohere }
+                                  else if (keys.ollama) { activeProvider = "ollama"; activeKey = keys.ollama }
+                                }
+                              } catch (errKey) {
+                                console.error('Gagal mengambil/mem-parse kunci API OCR:', errKey)
                               }
 
                               // Jika sedang di proses, kasih loading indikasi (bisa pakai alert dulu sementara)

@@ -4,6 +4,39 @@ import { Settings, Printer, FileDown } from 'lucide-react';
 import { usePPK } from './PPKContext';
 
 
+const getDynamicProductLink = (vendorName, keyword) => {
+  if (!vendorName || vendorName === 'TIDAK DITEMUKAN' || vendorName === 'PENYEDIA INAPROC') {
+    return `https://katalog.inaproc.id/search?keyword=${encodeURIComponent(keyword || '')}`;
+  }
+  const cleanVendor = vendorName.trim();
+  let vendorSlug = '';
+  
+  if (cleanVendor.includes('katalog.inaproc.id/')) {
+    try {
+      const fullUrl = cleanVendor.startsWith('http') ? cleanVendor : 'https://' + cleanVendor;
+      const urlObj = new URL(fullUrl);
+      const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+      vendorSlug = pathSegments[0] ? pathSegments[0].toLowerCase() : '';
+    } catch (e) {
+      // ignore
+    }
+  }
+  
+  if (!vendorSlug) {
+    if (cleanVendor.includes('katalog.inaproc.id/')) {
+      const match = cleanVendor.match(/katalog\.inaproc\.id\/([^/?&#]+)/);
+      vendorSlug = match ? match[1].toLowerCase() : cleanVendor.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    } else if (/^[a-z0-9][a-z0-9-]*[a-z0-9]$/i.test(cleanVendor) && cleanVendor.includes('-')) {
+      vendorSlug = cleanVendor.toLowerCase();
+    } else {
+      vendorSlug = cleanVendor.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+  }
+  
+  const q = keyword || '';
+  return `https://katalog.inaproc.id/${vendorSlug}?catalogueSearch=${encodeURIComponent(q)}`;
+};
+
 const parseSmartColons = (text) => {
   if (!text) return text;
   const lines = text.split('\n');
@@ -177,13 +210,39 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
                });
                img.setAttribute('src', base64Png);
             } else {
-               const base64 = await new Promise((resolve, reject) => {
-                 const reader = new FileReader();
-                 reader.onloadend = () => resolve(reader.result);
-                 reader.onerror = reject;
-                 reader.readAsDataURL(blob);
+               // Compress image to JPEG to reduce data/file size of exported Word document
+               const compressedBase64 = await new Promise((resolve, reject) => {
+                   const imgUrl = URL.createObjectURL(blob);
+                   const imgObj = new Image();
+                   imgObj.onload = () => {
+                       const canvas = document.createElement('canvas');
+                       // Reduce resolution: max width 600px is perfect for Word layout (keeps file size tiny)
+                       const maxWidth = 600;
+                       let targetWidth = imgObj.width || 600;
+                       let targetHeight = imgObj.height || 400;
+                       
+                       if (targetWidth > maxWidth) {
+                           const ratio = maxWidth / targetWidth;
+                           targetWidth = maxWidth;
+                           targetHeight = Math.round(targetHeight * ratio);
+                       }
+                       
+                       canvas.width = targetWidth;
+                       canvas.height = targetHeight;
+                       const ctx = canvas.getContext('2d');
+                       ctx.drawImage(imgObj, 0, 0, targetWidth, targetHeight);
+                       
+                       // Export to JPEG with 0.6 quality for excellent size reduction
+                       resolve(canvas.toDataURL('image/jpeg', 0.6));
+                       URL.revokeObjectURL(imgUrl);
+                   };
+                   imgObj.onerror = (err) => {
+                       URL.revokeObjectURL(imgUrl);
+                       reject(err);
+                   };
+                   imgObj.src = imgUrl;
                });
-               img.setAttribute('src', base64);
+               img.setAttribute('src', compressedBase64);
             }
           }
         } catch (err) {
@@ -1028,7 +1087,9 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
             );
           } else {
             const brandText = surveyProduct ? (surveyProduct.vendor || 'Sesuai Katalog') : 'Sesuai Kebutuhan DPA';
-            const linkHref = surveyProduct ? surveyProduct.link : '';
+            const linkHref = surveyProduct && surveyProduct.link
+              ? surveyProduct.link
+              : (surveyProduct ? getDynamicProductLink(surveyProduct.vendor, surveyProduct.name) : '');
             return (
               <tr key={item.no}>
                 <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
@@ -1084,23 +1145,24 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
             const compKey = 'ITEM-' + idx;
             const comp = comparisons && comparisons[compKey];
             const comp2 = comparisons && comparisons[compKey + '-2'];
-            let imgSrc = p.searchImg || p.img;
+            let imgSrc = p.img || p.searchImg;
             if (imgSrc && imgSrc.startsWith('/screenshots/')) {
-              imgSrc = `http://localhost:3001${imgSrc}`;
+              imgSrc = window.location.origin + imgSrc;
             }
+            const linkHref = p.link ? p.link : getDynamicProductLink(p.vendor, p.name);
             return (
               <React.Fragment key={p.id}>
                 <div className="border border-slate-400 p-4 bg-slate-50 mb-4" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                  <div className="font-bold text-lg mb-2 border-b border-slate-300 pb-2">Item {idx + 1}: {p.name} <span className="text-emerald-600 text-sm">(Daftar Produk Potensial)</span></div>
-                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                    <div><strong>Pelaku Usaha:</strong> {p.vendor}</div>
-                    <div><strong>Harga Tayang:</strong> Rp {(p.price || 0).toLocaleString('id-ID')}</div>
-                    <div className="col-span-2"><strong>Tautan (Link):</strong> <a href={p.link} target="_blank" className="text-blue-600 break-all">{p.link}</a></div>
-                  </div>
+                   <div className="font-bold text-lg mb-2 border-b border-slate-300 pb-2">Item {idx + 1}: {p.name} <span className="text-emerald-600 text-sm">(Daftar Produk Potensial)</span></div>
+                   <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                     <div><strong>Pelaku Usaha:</strong> {p.vendor}</div>
+                     <div><strong>Harga Tayang:</strong> Rp {(p.price || 0).toLocaleString('id-ID')}</div>
+                     <div className="col-span-2"><strong>Tautan (Link):</strong> <a href={linkHref} target="_blank" className="text-blue-600 break-all">{linkHref}</a></div>
+                   </div>
                   {imgSrc && (
                     <div className="mt-2 text-center">
                       <div className="text-xs font-semibold text-slate-500 mb-1">Bukti Tangkapan Layar Katalog</div>
-                      <img src={imgSrc} alt="Tangkapan Layar" className="max-w-full h-auto max-h-[800px] mx-auto border border-slate-200 shadow-sm" />
+                      <img src={imgSrc} alt="Tangkapan Layar" className="max-w-[450px] h-auto max-h-[260px] mx-auto border border-slate-200 shadow-sm" style={{ maxWidth: '450px', maxHeight: '260px' }} />
                     </div>
                   )}
                 </div>

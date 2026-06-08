@@ -1,3 +1,9 @@
 nohup: ignoring input
-2026/06/04 19:15:04 Connected to PostgreSQL via GORM
-2026/06/04 19:15:04 Server starting on :8080
+2026/06/06 16:04:50 Connected to PostgreSQL via GORM
+
+2026/06/06 16:04:50 [32m/home/beni/PBJ/backend/cmd/server/main.go:40 [33mSLOW SQL >= 200ms
+[0m[31;1m[213.281ms] [33m[rows:-][35m SELECT c.column_name, constraint_name, constraint_type FROM information_schema.table_constraints tc JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_catalog, table_name, constraint_name) JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema AND tc.table_name = c.table_name AND ccu.column_name = c.column_name WHERE constraint_type IN ('PRIMARY KEY', 'UNIQUE') AND c.table_catalog = 'pbj_db' AND c.table_schema = CURRENT_SCHEMA() AND c.table_name = 'packages'[0m
+2026/06/06 16:04:51 Server starting on :8081
+
+2026/06/06 16:10:17 [32m/home/beni/PBJ/backend/internal/repository/projects.go:109 [33mSLOW SQL >= 200ms
+[0m[31;1m[242.513ms] [33m[rows:1][35m SELECT * FROM "project_items" WHERE project_id IN (31)[0m

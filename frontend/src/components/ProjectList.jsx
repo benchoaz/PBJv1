@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
 const STATUS_CONFIG = {
-  'Draft':         { color: 'text-sky-700 bg-sky-50 border-sky-200',       dot: 'bg-sky-400',      label: 'Draft' },
-  'Terkirim ke PP':{ color: 'text-amber-700 bg-amber-50 border-amber-200', dot: 'bg-amber-400',    label: 'Terkirim ke PP' },
-  'Disetujui PP':  { color: 'text-emerald-700 bg-emerald-50 border-emerald-200', dot: 'bg-emerald-400', label: 'Disetujui PP' },
+  'Draft':               { color: 'text-sky-700 bg-sky-50 border-sky-200',         dot: 'bg-sky-400',      label: 'Draft' },
+  'Terkirim ke PP':      { color: 'text-amber-700 bg-amber-50 border-amber-200',   dot: 'bg-amber-400',    label: 'Terkirim ke PP' },
+  'Disetujui PP':        { color: 'text-emerald-700 bg-emerald-50 border-emerald-200', dot: 'bg-emerald-400', label: 'Disetujui PP' },
+  'Menunggu TTD PPK':    { color: 'text-orange-700 bg-orange-50 border-orange-200', dot: 'bg-orange-400',  label: 'Menunggu TTD PPK' },
   'Selesai (Arsip Lengkap)': { color: 'text-violet-700 bg-violet-50 border-violet-200', dot: 'bg-violet-400', label: 'Selesai' },
 }
 
@@ -19,6 +20,10 @@ export default function ProjectList() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [view, setView]           = useState('table') // 'table' | 'card'
+  const [ppkSignModal, setPpkSignModal] = useState(null) // project object or null
+  const [ppkSignMethod, setPpkSignMethod] = useState('scan')
+  const [ppkSignImg, setPpkSignImg] = useState('')
+  const [ppkSignSaving, setPpkSignSaving] = useState(false)
   const { user } = useAuth()
   const navigate = useNavigate()
 
@@ -171,8 +176,8 @@ export default function ProjectList() {
   const visibleProjects = user?.role === 'PP' ? projects.filter(p => p.status !== 'Draft') : projects;
 
   const statusList = user?.role === 'PP' 
-    ? ['Semua', 'Terkirim ke PP', 'Disetujui PP', 'Selesai (Arsip Lengkap)'] 
-    : ['Semua', 'Draft', 'Terkirim ke PP', 'Disetujui PP', 'Selesai (Arsip Lengkap)'];
+    ? ['Semua', 'Terkirim ke PP', 'Disetujui PP', 'Menunggu TTD PPK', 'Selesai (Arsip Lengkap)'] 
+    : ['Semua', 'Draft', 'Terkirim ke PP', 'Disetujui PP', 'Menunggu TTD PPK', 'Selesai (Arsip Lengkap)'];
 
   const filtered = visibleProjects.filter(p => {
     const matchStatus = filterStatus === 'Semua' || p.status === filterStatus
@@ -225,6 +230,7 @@ export default function ProjectList() {
   const totalKirim = visibleProjects.filter(p => p.status === 'Terkirim ke PP').length
 
   return (
+    <>
     <div className="animate-fade-in min-h-screen bg-slate-50/50">
 
       {/* ── PAGE HEADER ─────────────────────────────────── */}
@@ -416,6 +422,11 @@ export default function ProjectList() {
                         {parsedData?.selectedPack?.noSirup && (
                           <div className="text-[10px] text-slate-400 mt-0.5 font-mono">RUP: {parsedData.selectedPack.noSirup}</div>
                         )}
+                        {parsedData?.namaAcara && (
+                          <div className="text-[10px] text-indigo-500 mt-1 font-semibold bg-indigo-50 inline-block px-1.5 py-0.5 rounded border border-indigo-100">
+                            Acara: {parsedData.namaAcara}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-4 text-right whitespace-nowrap align-top">
                         <div className="flex justify-between items-center mb-1 gap-4">
@@ -486,6 +497,17 @@ export default function ProjectList() {
                             >
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
                               Kirim
+                            </button>
+                          )}
+                          {/* Tombol TTD untuk PPK jika status Menunggu TTD PPK */}
+                          {user?.role !== 'PP' && project.status === 'Menunggu TTD PPK' && (
+                            <button
+                              onClick={() => { setPpkSignModal(project); setPpkSignMethod('scan'); setPpkSignImg(''); }}
+                              title="Tanda Tangani BAHP"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-orange-600 hover:bg-orange-50 transition-colors border border-orange-300 font-semibold"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                              TTD BAHP
                             </button>
                           )}
                           {!isLocked && (
@@ -561,6 +583,11 @@ export default function ProjectList() {
                     {parsedData?.selectedPack?.noSirup && (
                       <div className="text-[10px] text-slate-400 mt-1 font-mono">RUP: {parsedData.selectedPack.noSirup}</div>
                     )}
+                    {parsedData?.namaAcara && (
+                      <div className="text-[10px] text-indigo-500 mt-1 font-semibold bg-indigo-50 inline-block px-1.5 py-0.5 rounded border border-indigo-100">
+                        Acara: {parsedData.namaAcara}
+                      </div>
+                    )}
                   </button>
 
                   <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2 mb-4 text-xs">
@@ -618,5 +645,133 @@ export default function ProjectList() {
         </div>
       </div>
     </div>
+    {/* ═══════════════════════════════════════════════════════════
+        MODAL TANDA TANGAN PPK
+        ═══════════════════════════════════════════════════════════ */}
+    {ppkSignModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+          {/* Header Modal */}
+          <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+              </div>
+              <div>
+                <h2 className="text-white font-bold text-sm">Tanda Tangan BAHP</h2>
+                <p className="text-orange-100 text-[10px]">Pejabat Pembuat Komitmen (PPK)</p>
+              </div>
+            </div>
+            <button onClick={() => setPpkSignModal(null)} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          {/* Info Paket */}
+          <div className="px-6 pt-5 pb-4 border-b border-slate-100">
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-1">
+              <div className="text-[10px] font-bold text-orange-700 uppercase mb-1">Paket yang Menunggu TTD Anda:</div>
+              <div className="font-semibold text-slate-800 text-sm leading-snug">{ppkSignModal.name}</div>
+              <div className="text-xs text-slate-500 mt-1">Pagu: <span className="font-mono font-semibold text-slate-700">Rp {Number(ppkSignModal.budget || 0).toLocaleString('id-ID')}</span></div>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-2 italic">Dokumen BAHP ini telah diselesaikan oleh Pejabat Pengadaan (PP). Dengan menandatangani, Anda menyetujui dan mengesahkan dokumen ini sebagai laporan pekerjaan yang selesai.</p>
+          </div>
+
+          {/* Pilihan Metode TTD */}
+          <div className="px-6 py-4">
+            <div className="text-[10px] font-bold text-slate-700 uppercase tracking-wide mb-3">Metode Tanda Tangan PPK</div>
+            <div className="flex gap-3 mb-4">
+              {[{ val: 'scan', label: 'Upload Scan / Gambar TTD' }, { val: 'tte', label: 'TTE Elektronik (BSrE BSSN)' }].map(opt => (
+                <label key={opt.val} className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="ppk_sign_method" value={opt.val} checked={ppkSignMethod === opt.val} onChange={e => setPpkSignMethod(e.target.value)} className="accent-orange-500" />
+                  <span className={`text-xs ${ppkSignMethod === opt.val ? 'font-bold text-orange-700' : 'text-slate-600'}`}>{opt.label}</span>
+                </label>
+              ))}
+            </div>
+
+            {ppkSignMethod === 'scan' ? (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row items-center gap-4">
+                <div className="flex-1">
+                  <p className="text-[10px] text-slate-500 mb-2">Unggah file gambar/scan tanda tangan PPK (PNG transparan direkomendasikan).</p>
+                  <label className="inline-flex items-center gap-2 cursor-pointer bg-white hover:bg-orange-50 border border-orange-300 px-4 py-2 rounded-xl text-xs font-bold text-orange-700 transition-all">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    Pilih File
+                    <input type="file" accept="image/*" className="hidden" onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => setPpkSignImg(ev.target.result);
+                      reader.readAsDataURL(file);
+                    }} />
+                  </label>
+                </div>
+                {ppkSignImg ? (
+                  <div className="flex flex-col items-center gap-1">
+                    <img src={ppkSignImg} alt="Preview TTD PPK" className="max-h-16 max-w-[140px] object-contain mix-blend-multiply rounded border border-slate-200" />
+                    <button onClick={() => setPpkSignImg('')} className="text-[9px] text-rose-500 font-bold hover:underline">✕ Hapus</button>
+                  </div>
+                ) : (
+                  <div className="w-28 h-14 border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-[9px] text-slate-400 italic">Belum ada TTD</div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-xs text-indigo-700">
+                <div className="font-bold flex items-center gap-2 text-[10px] text-indigo-800 mb-1">🛡️ Tanda Tangan Elektronik (TTE BSrE BSSN)</div>
+                <p className="leading-relaxed">Sistem akan menandai dokumen dengan sertifikat digital PPK yang diterbitkan oleh Balai Sertifikasi Elektronik (BSrE) BSSN. TTD ini secara hukum setara dengan tanda tangan basah.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Tombol Aksi */}
+          <div className="px-6 pb-5 flex justify-end gap-2">
+            <button
+              onClick={() => setPpkSignModal(null)}
+              className="px-5 py-2 text-sm border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 font-medium transition-colors"
+            >Batal</button>
+            <button
+              disabled={ppkSignSaving || (ppkSignMethod === 'scan' && !ppkSignImg)}
+              onClick={async () => {
+                setPpkSignSaving(true);
+                try {
+                  // Simpan TTD PPK ke description & ubah status ke Selesai
+                  let desc = {};
+                  try { desc = JSON.parse(ppkSignModal.description || '{}'); } catch(e) {}
+                  const updatedDocSettings = {
+                    ...(desc.docSettings || {}),
+                    ttdPpk: ppkSignMethod === 'scan' ? ppkSignImg : '',
+                    signatureMethodPpk: ppkSignMethod,
+                  };
+                  const updatedDesc = { ...desc, docSettings: updatedDocSettings };
+                  const res = await fetch(`/api/projects/${ppkSignModal.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      status: 'Selesai (Arsip Lengkap)',
+                      description: JSON.stringify(updatedDesc)
+                    })
+                  });
+                  if (!res.ok) throw new Error('Gagal menyimpan');
+                  setPpkSignModal(null);
+                  fetchProjects();
+                  alert('✅ BAHP telah ditandatangani PPK!\n\nDokumen sekarang berstatus Selesai (Arsip Lengkap).');
+                } catch(e) {
+                  alert('Gagal menyimpan: ' + e.message);
+                } finally {
+                  setPpkSignSaving(false);
+                }
+              }}
+              className="px-6 py-2 text-sm bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-sm shadow-orange-200 transition-all disabled:opacity-40 flex items-center gap-2"
+            >
+              {ppkSignSaving ? (
+                <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>Menyimpan...</>
+              ) : (
+                <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>Finalisasi & Tandatangani</>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

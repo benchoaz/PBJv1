@@ -22,6 +22,289 @@ export default function Step4TemplateSurat() {
   const getActiveSurveyData = () => null;
   const parseSmartColons = (t) => t;
 
+  const handleExportWord = async () => {
+    const printSheet = document.getElementById('print-sheet');
+    if (!printSheet) return;
+
+    // Clone the print-sheet DOM node
+    const clone = printSheet.cloneNode(true);
+
+    // 1. Convert all local images (relative paths / screenshots / local blob URLs) to Base64 asynchronously
+    const imgs = Array.from(clone.querySelectorAll('img'));
+    for (const img of imgs) {
+      const src = img.getAttribute('src');
+      if (src) {
+        let absoluteSrc = src;
+        // Make relative paths absolute to fetch them
+        if (src.startsWith('/')) {
+          absoluteSrc = window.location.origin + src;
+        }
+
+        try {
+          if (src.startsWith('data:image/') && !src.includes('svg+xml')) {
+            // Already a valid base64 non-svg image, skip fetch
+          } else {
+            const res = await fetch(absoluteSrc);
+            const blob = await res.blob();
+            
+            if (blob.type === 'image/svg+xml' || absoluteSrc.toLowerCase().includes('.svg')) {
+               // Word cannot render SVG. Convert SVG to PNG using Canvas.
+               const base64Png = await new Promise((resolve, reject) => {
+                   const svgUrl = URL.createObjectURL(blob);
+                   const imgObj = new Image();
+                   imgObj.onload = () => {
+                       const canvas = document.createElement('canvas');
+                       canvas.width = imgObj.width || 150;
+                       canvas.height = imgObj.height || 150;
+                       const ctx = canvas.getContext('2d');
+                       ctx.drawImage(imgObj, 0, 0);
+                       resolve(canvas.toDataURL('image/png'));
+                       URL.revokeObjectURL(svgUrl);
+                   };
+                   imgObj.onerror = reject;
+                   imgObj.src = svgUrl;
+               });
+               img.setAttribute('src', base64Png);
+            } else {
+               // Compress image to JPEG to reduce data/file size of exported Word document
+               const compressedBase64 = await new Promise((resolve, reject) => {
+                   const imgUrl = URL.createObjectURL(blob);
+                   const imgObj = new Image();
+                   imgObj.onload = () => {
+                       const canvas = document.createElement('canvas');
+                       // Reduce resolution: max width 600px is perfect for Word layout (keeps file size tiny)
+                       const maxWidth = 600;
+                       let targetWidth = imgObj.width || 600;
+                       let targetHeight = imgObj.height || 400;
+                       
+                       if (targetWidth > maxWidth) {
+                           const ratio = maxWidth / targetWidth;
+                           targetWidth = maxWidth;
+                           targetHeight = Math.round(targetHeight * ratio);
+                       }
+                       
+                       canvas.width = targetWidth;
+                       canvas.height = targetHeight;
+                       const ctx = canvas.getContext('2d');
+                       ctx.drawImage(imgObj, 0, 0, targetWidth, targetHeight);
+                       
+                       // Export to JPEG with 0.6 quality for excellent size reduction
+                       resolve(canvas.toDataURL('image/jpeg', 0.6));
+                       URL.revokeObjectURL(imgUrl);
+                   };
+                   imgObj.onerror = (err) => {
+                       URL.revokeObjectURL(imgUrl);
+                       reject(err);
+                   };
+                   imgObj.src = imgUrl;
+               });
+               img.setAttribute('src', compressedBase64);
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to convert image to base64 for Word export:', src, err);
+        }
+      }
+
+      // Force inline styling for compatibility in Word (Exclude Logo)
+      if (!img.classList.contains('logo-instansi')) {
+        img.style.width = '100%';
+        img.style.maxWidth = '280px';
+        img.style.height = 'auto';
+        img.style.display = 'block';
+        img.style.margin = '4px auto';
+        img.style.border = '1px solid #cbd5e1'; // slate-300
+        
+        // CRITICAL FOR WORD EXPORT: Explicit width attribute prevents Word from blowing up the image
+        img.setAttribute('width', '450');
+      } else {
+        // Keep logo compact
+        img.style.width = '70px';
+        img.style.height = 'auto';
+        img.setAttribute('width', '70');
+        img.setAttribute('height', '76');
+      }
+    }
+
+    // 2. Format tables for Word Compatibility (force physical borders and spacing)
+    const tables = Array.from(clone.querySelectorAll('table'));
+    tables.forEach(table => {
+      // Exclude layout tables like Kop Surat from receiving borders
+      if (table.classList.contains('no-border')) {
+        table.setAttribute('border', '0');
+        table.style.border = 'none';
+        const cells = Array.from(table.querySelectorAll('td, th'));
+        cells.forEach(cell => { cell.style.border = 'none'; });
+        return;
+      }
+
+      table.setAttribute('border', '1');
+      table.setAttribute('cellspacing', '0');
+      table.setAttribute('cellpadding', '6');
+      table.style.borderCollapse = 'collapse';
+      table.style.width = '100%';
+      table.style.marginBottom = '12px';
+      table.style.fontSize = '10pt';
+
+      const cells = Array.from(table.querySelectorAll('td, th'));
+      cells.forEach(cell => {
+        cell.style.border = '1px solid #000000';
+        cell.style.padding = '6px';
+      });
+    });
+
+    // 3. Convert grid of screenshots (.grid) into a 2-column Word table
+    const gridDiv = clone.querySelector('.grid');
+    if (gridDiv) {
+      const products = Array.from(gridDiv.children);
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      table.setAttribute('border', '0');
+      table.setAttribute('cellspacing', '0');
+      table.setAttribute('cellpadding', '8');
+
+      let row;
+      products.forEach((p, idx) => {
+        if (idx % 2 === 0) {
+          row = document.createElement('tr');
+          table.appendChild(row);
+        }
+        const td = document.createElement('td');
+        td.style.width = '50%';
+        td.style.padding = '8px';
+        td.style.verticalAlign = 'top';
+        td.style.border = '1px solid #94a3b8'; // border-slate-400
+        td.style.backgroundColor = '#f8fafc'; // bg-slate-50
+        td.style.textAlign = 'center';
+
+        td.innerHTML = p.innerHTML;
+
+        // Clean up classes inside td that might confuse Word
+        const img = td.querySelector('img');
+        if (img) {
+          img.setAttribute('width', '250');
+          img.style.width = '250px';
+          img.style.height = 'auto';
+          img.style.margin = '4px auto';
+        }
+
+        row.appendChild(td);
+      });
+
+      if (products.length % 2 !== 0 && row) {
+        const td = document.createElement('td');
+        td.style.width = '50%';
+        td.style.border = '1px solid #94a3b8';
+        td.style.backgroundColor = '#f8fafc';
+        row.appendChild(td);
+      }
+
+      gridDiv.replaceWith(table);
+    }
+
+    // 4. Convert flex signature sections into Word table
+    const flexSignatures = Array.from(clone.querySelectorAll('.signature-section.flex'));
+    flexSignatures.forEach(sig => {
+      const flexChildren = Array.from(sig.children);
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.marginTop = '24px';
+      table.setAttribute('border', '0');
+      table.setAttribute('cellspacing', '0');
+      table.setAttribute('cellpadding', '0');
+      table.className = 'no-border';
+      
+      const tr = document.createElement('tr');
+      flexChildren.forEach(child => {
+        const td = document.createElement('td');
+        if (child.classList.contains('text-center') || child.classList.contains('w-max')) {
+           td.style.width = '40%';
+           td.style.textAlign = 'center';
+           td.style.verticalAlign = 'bottom';
+        } else {
+           td.style.width = '60%';
+           td.style.verticalAlign = 'bottom';
+        }
+        td.innerHTML = child.innerHTML;
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+      sig.replaceWith(table);
+    });
+
+    const htmlContent = clone.innerHTML;
+    const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head>
+        <meta charset='utf-8'>
+        <title>Dokumen</title>
+        <style>
+          body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: black; }
+          @page WordSection1 {
+            size: ${docSettings.paperSize === 'F4' ? '8.5in 13in' : '8.27in 11.69in'};
+            margin: ${docSettings.marginTop}mm ${docSettings.marginRight}mm ${docSettings.marginBottom}mm ${docSettings.marginLeft}mm;
+            mso-page-orientation: portrait;
+            mso-header-margin: 35.4pt;
+            mso-footer-margin: 35.4pt;
+          }
+          div.WordSection1 { page: WordSection1; }
+          a { color: #1d4ed8; text-decoration: underline; }
+          
+          /* Tailwind to MS Word CSS Mapping */
+          table { width: 100%; border-collapse: collapse; margin-bottom: 1em; }
+          table.border-collapse td, table.border-collapse th { border: 1px solid black; padding: 4px; vertical-align: top; }
+          .font-bold, font-semibold { font-weight: bold; }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .text-justify { text-align: justify; }
+          .uppercase { text-transform: uppercase; }
+          .italic { font-style: italic; }
+          .underline { text-decoration: underline; }
+          .mb-2 { margin-bottom: 0.5rem; }
+          .mb-4 { margin-bottom: 1rem; }
+          .mb-6 { margin-bottom: 1.5rem; }
+          .mt-2 { margin-top: 0.5rem; }
+          .mt-4 { margin-top: 1rem; }
+          .mt-8 { margin-top: 2rem; }
+          .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+          .p-1 { padding: 4px; }
+          .pl-4 { padding-left: 1rem; }
+          .pl-8 { padding-left: 2rem; }
+          .w-full { width: 100%; }
+          .w-8 { width: 2rem; }
+          .w-20 { width: 5rem; }
+          .w-48 { width: 12rem; }
+          .space-y-1 > * + * { margin-top: 0.25rem; }
+          .space-y-2 > * + * { margin-top: 0.5rem; }
+          .space-y-3 > * + * { margin-top: 0.75rem; }
+          .space-y-4 > * + * { margin-top: 1rem; }
+          .bg-slate-100 { background-color: #f1f5f9; }
+          .grid-cols-2 > div { width: 48%; display: inline-block; vertical-align: top; margin: 1%; box-sizing: border-box; }
+          img { max-width: 100%; height: auto; }
+          ul.list-disc { margin-left: 1.5rem; }
+          .break-before-page { page-break-before: always; }
+          
+          /* Remove print hidden elements */
+          .print\\:hidden { display: none !important; }
+        </style>
+      </head>
+      <body>
+        <div class="WordSection1">
+          ${htmlContent}
+        </div>
+      </body>
+    </html>`;
+    const blob = new Blob(['\ufeff', header], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Dokumen_${activeDocPreview}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <>
       {/* Document Generation Action Center */}
@@ -964,17 +1247,17 @@ export default function Step4TemplateSurat() {
  <div className="font-bold uppercase mb-6 text-center border-b-2 border-slate-900 pb-2">LAMPIRAN: BUKTI TANGKAPAN LAYAR (SCREENSHOT) REFERENSI E-KATALOG LOKAL/NASIONAL</div>
  <div className="flex flex-col gap-8">
  {foundWithImages.map((p, index) => {
- // Gunakan searchImg (ber-watermark) jika ada, jika tidak fallback ke img thumbnail biasa
- let imgSrc = p.searchImg || p.img;
- if (imgSrc && imgSrc.startsWith('/screenshots/')) {
- imgSrc = `http://localhost:3001${imgSrc}`;
- }
- return (
- <div key={p.id} className="border border-slate-400 p-4 bg-slate-50" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
- <div className="font-bold mb-2 ">Gambar {index + 1}: {p.name} - {p.vendor}</div>
- <img src={imgSrc} alt={p.name} className="w-full h-auto object-contain border-2 border-slate-300 shadow-sm mb-2" style={{ maxHeight: '800px' }} />
- <div className="font-mono text-blue-800 break-all underline mt-2">
- <a href={p.link} target="_blank" rel="noopener noreferrer" className="hover:text-blue-900">{p.link}</a>
+  let imgSrc = p.img || p.searchImg;
+  if (imgSrc && imgSrc.startsWith('/screenshots/')) {
+    imgSrc = window.location.origin + imgSrc;
+  }
+  const linkHref = p.link && !p.link.includes('/search?keyword=') ? p.link : getDynamicProductLink(p.vendor, p.name);
+  return (
+  <div key={p.id} className="border border-slate-400 p-4 bg-slate-50" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+  <div className="font-bold mb-2 ">Gambar {index + 1}: {p.name} - {p.vendor}</div>
+  <img src={imgSrc} alt={p.name} className="w-full h-auto object-contain border-2 border-slate-300 shadow-sm mb-2" style={{ maxHeight: '800px' }} />
+  <div className="font-mono text-blue-800 break-all underline mt-2">
+  <a href={linkHref} target="_blank" rel="noopener noreferrer" className="hover:text-blue-900">{linkHref}</a>
  </div>
  <div className="font-bold mt-1 text-slate-800">Harga Tayang: Rp&nbsp;{(p.price || 0).toLocaleString('id-ID')}</div>
  </div>

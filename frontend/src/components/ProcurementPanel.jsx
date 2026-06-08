@@ -220,7 +220,7 @@ export default function ProcurementPanel() {
     
     try {
       setSearchProgress('Membatalkan survei... Mohon tunggu.');
-      const res = await fetch(`http://localhost:3001/api/survey/cancel/${currentJobId}`, {
+      const res = await fetch(`/api/survey/cancel/${currentJobId}`, {
         method: 'POST'
       });
       if (res.ok) {
@@ -239,6 +239,22 @@ export default function ProcurementPanel() {
   // Finalization state
   const [showFinalizeModal, setShowFinalizeModal] = useState(false);
   const [deliveryLocation, setDeliveryLocation] = useState('');
+
+  // ── Pencarian e-Katalog: Filter Wilayah & Toleransi Harga ─────────────────
+  // Default wilayah diambil dari satker user. PP bisa menambah/mengubah di UI.
+  const [searchLocations, setSearchLocations] = useState(() => {
+    const dept = user?.department || '';
+    const defaults = [];
+    if (dept.toLowerCase().includes('kabupaten') || dept.toLowerCase().includes('kab.') || dept.toLowerCase().includes('kecamatan') || dept.toLowerCase().includes('kec.')) {
+      defaults.push('Kab. Probolinggo');
+      defaults.push('Kota Probolinggo');
+    }
+    if (defaults.length === 0) defaults.push('Kab. Probolinggo', 'Kota Probolinggo');
+    return defaults;
+  });
+  const [searchIncludeNasional, setSearchIncludeNasional] = useState(false);
+  const [priceTolerance, setPriceTolerance] = useState(30); // % toleransi default
+  // ────────────────────────────────────────────────────────────────────────────
   const [packageType, setPackageType] = useState('ATK');
   const [exceptionNotes, setExceptionNotes] = useState('');
   const [ppkApprovedContinue, setPpkApprovedContinue] = useState(false);
@@ -274,6 +290,19 @@ export default function ProcurementPanel() {
     reader.onload = (event) => {
       const base64Str = event.target.result;
       const newSettings = { ...docSettings, ttdPp: base64Str };
+      setDocSettings(newSettings);
+      localStorage.setItem('pbj_doc_settings', JSON.stringify(newSettings));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleTtdPpkUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64Str = event.target.result;
+      const newSettings = { ...docSettings, ttdPpk: base64Str };
       setDocSettings(newSettings);
       localStorage.setItem('pbj_doc_settings', JSON.stringify(newSettings));
     };
@@ -326,13 +355,14 @@ export default function ProcurementPanel() {
     const useAutoComparator = forceAutoComparator !== null ? forceAutoComparator : autoComparatorEnabled;
     try {
       // Step 1: Post to queue, get jobId
-      const response = await fetch('http://localhost:3001/api/survey/run', {
+      const response = await fetch('/api/survey/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           items: itemsToSearch,
           useAi: true,
-          locations: [],
+          locations: searchIncludeNasional ? [] : searchLocations,
+          priceTolerance: priceTolerance,
           ignorePriceLimit: false,
           autoComparator: useAutoComparator
         })
@@ -352,7 +382,7 @@ export default function ProcurementPanel() {
         await new Promise(r => setTimeout(r, 2500));
         attempts++;
         
-        const statusRes = await fetch(`http://localhost:3001/api/survey/status/${runRes.jobId}`);
+        const statusRes = await fetch(`/api/survey/status/${runRes.jobId}`);
         if (!statusRes.ok) throw new Error('Gagal mengecek status job');
         const statusData = await statusRes.json();
 
@@ -374,16 +404,18 @@ export default function ProcurementPanel() {
       const updatedNego = { ...negotiatedItems };
       results.forEach((res, i) => {
         const targetItem = itemsToSearch[i];
-        if (res && res.price > 0) {
-          successCount++;
+        if (res) {
+          if (res.success) {
+            successCount++;
+          }
           const key = targetItem.originalNo;
-          console.log(`[SURVEY RESULT] item key=${key} price=${res.price} vendor=${res.vendor}`);
+          console.log(`[SURVEY RESULT] item key=${key} price=${res.price} vendor=${res.vendor} success=${res.success}`);
           updatedNego[key] = {
             ...(updatedNego[key] || {}),
             tayang: res.price,
             vendor: res.vendor || '',
             linkSelected: res.link || '',
-            screenshotUrl: res.img ? 'http://localhost:3001' + res.img : '',
+            screenshotUrl: res.img ? res.img : '',
             hasScreenshot: !!res.img,
             // Simpan comparators otomatis jika ada
             autoComparators: (res.comparators && res.comparators.length > 0) ? res.comparators : (updatedNego[key]?.autoComparators || [])
@@ -411,6 +443,38 @@ export default function ProcurementPanel() {
     }
   };
 
+  const handleManualScreenshotUpload = async (itemNo, file) => {
+    if (!file) return;
+    try {
+      setSearchProgress(`Mengunggah screenshot manual untuk item...`);
+      const formData = new FormData();
+      formData.append('screenshot', file);
+      
+      const res = await fetch('/api/pbj/upload-screenshot', {
+        method: 'POST',
+        body: formData
+      });
+      if (!res.ok) throw new Error('Gagal mengunggah file screenshot');
+      
+      const data = await res.json();
+      
+      // Update negotiatedItems with the new screenshot
+      const updatedNego = { ...negotiatedItems };
+      updatedNego[itemNo] = {
+        ...(updatedNego[itemNo] || {}),
+        screenshotUrl: data.screenshotPath,
+        hasScreenshot: true
+      };
+      setNegotiatedItems(updatedNego);
+      localStorage.setItem('pbj_negotiated_items', JSON.stringify(updatedNego));
+      dialog.success('Screenshot manual berhasil diunggah! Gambar ini akan dipakai di BAHP dan mem-bypass hasil robot yang diblokir WAF.');
+    } catch (e) {
+      dialog.error(e.message);
+    } finally {
+      setSearchProgress('');
+    }
+  };
+
   const handleSearchSingleItem = (item, forceAutoComparator = null) => {
     const params = searchParams[item.no] || {};
     const payloadItem = {
@@ -425,7 +489,8 @@ export default function ProcurementPanel() {
       targetUrl: params.link !== undefined ? params.link : (item.link || ''),
       // Kirim null jika kosong/0 agar backend tahu tidak ada batas eksplisit
       explicitMinPrice: params.minPrice && parseInt(params.minPrice) > 0 ? parseInt(params.minPrice) : null,
-      explicitMaxPrice: params.maxPrice && parseInt(params.maxPrice) > 0 ? parseInt(params.maxPrice) : null
+      explicitMaxPrice: params.maxPrice && parseInt(params.maxPrice) > 0 ? parseInt(params.maxPrice) : null,
+      priceTolerance: priceTolerance
     };
     executePuppeteerSearch([payloadItem], forceAutoComparator);
   };
@@ -443,7 +508,8 @@ export default function ProcurementPanel() {
         targetVendor: params.vendorTarget || '',
         targetUrl: params.link !== undefined ? params.link : (item.link || ''),
         explicitMinPrice: params.minPrice && parseInt(params.minPrice) > 0 ? parseInt(params.minPrice) : null,
-        explicitMaxPrice: params.maxPrice && parseInt(params.maxPrice) > 0 ? parseInt(params.maxPrice) : null
+        explicitMaxPrice: params.maxPrice && parseInt(params.maxPrice) > 0 ? parseInt(params.maxPrice) : null,
+        priceTolerance: priceTolerance
       };
     });
     executePuppeteerSearch(payloadItems, forceAutoComparator);
@@ -550,7 +616,7 @@ export default function ProcurementPanel() {
 
     setIsSubmittingBahp(true);
     try {
-      const res = await fetch(`http://localhost:3000/api/projects/${projectId}/bahp`, {
+      const res = await fetch(`/api/projects/${projectId}/bahp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -590,7 +656,7 @@ export default function ProcurementPanel() {
       const itemName = problemItems.map(i => i.name).join(', ');
       const itemStatus = problemItems.map(i => (negotiatedItems[i.no] || {}).itemStatus).join(', ');
 
-      const res = await fetch('http://localhost:3000/api/ai/refine-exception', {
+      const res = await fetch('/api/ai/refine-exception', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -617,7 +683,7 @@ export default function ProcurementPanel() {
     if (!rawText.trim()) return alert('Isi catatan terlebih dahulu.');
     loaderSetter(true);
     try {
-      const res = await fetch('http://localhost:3000/api/ai/refine-text', {
+      const res = await fetch('/api/ai/refine-text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ raw_text: rawText, context: context })
@@ -657,7 +723,7 @@ export default function ProcurementPanel() {
 
     setIsRefiningBahp(true);
     try {
-      const res = await fetch('http://localhost:3000/api/ai/refine-bahp', {
+      const res = await fetch('/api/ai/refine-bahp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1902,7 +1968,7 @@ export default function ProcurementPanel() {
                                 }
                                 handleNegotiationChange(item.no, 'isAiLoading', true);
                                 try {
-                                    const res = await fetch('http://localhost:3001/api/survey/find-comparator', {
+                                    const res = await fetch('/api/survey/find-comparator', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ query: item.name, originalVendor: nego.vendor })
@@ -1915,7 +1981,7 @@ export default function ProcurementPanel() {
                                         handleNegotiationChange(item.no, 'compareVendor', data.vendor);
                                         handleNegotiationChange(item.no, 'comparePrice', data.price);
                                         handleNegotiationChange(item.no, 'hasScreenshot', true);
-                                        handleNegotiationChange(item.no, 'screenshotUrl', 'http://localhost:3001' + data.screenshotUrl);
+                                        handleNegotiationChange(item.no, 'screenshotUrl', data.screenshotUrl || '');
                                     } else {
                                         alert('Gagal mencari pembanding: ' + (data.error || 'Unknown error'));
                                     }
@@ -2052,7 +2118,87 @@ export default function ProcurementPanel() {
                                 </div>
                               </div>
 
-                              {/* ── Nego & Ongkir Inputs ─────────────────── */}
+                              {/* ── Filter Wilayah & Toleransi Harga ───────── */}
+                              <div className="mt-4 pt-4 border-t border-indigo-100">
+                                <div className="text-[10px] font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                                  <span>Filter Wilayah & Toleransi Harga</span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {/* Filter Wilayah */}
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Wilayah Pencarian</label>
+                                    <div className="space-y-1.5">
+                                      {[
+                                        { label: `Kab. Probolinggo`, value: 'Kab. Probolinggo' },
+                                        { label: `Kota Probolinggo`, value: 'Kota Probolinggo' },
+                                        { label: `Kota Surabaya`, value: 'Kota Surabaya' },
+                                        { label: `Jawa Timur (Provinsi)`, value: 'Jawa Timur' },
+                                      ].map(opt => (
+                                        <label key={opt.value} className="flex items-center gap-2 cursor-pointer group">
+                                          <input
+                                            type="checkbox"
+                                            checked={searchLocations.includes(opt.value)}
+                                            onChange={(e) => {
+                                              setSearchLocations(prev =>
+                                                e.target.checked
+                                                  ? [...prev, opt.value]
+                                                  : prev.filter(l => l !== opt.value)
+                                              );
+                                            }}
+                                            className="w-3.5 h-3.5 accent-indigo-600 rounded"
+                                          />
+                                          <span className="text-xs text-slate-600 group-hover:text-indigo-700 transition-colors">{opt.label}</span>
+                                        </label>
+                                      ))}
+                                      <label className="flex items-center gap-2 cursor-pointer group mt-1 pt-1 border-t border-slate-100">
+                                        <input
+                                          type="checkbox"
+                                          checked={searchIncludeNasional}
+                                          onChange={(e) => setSearchIncludeNasional(e.target.checked)}
+                                          className="w-3.5 h-3.5 accent-purple-600 rounded"
+                                        />
+                                        <span className="text-xs text-purple-700 font-semibold group-hover:text-purple-900 transition-colors">🌐 Nasional (semua wilayah)</span>
+                                      </label>
+                                    </div>
+                                    {searchIncludeNasional && (
+                                      <div className="mt-2 text-[9px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 flex items-start gap-1">
+                                        <span>⚠️</span>
+                                        <span>Mode Nasional akan mengembalikan produk dari seluruh Indonesia. Harga mungkin lebih murah namun ongkir lebih tinggi.</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Toleransi Harga */}
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">
+                                      Toleransi Harga — <span className="text-indigo-600 font-black">±{priceTolerance}%</span>
+                                    </label>
+                                    <input
+                                      type="range"
+                                      min="5"
+                                      max="60"
+                                      step="5"
+                                      value={priceTolerance}
+                                      onChange={(e) => setPriceTolerance(parseInt(e.target.value))}
+                                      className="w-full accent-indigo-600"
+                                    />
+                                    <div className="flex justify-between text-[9px] text-slate-400 mt-1">
+                                      <span>Ketat (5%)</span>
+                                      <span>Longgar (60%)</span>
+                                    </div>
+                                    <div className="mt-2 bg-slate-50 border border-slate-200 rounded p-2">
+                                      <div className="text-[9px] text-slate-500 font-medium mb-1">Rentang harga aktif untuk produk ini:</div>
+                                      <div className="text-xs font-mono font-bold text-indigo-700">
+                                        Rp {Math.floor((item.paguDpa || item.price || 0) * (1 - priceTolerance/100)).toLocaleString('id-ID')}
+                                        {' — '}
+                                        Rp {Math.floor((item.paguDpa || item.price || 0) * (1 + priceTolerance/100)).toLocaleString('id-ID')}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* ─────────────────────────────────────────── */}
                               <div className="mt-4 pt-4 border-t border-slate-100">
                                 <div className="text-[10px] font-bold text-slate-500 uppercase mb-3 flex items-center gap-1">
                                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -2073,7 +2219,10 @@ export default function ProcurementPanel() {
                                     </div>
                                   </div>
                                   <div>
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ongkos Kirim (Rp)</label>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1.5">
+                                      <span>Ongkos Kirim</span>
+                                      <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold tracking-wider">{docSettings.deliveryZone || 'Zona 1'}</span>
+                                    </label>
                                     <div className="relative">
                                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-mono">Rp</span>
                                       <input
@@ -2084,6 +2233,12 @@ export default function ProcurementPanel() {
                                         onChange={e => handleNegotiationChange(item.no, 'ongkir', e.target.value)}
                                       />
                                     </div>
+                                    {parseFloat(ongkir || 0) > 0 && (
+                                      <div className="mt-1.5 flex items-start gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500 shrink-0 mt-0.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                        <span className="text-[8px] leading-tight text-amber-600 italic font-medium">Harap pastikan nominal wajar sesuai kesepakatan {docSettings.deliveryZone || 'Zona 1'}.</span>
+                                      </div>
+                                    )}
                                   </div>
                                   <div>
                                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Total Akhir</label>
@@ -2212,16 +2367,7 @@ export default function ProcurementPanel() {
               );
             })()}
 
-            {/* ─── FINALIZE BUTTON ──────────────────────────────────────── */}
-            <div className="mt-5 flex justify-end">
-              <button
-                onClick={() => setShowFinalizeModal(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-8 py-3 rounded-xl flex items-center gap-2 shadow-md transition-all text-sm"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
-                Finalisasi Semua & Buat BAHP Draft
-              </button>
-            </div>
+
 
             {/* --- MOVED VALIDATION FORMS --- */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mt-6">
@@ -2774,6 +2920,46 @@ export default function ProcurementPanel() {
                 </div>
 
                 {/* ═══════════════════════════════════════════════════════════ */}
+                {/* SEKSI D.4: ZONA PENGIRIMAN                                 */}
+                {/* ═══════════════════════════════════════════════════════════ */}
+                <div className="font-bold text-[11px] uppercase tracking-wide border-b border-slate-200 pb-1 mt-8 text-indigo-850">
+                  D.4 VALIDASI ZONA LOKASI PENGIRIMAN
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-3 mb-8 print:border-slate-300">
+                  <label className="block text-[10px] font-bold text-slate-600 mb-2">Pilih Zona Pengiriman (Dasar Kesepakatan Ongkir)</label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {[
+                      { val: 'Zona 1', label: 'Zona 1 (Dekat)', desc: 'Akses mudah/dekat' },
+                      { val: 'Zona 2', label: 'Zona 2 (Menengah)', desc: 'Akses sedang/beda wilayah' },
+                      { val: 'Zona 3', label: 'Zona 3 (Jauh/Sulit)', desc: 'Akses jauh/pelosok' }
+                    ].map(z => (
+                      <label key={z.val} className={`flex-1 flex items-start gap-2 p-3 rounded-xl border cursor-pointer transition-all ${docSettings.deliveryZone === z.val || (!docSettings.deliveryZone && z.val === 'Zona 1') ? 'bg-indigo-50 border-indigo-300 ring-1 ring-indigo-200' : 'bg-white border-slate-200 hover:border-indigo-200'}`}>
+                        <input
+                          type="radio"
+                          name="delivery_zone"
+                          value={z.val}
+                          checked={docSettings.deliveryZone === z.val || (!docSettings.deliveryZone && z.val === 'Zona 1')}
+                          onChange={(e) => {
+                            const next = { ...docSettings, deliveryZone: e.target.value };
+                            setDocSettings(next);
+                            localStorage.setItem('pbj_doc_settings', JSON.stringify(next));
+                          }}
+                          className="mt-0.5 accent-indigo-600"
+                        />
+                        <div>
+                          <div className={`text-[11px] font-bold ${docSettings.deliveryZone === z.val || (!docSettings.deliveryZone && z.val === 'Zona 1') ? 'text-indigo-700' : 'text-slate-700'}`}>{z.label}</div>
+                          <div className="text-[9px] text-slate-500 mt-0.5">{z.desc}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[9px] text-slate-500 mt-3 flex gap-1.5 items-start">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-500 mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    <span>Penentuan zona ini akan muncul di BAHP. Tidak ada pembatasan/lock nominal ongkir. Ongkir disesuaikan dengan kesepakatan final Pejabat Pengadaan dan Penyedia berdasarkan zona yang dipilih.</span>
+                  </p>
+                </div>
+
+                {/* ═══════════════════════════════════════════════════════════ */}
                 {/* SEKSI F: PENILAIAN KINERJA LAYANAN PENYEDIA               */}
                 {/* ═══════════════════════════════════════════════════════════ */}
                 <div className="font-bold text-[11px] uppercase tracking-wide border-b border-slate-200 pb-1 mt-8 text-indigo-850">F. Ulasan Transaksi & Evaluasi Teknis Penyedia</div>
@@ -2945,6 +3131,17 @@ export default function ProcurementPanel() {
                   </div>
                 </div>
 
+                  {/* Informasi TTD PPK — sekarang dilakukan oleh PPK sendiri */}
+                  <div className="mt-4 border-t border-slate-200 pt-4">
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 items-start">
+                      <div className="text-amber-500 mt-0.5 text-lg">📋</div>
+                      <div>
+                        <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wide mb-1">Tanda Tangan PPK — Dilakukan di Panel PPK</div>
+                        <p className="text-xs text-amber-700 leading-relaxed">Setelah Bapak/Ibu menerbitkan BAHP ini, dokumen akan diteruskan secara otomatis ke dashboard Pejabat Pembuat Komitmen (PPK). PPK akan mereview dan membubuhkan tanda tangannya sendiri melalui akun PPK-nya, kemudian dokumen dinyatakan <strong>Selesai (Arsip Lengkap)</strong>.</p>
+                      </div>
+                    </div>
+                  </div>
+
                 <p className="mt-8 text-[10px] text-slate-500 italic">
                   Demikian Berita Acara Hasil Pemilihan (BAHP) ini dibuat secara elektronik oleh Pejabat Pengadaan untuk menjadi dokumen pertanggungjawaban dalam audit belanja dinas e-Purchasing.
                 </p>
@@ -2981,7 +3178,8 @@ export default function ProcurementPanel() {
                       totalOngkir += (parseFloat(n.ongkir) || 0);
                     });
                     
-                    const data = {
+                    // 1. Simpan BAHP ke database
+                    const bahpData = {
                       document_number: `027 / ${Math.floor(Math.random() * 100) + 10} / PP / 437.82 / 2026`,
                       vendor_name: firstVendor,
                       vendor_address: 'Sesuai data terverifikasi e-Katalog LKPP',
@@ -2992,26 +3190,39 @@ export default function ProcurementPanel() {
                       screenshot_url: '',
                     };
                     
-                    const res = await fetch(`/api/projects/${submittedPack.id}/bahp`, {
+                    const bahpRes = await fetch(`/api/projects/${submittedPack.id}/bahp`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(data)
+                      body: JSON.stringify(bahpData)
                     });
-                    
-                    if (!res.ok) throw new Error('Gagal menyimpan BAHP ke database');
+                    if (!bahpRes.ok) throw new Error('Gagal menyimpan BAHP ke database');
+
+                    // 2. Simpan docSettings (TTD PP) ke deskripsi proyek & ubah status ke 'Menunggu TTD PPK'
+                    let existingDesc = {};
+                    try { existingDesc = JSON.parse(submittedPack.description || '{}'); } catch(e) {}
+                    const updatedDesc = { ...existingDesc, docSettings };
+                    const statusRes = await fetch(`/api/projects/${submittedPack.id}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        status: 'Menunggu TTD PPK',
+                        description: JSON.stringify(updatedDesc)
+                      })
+                    });
+                    if (!statusRes.ok) throw new Error('Gagal mengubah status proyek');
                     
                     setActiveTab('docs');
-                    alert('Berita Acara Hasil Pemilihan (BAHP) e-Purchasing berhasil diterbitkan berdasarkan Tabel Negosiasi!');
+                    alert('✅ BAHP berhasil diterbitkan!\n\nDokumen telah diteruskan ke Pejabat Pembuat Komitmen (PPK) untuk ditandatangani. Status paket: Menunggu TTD PPK.');
                   } catch (err) {
                     console.error(err);
                     setActiveTab('docs');
-                    alert('Berita Acara Hasil Pemilihan (BAHP) dibuat, tapi ada peringatan: ' + err.message);
+                    alert('BAHP dibuat, tapi ada peringatan: ' + err.message);
                   }
                 }}
                 className="btn-primary text-sm font-bold py-3.5 px-8 shadow-md hover:shadow-lg transition-all flex items-center gap-2 rounded-xl"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                Simpan & Terbitkan Berita Acara Pemilihan (BAHP)
+                Terbitkan BAHP & Kirim ke PPK
               </button>
             </div>
           </div>
@@ -3312,85 +3523,11 @@ export default function ProcurementPanel() {
 
     </div>
 
-    {/* ═══════════════════════════════════════════════════════════ */}
-    {/* FINALIZE BAHP MODAL                                        */}
-    {/* ═══════════════════════════════════════════════════════════ */}
-    {showFinalizeModal && (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-700"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Finalisasi & Buat BAHP Draft
-            </h2>
-            <button onClick={() => setShowFinalizeModal(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
-          </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5 flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-rose-500"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Lokasi Pengiriman <span className="text-rose-500">*</span></label>
-              <input
-                type="text"
-                value={deliveryLocation}
-                onChange={e => setDeliveryLocation(e.target.value)}
-                placeholder={`Contoh: Kantor ${user?.department || 'Kecamatan'}, Jl. Raya No.1`}
-                className="w-full text-sm p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5 flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><polygon points="12 22.08 12 12 3 6.92 3 17.08 12 22.08"/><polygon points="12 12 21 6.92 21 17.08 12 22.08"/><polygon points="12 2 21 6.92 12 12 3 6.92 12 2"/></svg>Jenis Pengadaan</label>
-              <select
-                value={packageType}
-                onChange={e => setPackageType(e.target.value)}
-                className="w-full text-sm p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white"
-              >
-                <option value="ATK">ATK / Alat Tulis Kantor</option>
-                <option value="Mamin">Makanan & Minuman</option>
-                <option value="Jasa">Jasa Lainnya</option>
-                <option value="Modal">Belanja Modal</option>
-              </select>
-            </div>
-
-            <div className="bg-slate-50 rounded-xl p-4 text-xs text-slate-600 space-y-1">
-              <div className="font-bold text-slate-700 mb-2 flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Ringkasan Item:</div>
-              {getPackageItems(submittedPack).filter(i => checkedItems[i.no]).map(item => {
-                const nego = negotiatedItems[item.no] || {};
-                const status = nego.itemStatus || 'Tersedia';
-                const statusIcon = status === 'Tersedia' ? '✓' : status === 'Stok Kurang' ? '!' : '✕';
-                return (
-                  <div key={item.no} className="flex items-center justify-between">
-                    <span>{statusIcon} {item.name}</span>
-                    <span className="font-mono text-slate-500">
-                      {nego.vendor || '-'} | Rp {(parseFloat(nego.price || 0) * item.qty).toLocaleString('id-ID')}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setShowFinalizeModal(false)}
-                className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition-all"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleFinalizeBahp}
-                disabled={isSubmittingBahp}
-                className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isSubmittingBahp ? 'Menyimpan...' : 'Buat BAHP Draft'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )}
 
     {showForcedRatingModal && (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl p-6 animate-scale-in">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl p-6 animate-scale-in max-h-[95vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
             <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
               ⭐ Ulasan Transaksi & Evaluasi Teknis (Wajib)

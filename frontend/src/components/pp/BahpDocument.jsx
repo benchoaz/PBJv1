@@ -600,7 +600,48 @@ export default function BahpDocument({
       {/* ╔══════════════════════════════════════════════╗
           ║ TANDA TANGAN                                 ║
           ╚══════════════════════════════════════════════╝ */}
-      <div className="flex justify-end mt-8 ">
+      <div className="flex justify-between mt-8 ">
+        {/* Tanda Tangan PPK (Kiri) */}
+        <div className="w-64 text-center">
+          <div className="text-[0.95em] text-black mb-0.5">&nbsp;</div>
+          <div className="text-[0.95em] text-black mb-2 flex flex-col items-center">
+            <span>Menyetujui,</span>
+            <span>Pejabat Pembuat Komitmen (PPK)</span>
+            {docSettings.signatureMethodPpk === 'tte' ? (
+              <div className="flex justify-center my-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="220" height="90" viewBox="0 0 220 90" style={{ border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#f8fafc', fontFamily: 'Arial, sans-serif' }}>
+                  <rect x="0" y="0" width="220" height="90" fill="#f8fafc" rx="6" />
+                  <rect x="10" y="10" width="70" height="70" fill="white" stroke="#334155" strokeWidth="1.5" />
+                  <path d="M15 15h10v10H15zm0 15h10v10H15zm15-15h10v10H30zm0 15h10v10H30zm15-15h10v10H45zm0 15h10v10H45zm15 0h10v10H60zm0-15h10v10H60z" fill="#334155" />
+                  <path d="M20 20h20v20H20zm25 25h15v15H45z" fill="#000" />
+                  <text x="90" y="22" fontSize="7" fontWeight="bold" fill="#0f172a" letterSpacing="0.5">TANDA TANGAN ELEKTRONIK</text>
+                  <text x="90" y="32" fontSize="6" fontWeight="bold" fill="#475569">Sertifikat Elektronik Diterbitkan Oleh:</text>
+                  <text x="90" y="42" fontSize="7" fontWeight="black" fill="#1e3a8a">BSrE BSSN</text>
+                  <line x1="90" y1="48" x2="210" y2="48" stroke="#cbd5e1" strokeWidth="1" />
+                  <text x="90" y="58" fontSize="6.5" fontWeight="bold" fill="#0f172a">PEJABAT PEMBUAT KOMITMEN</text>
+                  <text x="90" y="68" fontSize="6" fill="#475569">NIP: .......................................</text>
+                  <text x="90" y="78" fontSize="5" fontWeight="bold" fill="#16a34a">✓ VERIFIED &amp; SECURED BY BSSN</text>
+                </svg>
+              </div>
+            ) : (
+              docSettings.ttdPpk ? (
+                <img 
+                  src={docSettings.ttdPpk} 
+                  alt="TTD Pejabat Pembuat Komitmen" 
+                  style={{ maxHeight: '75px', maxWidth: '200px', width: 'auto', height: 'auto', objectFit: 'contain', mixBlendMode: 'multiply', marginTop: '6px', marginBottom: '4px' }} 
+                />
+              ) : (
+                <div style={{ height: '75px', marginTop: '6px', marginBottom: '4px' }}></div>
+              )
+            )}
+          </div>
+          <div className={`text-[1.05em] font-bold text-black underline ${(!docSettings.ttdPpk && docSettings.signatureMethodPpk !== 'tte') ? 'mt-14' : 'mt-2'}`}>
+            .......................................................
+          </div>
+          <div className="text-[0.95em] text-black">NIP. ...............................................</div>
+        </div>
+
+        {/* Tanda Tangan PP (Kanan) */}
         <div className="w-64 text-center">
           <div className="text-[0.95em] text-black mb-0.5">{instansi}, {tglShort}</div>
           <div className="text-[0.95em] text-black mb-2 flex flex-col items-center">

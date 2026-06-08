@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"gorm.io/gorm"
@@ -96,6 +97,7 @@ func (r *ProjectRepository) GetAll(filter *models.ProjectFilter) ([]*models.Proj
 		}
 		p.StartDate = parseTimePtr(startDate)
 		p.EndDate = parseTimePtr(endDate)
+		r.syncProjectWithSirup(p)
 		projects = append(projects, p)
 	}
 
@@ -149,6 +151,8 @@ func (r *ProjectRepository) GetByID(id int64) (*models.Project, error) {
 	var allItems []models.ProjectItem
 	r.gorm.Preload("Surveys").Where("project_id = ?", id).Find(&allItems)
 	p.Items = allItems
+
+	r.syncProjectWithSirup(p)
 
 	return p, nil
 }
@@ -330,4 +334,115 @@ func (r *ProjectRepository) Count(filter *models.ProjectFilter) (int, error) {
 		return 0, fmt.Errorf("counting projects: %w", err)
 	}
 	return count, nil
+}
+
+func (r *ProjectRepository) syncProjectWithSirup(p *models.Project) (bool, error) {
+	if p == nil || p.Description == "" {
+		return false, nil
+	}
+
+	var descMap map[string]interface{}
+	if err := json.Unmarshal([]byte(p.Description), &descMap); err != nil {
+		return false, nil
+	}
+
+	selectedPackVal, ok := descMap["selectedPack"]
+	if !ok || selectedPackVal == nil {
+		return false, nil
+	}
+
+	selectedPack, ok := selectedPackVal.(map[string]interface{})
+	if !ok {
+		return false, nil
+	}
+
+	noSirupVal, ok := selectedPack["noSirup"]
+	if !ok || noSirupVal == nil {
+		return false, nil
+	}
+
+	var noSirup string
+	switch v := noSirupVal.(type) {
+	case string:
+		noSirup = v
+	case float64:
+		noSirup = fmt.Sprintf("%.0f", v)
+	case int:
+		noSirup = strconv.Itoa(v)
+	case int64:
+		noSirup = strconv.FormatInt(v, 10)
+	default:
+		noSirup = fmt.Sprintf("%v", v)
+	}
+
+	if noSirup == "" {
+		return false, nil
+	}
+
+	// Query procurement_packs for this noSirup
+	var packName string
+	var budgetAllocation float64
+	err := r.gorm.Raw("SELECT pack_name, budget_allocation FROM procurement_packs WHERE no_sirup = ?", noSirup).Row().Scan(&packName, &budgetAllocation)
+	if err != nil {
+		// If not found in procurement_packs, do nothing
+		return false, nil
+	}
+
+	changed := false
+
+	// Compare and update selectedPack
+	if currentPackName, _ := selectedPack["packName"].(string); currentPackName != packName {
+		selectedPack["packName"] = packName
+		changed = true
+	}
+	if currentNamaPaket, _ := selectedPack["namaPaket"].(string); currentNamaPaket != packName {
+		selectedPack["namaPaket"] = packName
+		changed = true
+	}
+	
+	// Check pagu
+	var currentPagu float64
+	switch v := selectedPack["pagu"].(type) {
+	case float64:
+		currentPagu = v
+	case float32:
+		currentPagu = float64(v)
+	case int:
+		currentPagu = float64(v)
+	case int64:
+		currentPagu = float64(v)
+	}
+	if currentPagu != budgetAllocation {
+		selectedPack["pagu"] = budgetAllocation
+		changed = true
+	}
+
+	// Sync project main columns (Name and Budget)
+	if p.Budget != budgetAllocation {
+		p.Budget = budgetAllocation
+		changed = true
+	}
+	
+	if p.Name != packName {
+		p.Name = packName
+		changed = true
+	}
+
+	if changed {
+		descMap["selectedPack"] = selectedPack
+		newDescBytes, err := json.Marshal(descMap)
+		if err != nil {
+			return false, err
+		}
+		p.Description = string(newDescBytes)
+
+		// Update database
+		_, err = r.db.Exec("UPDATE projects SET name = $1, budget = $2, description = $3, updated_at = NOW() WHERE id = $4", p.Name, p.Budget, p.Description, p.ID)
+		if err != nil {
+			return false, fmt.Errorf("updating synced project in DB: %w", err)
+		}
+		return true, nil
+	}
+
+	return false, nil
 }

@@ -1,0 +1,142 @@
+nohup: ignoring input
+
+🟢 Survey service berjalan di port 3001
+📁 Screenshot tersimpan di: /home/beni/PBJ/survey-service/screenshots
+Received payload items: [
+  {
+    name: 'Nasi Kotak',
+    query: 'Nasi Kotak',
+    fallbackPrice: 30000,
+    qty: 70,
+    originalNo: 1286,
+    targetVendor: 'DWI RATNA ANGGRAENI',
+    targetUrl: '',
+    explicitMinPrice: null,
+    explicitMaxPrice: 30000,
+    priceTolerance: 30,
+    locations: [ 'Kab. Probolinggo', 'Kota Probolinggo' ],
+    ignorePriceLimit: false,
+    autoComparator: true
+  }
+]
+[Queue] Diterima Job ID: 1 untuk 1 item.
+
+========================================
+🚀 [Worker] Memulai job in-memory untuk 1 item
+========================================
+[BrowserPool] Meluncurkan browser instance baru...
+
+[1] Memproses: "Nasi Kotak"
+  → Query pencarian yang akan dicoba (Target: Nasi Kotak): [ 'Nasi Kotak' ]
+  ℹ️ [VENDOR] Nama biasa, slug dibuat: dwi-ratna-anggraeni (mungkin perlu URL lengkap jika gagal)
+  → [Mencari #1 - VENDOR] Membuka: https://katalog.inaproc.id/dwi-ratna-anggraeni?catalogueSearch=Nasi%20Kotak
+    ✅ Berhasil menemukan 5 produk dengan query: "Nasi Kotak"
+    ℹ️ Auto Comparator aktif (Comparator ditemukan: false), lanjut mencari referensi lain...
+  → [Mencari #2 - VENDOR] Membuka: https://katalog.inaproc.id/dwi-ratna-anggraeni?keyword=Nasi%20Kotak
+    ✅ Berhasil menemukan 10 produk dengan query: "Nasi Kotak"
+    ℹ️ Auto Comparator aktif (Comparator ditemukan: false), lanjut mencari referensi lain...
+  → [Mencari #3 - VENDOR] Membuka: https://katalog.inaproc.id/dwi-ratna-anggraeni
+    ✅ Berhasil menemukan 10 produk dengan query: "Nasi Kotak"
+    ℹ️ Auto Comparator aktif (Comparator ditemukan: false), lanjut mencari referensi lain...
+  → [Mencari #4 - GLOBAL] Membuka: https://katalog.inaproc.id/search?keyword=Nasi%20Kotak&maxPrice=30000&regionNames=Kab.%20Probolinggo%2CKota%20Probolinggo&regionCode=35.13%2C35.74
+    ✅ Berhasil menemukan 60 produk dengan query: "Nasi Kotak"
+  → Menghitung skor kemiripan untuk 73 kandidat...
+    ⭐ [TARGET MATCH] Vendor DWI RATNA ANGGRAENI mendapat prioritas mutlak!
+    - [Skor: 10.720] PAKET NASI KOTAK PUJASERA99 (Vendor: DWI RATNA ANGGRAENI, Rp 30000)
+    ⭐ [TARGET MATCH] Vendor DWI RATNA ANGGRAENI mendapat prioritas mutlak!
+    - [Skor: 10.669] Paket Nasi Kotak 1 PS99 (Vendor: DWI RATNA ANGGRAENI, Rp 30000)
+    ⚠️ [TOLERANSI TARGET] Harga Rp 40000 melampaui batas atas (Rp 30000) TAPI diizinkan karena ini dari Target Penyedia (bisa dinego)
+    ⭐ [TARGET MATCH] Vendor DWI RATNA ANGGRAENI mendapat prioritas mutlak!
+    - [Skor: 10.720] Paket Nasi Kotak 3 (Vendor: DWI RATNA ANGGRAENI, Rp 40000)
+    ⚠️ [TOLERANSI TARGET] Harga Rp 40000 melampaui batas atas (Rp 30000) TAPI diizinkan karena ini dari Target Penyedia (bisa dinego)
+    ⭐ [TARGET MATCH] Vendor DWI RATNA ANGGRAENI mendapat prioritas mutlak!
+    - [Skor: 10.720] Paket Nasi Kotak 2 (Vendor: DWI RATNA ANGGRAENI, Rp 40000)
+    ⚠️ [TOLERANSI TARGET] Harga Rp 40000 melampaui batas atas (Rp 30000) TAPI diizinkan karena ini dari Target Penyedia (bisa dinego)
+    ⭐ [TARGET MATCH] Vendor DWI RATNA ANGGRAENI mendapat prioritas mutlak!
+    - [Skor: 10.720] Paket Nasi Kotak 1 (Vendor: DWI RATNA ANGGRAENI, Rp 40000)
+    ⚠️ [TOLERANSI TARGET] Harga Rp 60000 melampaui batas atas (Rp 30000) TAPI diizinkan karena ini dari Target Penyedia (bisa dinego)
+    ⭐ [TARGET MATCH] Vendor DWI RATNA ANGGRAENI mendapat prioritas mutlak!
+    - [Skor: 10.000] PRASMANAN VVIP PS99 (Vendor: DWI RATNA ANGGRAENI, Rp 60000)
+    ⭐ [TARGET MATCH] Vendor DWI RATNA ANGGRAENI mendapat prioritas mutlak!
+    - [Skor: 10.411] Nasi Rantang PS99 (Vendor: DWI RATNA ANGGRAENI, Rp 25000)
+    ⭐ [TARGET MATCH] Vendor DWI RATNA ANGGRAENI mendapat prioritas mutlak!
+    - [Skor: 10.000] Sego Polo’an PS99 (Vendor: DWI RATNA ANGGRAENI, Rp 20000)
+    ⭐ [TARGET MATCH] Vendor DWI RATNA ANGGRAENI mendapat prioritas mutlak!
+    - [Skor: 10.000] Snack Kudapan (polo pendem) PS99 (Vendor: DWI RATNA ANGGRAENI, Rp 15000)
+    ⭐ [TARGET MATCH] Vendor DWI RATNA ANGGRAENI mendapat prioritas mutlak!
+    - [Skor: 10.373] Snack Kotak PS99 (Vendor: DWI RATNA ANGGRAENI, Rp 15000)
+    ⭐ [TARGET MATCH] Vendor DWI RATNA ANGGRAENI mendapat prioritas mutlak!
+    - [Skor: 10.000] Paket Snack Box isi 3 PS99 (Vendor: DWI RATNA ANGGRAENI, Rp 25000)
+    ⚠️ [TOLERANSI TARGET] Harga Rp 50000 melampaui batas atas (Rp 30000) TAPI diizinkan karena ini dari Target Penyedia (bisa dinego)
+    ⭐ [TARGET MATCH] Vendor DWI RATNA ANGGRAENI mendapat prioritas mutlak!
+    - [Skor: 10.000] MENU PRASMANAN Pujasera99 (Vendor: DWI RATNA ANGGRAENI, Rp 50000)
+    ⚠️ [TOLERANSI TARGET] Harga Rp 35000 melampaui batas atas (Rp 30000) TAPI diizinkan karena ini dari Target Penyedia (bisa dinego)
+    ⭐ [TARGET MATCH] Vendor DWI RATNA ANGGRAENI mendapat prioritas mutlak!
+    - [Skor: 10.000] KUE NAMPAN Pujasera99 (Vendor: DWI RATNA ANGGRAENI, Rp 35000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: IIN NURAFNI HIDAYAH, Rp 25000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: MAYANG JUFIYA ROSALINA, Rp 25000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: DINI DWI JANUARI, Rp 25000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: WITRIA IKE ETIFA, Rp 30000)
+    - [Skor: 0.792] NASI KOTAK AYAM BAKAR (Vendor: SUSI SUSANTI 2LQ4, Rp 30000)
+    - [Skor: 1.100] NASI KOTAK (Vendor: AYU YOLANDHA, Rp 30000)
+    - [Skor: 0.890] NASI KOTAK 3 (Vendor: RULLY JAYA, Rp 22000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: HURIN ROSI IFTITAH, Rp 20000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: SRI LESTARI QPT0, Rp 30000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: FERY SETYA MADONA, Rp 30000)
+    - [Skor: 1.100] Nasi kotak (Vendor: WARSI WAHYUNI, Rp 30000)
+    - [Skor: 0.890] NASI KOTAK 2 (Vendor: RULLY JAYA, Rp 30000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: HUSNUL HOTIMAH, Rp 30000)
+    - [Skor: 1.100] NASI KOTAK (Vendor: SITI UNIYAH, Rp 30000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: DESI NUR HAVIVAH, Rp 30000)
+    - [Skor: 1.100] NASI KOTAK (Vendor: ANTIAH NURAIDA, Rp 30000)
+    - [Skor: 1.100] nasi kotak (Vendor: HERMIN NANIK HERAWATI, Rp 30000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: AYUNIN DEWANTY SEPTININGTYAS, Rp 30000)
+    - [Skor: 1.100] NASI KOTAK (Vendor: DANISH JAYA MAKMUR, Rp 25000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: SINAR FAJAR YPRT, Rp 30000)
+    - [Skor: 0.000] Pre Order (Vendor: YUNITA SAFITRI AMALIA, Rp 30000)
+    - [Skor: 1.100] Nasi kotak (Vendor: NIMAN TAUFIK, Rp 25000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: RIKE SARTIKA PUTRI, Rp 30000)
+    - [Skor: 0.890] Nasi Kotak Mini (Vendor: MAYANG JUFIYA ROSALINA, Rp 15000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: SUPRIYANTO 9FF3, Rp 30000)
+    - [Skor: 1.100] Nasi kotak (Vendor: LINDA KURNIAWATI, Rp 30000)
+    - [Skor: 1.100] Nasi kotak (Vendor: S FEBRIYANTO, Rp 30000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: MOH RIZKY ARIFANTO, Rp 30000)
+    - [Skor: 1.100] Nasi kotak (Vendor: COMPANY_SLUG, Rp 30000)
+    - [Skor: 1.100] nasi kotak (Vendor: ROHYANI, Rp 30000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: MITRA SARANA BANGSA, Rp 30000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: HOLILA, Rp 29000)
+    - [Skor: 1.100] nasi kotak (Vendor: ANUGERAH MULYA, Rp 30000)
+    - [Skor: 1.100] NASI KOTAK (Vendor: SUYONO TJ12, Rp 30000)
+    - [Skor: 1.100] Nasi kotak (Vendor: YULIA DEWI SURYAJAYA, Rp 25000)
+    - [Skor: 1.100] Nasi kotak (Vendor: SARI PURNOMO ASIH, Rp 30000)
+    - [Skor: 0.890] Nasi Kotak 4 (Vendor: LINDAWATI 8Z98, Rp 30000)
+    - [Skor: 0.792] Nasi kotak ayam panggang (Vendor: DWI YUNIARTO, Rp 30000)
+    - [Skor: 1.100] NASI KOTAK (Vendor: FERNANDA ZULKARNAIN, Rp 30000)
+    - [Skor: 0.890] Nasi kotak 3 (Vendor: CATERING MBOK NGATEMI, Rp 30000)
+    - [Skor: 0.411] Nasi kotak/nasi box (Vendor: FAIQOTUL ELISA, Rp 30000)
+    - [Skor: 0.000] Pre Order (Vendor: EDY PRASETYO, Rp 30000)
+    - [Skor: 1.100] Nasi Kotak (Vendor: LAILATUL QOMARIAH, Rp 30000)
+    - [Skor: 0.890] Nasi kotak 2 (Vendor: DHANIAR MUDITA, Rp 30000)
+    - [Skor: 0.890] Nasi kotak Purnama (Vendor: PURWATI WT5P, Rp 30000)
+    - [Skor: 0.890] Nasi kotak 2 (Vendor: CATERING MBOK NGATEMI, Rp 30000)
+    - [Skor: 0.809] MAKANAN - NASI KOTAK (Vendor: DANISH JAYA MAKMUR, Rp 30000)
+    - [Skor: 0.890] Nasi Kotak 2 (Vendor: EMY MUJIWATI, Rp 30000)
+    - [Skor: 0.890] Nasi Kotak 1 (Vendor: SITI NURCHOTIMAH, Rp 30000)
+    - [Skor: 0.890] Nasi kotak 1 (Vendor: SITI MUSYARAFAH, Rp 25000)
+    - [Skor: 0.890] NASI KOTAK 015 (Vendor: YAQUTATUL FARIDAH, Rp 25000)
+    - [Skor: 0.890] Nasi Kotak 01 (Vendor: SOLEHATIN, Rp 30000)
+    - [Skor: 0.890] Nasi Kotak 10 (Vendor: KARTINI UL2I, Rp 30000)
+    - [Skor: 0.890] NASI KOTAK 008 (Vendor: YAQUTATUL FARIDAH, Rp 30000)
+    - [Skor: 0.890] NASI KOTAK 016 (Vendor: YAQUTATUL FARIDAH, Rp 30000)
+    - [Skor: 0.890] NASI KOTAK 014 (Vendor: YAQUTATUL FARIDAH, Rp 30000)
+    - [Skor: 0.890] NASI KOTAK 11 (Vendor: KARTINI UL2I, Rp 30000)
+    - [Skor: 0.890] Nasi kotak 25k (Vendor: CATERING MBOK NGATEMI, Rp 25000)
+    - [Skor: 0.890] Nasi Kotak 03 (Vendor: EFFENDI 6DZ5, Rp 30000)
+    - [Skor: 0.890] Nasi Kotak Campur (Vendor: RIAN DWI PUTRA, Rp 25000)
+  🌟 Produk Terpilih: "PAKET NASI KOTAK PUJASERA99" dengan skor 10.720
+  ⚖️ Auto-Comparator 1 Ditemukan: WITRIA IKE ETIFA - Rp 30000
+  → Membuka halaman detail produk terpilih: https://katalog.inaproc.id/dwi-ratna-anggraeni/paket-nasi-kotak-pujasera99
+  ✅ Screenshot detail disimpan: item_0_Nasi_Kotak_detail.png
+  → Detail terverifikasi: harga=30000, vendor=DWI RATNA ANGGRAENI
+
+✅ [Worker] Job in-memory selesai! 1/1 berhasil.

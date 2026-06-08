@@ -118,7 +118,81 @@ export default function Step1PilihPaket() {
                 </>
               )}
             </button>
+
+            <div className="relative">
+              <input
+                type="file"
+                accept=".json"
+                onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = async (event) => {
+                    try {
+                      const json = JSON.parse(event.target.result);
+                      if (!json || (!json.aaData && !Array.isArray(json))) {
+                        alert("Format file JSON tidak valid. Pastikan file yang Anda unggah benar.");
+                        return;
+                      }
+                      
+                      setIsFetchingSirup(true);
+                      const uploadRes = await fetch(`/api/sirup/satker/${satkerId}?tahun=2026`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(json)
+                      });
+                      const uploadData = await uploadRes.json();
+                      if (uploadData.success) {
+                        alert(`✅ Sukses mengimpor paket SIRUP untuk Satker #${satkerId}!`);
+                        fetchSirupPackages(satkerId);
+                      } else {
+                        alert("Gagal menyimpan data ke database: " + (uploadData.message || "Error"));
+                      }
+                    } catch (err) {
+                      alert("Gagal membaca file JSON: " + err.message);
+                    } finally {
+                      setIsFetchingSirup(false);
+                      e.target.value = '';
+                    }
+                  };
+                  reader.readAsText(file);
+                }}
+                className="hidden"
+                id="sirup-json-upload"
+              />
+              <button
+                type="button"
+                onClick={() => document.getElementById('sirup-json-upload').click()}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 animate-fade-in"
+              >
+                <span>Impor JSON SIRUP</span>
+              </button>
+            </div>
           </div>
+
+          {/* SOP Panduan Impor JSON */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-600 space-y-2">
+            <p className="font-bold text-slate-700">💡 Panduan Cepat Menarik Paket via Impor JSON (Jika Tarik Otomatis Gagal):</p>
+            <ol className="list-decimal pl-4 space-y-1">
+              <li>
+                Buka link resmi LKPP ini di tab baru:{" "}
+                <a 
+                  href={`https://sirup.inaproc.id/sirup/datatablectr/dataruppenyediasatker?tahun=2026&idSatker=${satkerId}&sEcho=1&iColumns=7&iDisplayStart=0&iDisplayLength=2000`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 font-semibold underline hover:text-indigo-800"
+                >
+                  Unduh Data Paket Satker {satkerId} (Klik Kanan &gt; Buka di Tab Baru)
+                </a>
+              </li>
+              <li>Setelah halaman terbuka dan menampilkan data teks (JSON), <strong>klik kanan</strong> di mana saja pada halaman tersebut dan pilih <strong>"Save As..." (Simpan Sebagai...)</strong>.</li>
+              <li>Simpan file dengan nama apa saja (pastikan formatnya tetap <code>.json</code>).</li>
+              <li>Kembali ke halaman ini, klik tombol <strong className="text-emerald-600">"Impor JSON SIRUP"</strong> di atas, lalu pilih file yang baru saja diunduh. Selesai!</li>
+            </ol>
+          </div>
+
 
           {/* List of Live LKPP Packages */}
           <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">

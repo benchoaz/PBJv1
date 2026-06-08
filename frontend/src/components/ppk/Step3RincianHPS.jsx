@@ -4,6 +4,37 @@ import { Save, Search, RefreshCw, Camera, Sparkles, CheckCircle2, XCircle, Alert
 import DocPreviewModal from './DocPreviewModal';
 import { dialog } from '../../utils/dialog';
 
+const getDynamicProductLink = (vendorName, keyword) => {
+  if (!vendorName) return '';
+  const cleanVendor = vendorName.trim();
+  let vendorSlug = '';
+  
+  if (cleanVendor.includes('katalog.inaproc.id/')) {
+    try {
+      const fullUrl = cleanVendor.startsWith('http') ? cleanVendor : 'https://' + cleanVendor;
+      const urlObj = new URL(fullUrl);
+      const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+      vendorSlug = pathSegments[0] ? pathSegments[0].toLowerCase() : '';
+    } catch (e) {
+      // ignore
+    }
+  }
+  
+  if (!vendorSlug) {
+    if (cleanVendor.includes('katalog.inaproc.id/')) {
+      const match = cleanVendor.match(/katalog\.inaproc\.id\/([^/?&#]+)/);
+      vendorSlug = match ? match[1].toLowerCase() : cleanVendor.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    } else if (/^[a-z0-9][a-z0-9-]*[a-z0-9]$/i.test(cleanVendor) && cleanVendor.includes('-')) {
+      vendorSlug = cleanVendor.toLowerCase();
+    } else {
+      vendorSlug = cleanVendor.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+  }
+  
+  const q = keyword || '';
+  return `https://katalog.inaproc.id/${vendorSlug}?catalogueSearch=${encodeURIComponent(q)}`;
+};
+
 export default function Step3RincianHPS() {
   const DAFTAR_KECAMATAN = [
     "Bantaran", "Banyuanyar", "Besuk", "Dringu", "Gading", "Gending", "Kotaanyar", 
@@ -116,7 +147,7 @@ export default function Step3RincianHPS() {
   }, [hpsPrices, selectedPack, dpaRincian, getPackageItems, setHpsValue]);
 
   const handleUpdateVendorLocation = async (vendorName, subdistrict) => {
-    if (!vendorName || vendorName === 'TIDAK DITEMUKAN') return;
+    if (!vendorName || vendorName === 'TIDAK DITEMUKAN' || vendorName === 'PENYEDIA INAPROC') return;
     try {
       const response = await fetch('/api/vendor-locations', {
         method: 'POST',
@@ -165,12 +196,23 @@ export default function Step3RincianHPS() {
     const tPrice = parseFloat(targetPrice) || 0;
     const cPrice = parseFloat(compPrice) || 0;
     const diff = cPrice - tPrice;
-    const diffText = diff > 0 ? `dengan selisih penghematan Rp ${formatPrice(diff)} per unit` : 'dengan harga yang bersaing';
 
-    if (isMamin) {
-      return `Pemilihan ${targetVendor || 'Penyedia Terpilih'} (Rp ${formatPrice(tPrice)}) didasarkan pada harga e-Katalog yang lebih efisien dibandingkan penyedia pembanding ${compVendor || 'Penyedia Pembanding'} (Rp ${formatPrice(cPrice)}) ${diffText}. Selain itu, dari aspek logistik, penyedia berlokasi di ${targetLocLabel} yang mengefisienkan waktu pengiriman Mamin agar tetap segar saat dikerjakan. Pemilihan ini juga selaras dengan aspek pemerataan penyedia lokal dalam SE Bupati Probolinggo Nomor 000.3/2747/426.42/2025.`;
+    if (diff > 0) {
+      // Pembanding lebih mahal -> Justifikasi berbasis Harga (Penghematan)
+      const diffText = `dengan selisih penghematan Rp ${formatPrice(diff)} per unit`;
+      if (isMamin) {
+        return `Pemilihan ${targetVendor || 'Penyedia Terpilih'} (Rp ${formatPrice(tPrice)}) didasarkan pada harga tayang e-Katalog yang lebih efisien dibandingkan penyedia pembanding ${compVendor || 'Penyedia Pembanding'} (Rp ${formatPrice(cPrice)}) ${diffText}. Selain itu, dari aspek logistik, penyedia berlokasi di ${targetLocLabel} yang mengefisienkan waktu pengiriman Mamin agar tetap segar saat dikerjakan. Pemilihan ini juga selaras dengan aspek pemerataan penyedia lokal dalam SE Bupati Probolinggo.`;
+      } else {
+        return `Pemilihan ${targetVendor || 'Penyedia Terpilih'} (Rp ${formatPrice(tPrice)}) dilakukan karena menawarkan harga tayang e-Katalog yang lebih kompetitif dibandingkan penyedia pembanding ${compVendor || 'Penyedia Pembanding'} (Rp ${formatPrice(cPrice)}) ${diffText}. Dari sisi lokasi, penyedia terpilih berlokasi di ${targetLocLabel} yang memudahkan koordinasi logistik serah terima barang.`;
+      }
     } else {
-      return `Pemilihan ${targetVendor || 'Penyedia Terpilih'} (Rp ${formatPrice(tPrice)}) dilakukan karena menawarkan harga tayang e-Katalog yang lebih kompetitif dibandingkan penyedia pembanding ${compVendor || 'Penyedia Pembanding'} (Rp ${formatPrice(cPrice)}) ${diffText}. Dari sisi lokasi, penyedia terpilih berlokasi di ${targetLocLabel} yang memudahkan koordinasi logistik serah terima barang.`;
+      // Pembanding lebih murah atau sama -> Justifikasi berbasis Jarak/Logistik/Teknis
+      const conditionText = diff < 0 ? 'menawarkan harga lebih rendah' : 'menawarkan harga yang sama';
+      if (isMamin) {
+        return `Meskipun penyedia pembanding ${compVendor || 'Penyedia Pembanding'} ${conditionText} (Rp ${formatPrice(cPrice)}), pemilihan ${targetVendor || 'Penyedia Terpilih'} (Rp ${formatPrice(tPrice)}) tetap diprioritaskan berdasarkan efisiensi jarak dan waktu logistik. Penyedia terpilih berlokasi di ${targetLocLabel} yang memastikan Mamin tiba lebih cepat dan terjamin kesegarannya. Hal ini juga selaras dengan aspek pemerataan penyedia lokal dalam SE Bupati Probolinggo.`;
+      } else {
+        return `Meskipun penyedia pembanding ${compVendor || 'Penyedia Pembanding'} ${conditionText} (Rp ${formatPrice(cPrice)}), pemilihan ${targetVendor || 'Penyedia Terpilih'} (Rp ${formatPrice(tPrice)}) tetap dilakukan dengan pertimbangan efisiensi jarak pengiriman dan jaminan ketersediaan barang. Penyedia terpilih berlokasi di ${targetLocLabel} yang mempermudah koordinasi serta percepatan serah terima logistik.`;
+      }
     }
   };
 
@@ -215,8 +257,8 @@ export default function Step3RincianHPS() {
 
   const [useAiMode, setUseAiMode] = useState(true);
   const [globalPriceTolerance, setGlobalPriceTolerance] = useState(8);
-  const [globalTargetVendor, setGlobalTargetVendor] = useState('SULTONI');
-  const [searchLocations, setSearchLocations] = useState('Kab.Probolinggo');
+  const [globalTargetVendor, setGlobalTargetVendor] = useState('');
+  const [searchLocations, setSearchLocations] = useState('Kab. Probolinggo');
   const [customKeywords, setCustomKeywords] = useState({});
   
   const [ignorePriceLimit, setIgnorePriceLimit] = useState(false);
@@ -433,6 +475,27 @@ export default function Step3RincianHPS() {
   const isOverBudget = !isHpsExemptSelected && selectedPack?.pagu > 0 && parseInt(hpsValue || 0) > selectedPack.pagu;
   const cancelSurvey = () => setIsSurveying(false);
 
+  const fetchGeminiKeyHelper = async () => {
+    let geminiKey = '';
+    try {
+      const satker = satkerId || '';
+      let resKeys = await fetch(`/api/settings/ocr_api_keys_satker_${satker}`);
+      if (!resKeys.ok) {
+        resKeys = await fetch('/api/settings/ocr_api_keys');
+      }
+      if (resKeys.ok) {
+        const keysObj = await resKeys.json();
+        if (keysObj && keysObj.value) {
+          const parsed = JSON.parse(keysObj.value);
+          geminiKey = parsed.gemini || '';
+        }
+      }
+    } catch (e) {
+      console.error("Gagal memuat API key untuk AI:", e);
+    }
+    return geminiKey;
+  };
+
   const runAiSurvey = async () => {
     if (!selectedPack) return;
     setIsSurveying(true);
@@ -443,11 +506,10 @@ export default function Step3RincianHPS() {
     const items = getPackageItems(selectedPack);
 
     const requestItems = items
-      .filter(item => {
-        const qty = item.qty === '' ? 0 : (item.qty || 0);
-        return qty > 0;
-      })
       .map((item, idx) => {
+        const qty = item.qty === '' ? 0 : (item.qty || 0);
+        if (qty <= 0) return null;
+        
         let rawQuery = item.name;
         
         // Jika user sudah mengetik manual, gunakan itu
@@ -469,7 +531,8 @@ export default function Step3RincianHPS() {
           targetVendor: customTargets[idx] || globalTargetVendor || '',
           targetUrl: (customTargets[idx] && customTargets[idx].startsWith('http')) ? customTargets[idx] : ''
         };
-      });
+      })
+      .filter(Boolean);
 
     if (requestItems.length === 0) {
       setIsSurveying(false);
@@ -481,13 +544,17 @@ export default function Step3RincianHPS() {
       setSurveyProgress(`Menganalisis referensi E-Katalog... Mohon tunggu (Estimasi: ${items.length * 10} detik)`);
       setSurveyProgressPercent(5);
 
+      // Load Gemini API Key using helper
+      const geminiKey = await fetchGeminiKeyHelper();
+
       // Server ini sekarang menggunakan Service Node.js baru di port 3001
-      const response = await fetch('http://localhost:3001/api/survey/run', {
+      const response = await fetch('/api/survey/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           items: requestItems,
           useAi: useAiMode,
+          geminiKey: geminiKey,
           locations: searchLocations.split(',').map(s => s.trim()).filter(Boolean),
           ignorePriceLimit: ignorePriceLimit,
           autoComparator: autoComparator
@@ -505,29 +572,44 @@ export default function Step3RincianHPS() {
       setSurveyProgress(`Mengantre di Worker (Job ID: ${runRes.jobId})...`);
 
       let results = null;
+      let failCount = 0;
       while (true) {
         await new Promise(r => setTimeout(r, 2500)); // poll every 2.5s
         
-        const statusRes = await fetch(`http://localhost:3001/api/survey/status/${runRes.jobId}`);
-        if (!statusRes.ok) throw new Error('Gagal mengecek status job');
-        const statusData = await statusRes.json();
+        try {
+          const statusRes = await fetch(`/api/survey/status/${runRes.jobId}?t=${Date.now()}`, {
+            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+          });
+          if (!statusRes.ok) throw new Error('Status response not OK');
+          const statusData = await statusRes.json();
+          failCount = 0; // reset on success
 
-        if (statusData.isCanceled || statusData.status === 'completed') {
-          results = statusData.results || [];
-          if (statusData.isCanceled) {
-            results.wasCanceled = true;
+          if (statusData.isCanceled || statusData.status === 'completed') {
+            results = statusData.results || [];
+            if (statusData.isCanceled) {
+              results.wasCanceled = true;
+            }
+            break;
+          } else if (statusData.status === 'failed') {
+            throw new Error('Gagal memproses data: ' + statusData.error);
+          } else if (statusData.status === 'waiting' && statusData.progress === 0) {
+            // Masih mengantre, belum diambil worker — tetap tampilkan progress awal
+            setSurveyProgress(`Mengantre di Worker (Job ID: ${runRes.jobId})...`);
+          } else {
+            // Sedang diproses — update progress langsung tanpa threshold
+            if (statusData.progress > 0) {
+              setSurveyProgressPercent(statusData.progress);
+              setSurveyProgress(`Sistem sedang mencari harga di E-Katalog (${statusData.progress}% selesai)...`);
+            }
           }
-          break;
-        } else if (statusData.status === 'failed') {
-          throw new Error('Gagal memproses data: ' + statusData.error);
-        } else if (statusData.status === 'waiting' && statusData.progress === 0) {
-          // Masih mengantre, belum diambil worker — tetap tampilkan progress awal
-          setSurveyProgress(`Mengantre di Worker (Job ID: ${runRes.jobId})...`);
-        } else {
-          // Sedang diproses — update progress langsung tanpa threshold
-          if (statusData.progress > 0) {
-            setSurveyProgressPercent(statusData.progress);
-            setSurveyProgress(`Sistem sedang mencari harga di E-Katalog (${statusData.progress}% selesai)...`);
+        } catch (err) {
+          if (err.message.includes('Gagal memproses data')) {
+            throw err; // Re-throw fatal worker errors
+          }
+          failCount++;
+          console.warn(`Gagal mengecek status job (percobaan ${failCount}/5):`, err);
+          if (failCount >= 5) {
+            throw new Error('Gagal mengecek status job. Silakan periksa jaringan VPS Anda.');
           }
         }
       }
@@ -613,6 +695,7 @@ export default function Step3RincianHPS() {
           vendor: r.vendor,
           price: r.price,
           link: r.link,
+          vendorLink: r.vendorLink,
           img: r.img,
           searchImg: r.searchImg,
           success: r.success,
@@ -667,12 +750,14 @@ export default function Step3RincianHPS() {
     }];
 
     try {
-      const response = await fetch('http://localhost:3001/api/survey/run', {
+      const geminiKey = await fetchGeminiKeyHelper();
+      const response = await fetch('/api/survey/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           items: requestItems,
           useAi: useAiMode,
+          geminiKey: geminiKey,
           locations: searchLocations.split(',').map(s => s.trim()).filter(Boolean),
           ignorePriceLimit: ignorePriceLimit,
           autoComparator: autoComparator
@@ -687,18 +772,33 @@ export default function Step3RincianHPS() {
       if (!runRes.jobId) throw new Error('Tidak mendapatkan Job ID dari server');
 
       let results = null;
+      let failCount = 0;
       while (true) {
         await new Promise(r => setTimeout(r, 1500)); // poll faster for single item
         
-        const statusRes = await fetch(`http://localhost:3001/api/survey/status/${runRes.jobId}`);
-        if (!statusRes.ok) throw new Error('Gagal mengecek status job');
-        const statusData = await statusRes.json();
+        try {
+          const statusRes = await fetch(`/api/survey/status/${runRes.jobId}?t=${Date.now()}`, {
+            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+          });
+          if (!statusRes.ok) throw new Error('Status response not OK');
+          const statusData = await statusRes.json();
+          failCount = 0; // reset on success
 
-        if (statusData.status === 'completed') {
-          results = statusData.results;
-          break;
-        } else if (statusData.status === 'failed') {
-          throw new Error('Proses worker gagal: ' + statusData.error);
+          if (statusData.status === 'completed') {
+            results = statusData.results;
+            break;
+          } else if (statusData.status === 'failed') {
+            throw new Error('Proses worker gagal: ' + statusData.error);
+          }
+        } catch (err) {
+          if (err.message.includes('Proses worker gagal')) {
+            throw err; // Re-throw fatal worker errors
+          }
+          failCount++;
+          console.warn(`Gagal mengecek status job (percobaan ${failCount}/5):`, err);
+          if (failCount >= 5) {
+            throw new Error('Gagal mengecek status job. Silakan periksa jaringan VPS Anda.');
+          }
         }
       }
       const singleRes = results[0];
@@ -713,7 +813,9 @@ export default function Step3RincianHPS() {
           vendor: singleRes.vendor,
           price: singleRes.price,
           link: singleRes.link,
+          vendorLink: singleRes.vendorLink,
           img: singleRes.img,
+          searchImg: singleRes.searchImg || singleRes.img,
           success: singleRes.success,
           location: singleRes.location || singleRes.location_name || singleRes.address || ''
         };
@@ -813,12 +915,20 @@ export default function Step3RincianHPS() {
   const captureScreenshot = async (p) => {
     try {
       setScreenshotStatus(prev => ({ ...prev, [p.id]: 'loading' }));
-      const response = await fetch('http://localhost:3001/api/survey/screenshot', {
+      const screenshotUrl = getDynamicProductLink(p.vendor, p.name) || p.link;
+      const response = await fetch('/api/survey/screenshot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: p.link, id: p.id })
+        body: JSON.stringify({ url: screenshotUrl, id: p.id })
       });
       if (!response.ok) throw new Error('Gagal mengambil tangkapan layar');
+      const data = await response.json();
+      if (data.success && data.img) {
+        const updatedProducts = surveyData.products.map(prod => 
+          prod.id === p.id ? { ...prod, img: data.img, searchImg: data.img } : prod
+        );
+        setSurveyData({ ...surveyData, products: updatedProducts });
+      }
       setScreenshotStatus(prev => ({ ...prev, [p.id]: 'done' }));
     } catch (err) {
       console.error(err);
@@ -869,14 +979,18 @@ export default function Step3RincianHPS() {
     const indicesToSearch = [];
     const requestItems = [];
 
-    // Cari barang yang punya ketikan baru di customKeywords (baik sukses maupun gagal)
+    // Cari barang yang punya ketikan baru di customKeywords atau customTargets (baik sukses maupun gagal)
     items.forEach((item, idx) => {
       const qty = item.qty === '' ? 0 : (item.qty || 0);
-      if (qty > 0 && customKeywords[idx] && customKeywords[idx].trim() !== '') {
+      const hasCustomKeyword = customKeywords[idx] && customKeywords[idx].trim() !== '';
+      const hasCustomTarget = customTargets[idx] && customTargets[idx].trim() !== '';
+      
+      if (qty > 0 && (hasCustomKeyword || hasCustomTarget)) {
         indicesToSearch.push(idx);
         requestItems.push({
           name: item.name,
-          query: customKeywords[idx].trim(),
+          query: hasCustomKeyword ? customKeywords[idx].trim() : autoCleanKeyword(item.name),
+          isCustomKeyword: hasCustomKeyword,
           fallbackPrice: item.price || item.paguDpa,
           explicitMinPrice: customMinPrices[idx] ? parseInt(customMinPrices[idx].toString().replace(/\D/g, ''), 10) : null,
           explicitMaxPrice: customMaxPrices[idx] ? parseInt(customMaxPrices[idx].toString().replace(/\D/g, ''), 10) : null,
@@ -897,12 +1011,14 @@ export default function Step3RincianHPS() {
     setSurveyProgress(`Mencari ulang ${requestItems.length} barang (Sesuai Filter Wilayah)...`);
 
     try {
-      const response = await fetch('http://localhost:3001/api/survey/run', {
+      const geminiKey = await fetchGeminiKeyHelper();
+      const response = await fetch('/api/survey/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
            items: requestItems,
            useAi: false, // Matikan pencari sinonim untuk pencarian manual ini
+           geminiKey: geminiKey,
            locations: searchLocations.split(',').map(s => s.trim()).filter(Boolean),
            ignorePriceLimit: ignorePriceLimit,
            autoComparator: autoComparator
@@ -920,21 +1036,36 @@ export default function Step3RincianHPS() {
       setSurveyProgress(`Mengantre di Worker (Job ID: ${runRes.jobId})...`);
 
       let results = null;
+      let failCount = 0;
       while (true) {
         await new Promise(r => setTimeout(r, 2000));
         
-        const statusRes = await fetch(`http://localhost:3001/api/survey/status/${runRes.jobId}`);
-        if (!statusRes.ok) throw new Error('Gagal mengecek status job');
-        const statusData = await statusRes.json();
+        try {
+          const statusRes = await fetch(`/api/survey/status/${runRes.jobId}?t=${Date.now()}`, {
+            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+          });
+          if (!statusRes.ok) throw new Error('Status response not OK');
+          const statusData = await statusRes.json();
+          failCount = 0; // reset on success
 
-        if (statusData.status === 'completed') {
-          results = statusData.results;
-          break;
-        } else if (statusData.status === 'failed') {
-          throw new Error('Proses worker gagal: ' + statusData.error);
-        } else {
-          setSurveyProgressPercent(statusData.progress || 10);
-          setSurveyProgress(`Mencari ulang di latar belakang (${statusData.progress || 0}% selesai)...`);
+          if (statusData.status === 'completed') {
+            results = statusData.results;
+            break;
+          } else if (statusData.status === 'failed') {
+            throw new Error('Proses worker gagal: ' + statusData.error);
+          } else {
+            setSurveyProgressPercent(statusData.progress || 10);
+            setSurveyProgress(`Mencari ulang di latar belakang (${statusData.progress || 0}% selesai)...`);
+          }
+        } catch (err) {
+          if (err.message.includes('Proses worker gagal')) {
+            throw err; // Re-throw fatal worker errors
+          }
+          failCount++;
+          console.warn(`Gagal mengecek status job (percobaan ${failCount}/5):`, err);
+          if (failCount >= 5) {
+            throw new Error('Gagal mengecek status job. Silakan periksa jaringan VPS Anda.');
+          }
         }
       }
       
@@ -953,6 +1084,7 @@ export default function Step3RincianHPS() {
           vendor: res.vendor,
           price: res.price,
           link: res.link,
+          vendorLink: res.vendorLink,
           img: res.img,
           searchImg: res.searchImg,
           success: res.success,
@@ -1303,6 +1435,8 @@ export default function Step3RincianHPS() {
                             setComparisons({});
                             setScreenshotStatus({});
                             setExpandedSurveyRows({});
+                            setCustomKeywords({});
+                            setCustomTargets({});
                             // Hapus juga dari localStorage agar tidak kembali saat direfresh
                             localStorage.removeItem('pbj_survey_data');
                             localStorage.removeItem('pbj_hps_prices');
@@ -1452,8 +1586,26 @@ export default function Step3RincianHPS() {
                                     <div className="flex flex-col gap-0.5">
                                       <span className="text-[10px] font-bold text-slate-700 truncate max-w-[150px] flex items-center gap-1" title={surveyItem.vendor}>
                                         <Store className="w-3 h-3 text-slate-500" />
-                                        <span>{surveyItem.vendor}</span>
+                                        <input
+                                          type="text"
+                                          value={surveyItem.vendor}
+                                          onChange={(e) => {
+                                            const newVendor = e.target.value;
+                                            const updatedProducts = surveyData.products.map(p => 
+                                              p.name === item.name ? { ...p, vendor: newVendor } : p
+                                            );
+                                            setSurveyData({ ...surveyData, products: updatedProducts });
+                                            setIsSigned(false);
+                                          }}
+                                          className="bg-transparent hover:bg-slate-100 border-b border-dashed border-slate-300 focus:border-indigo-500 focus:bg-white px-1 outline-none text-[10px] font-bold text-slate-700 w-full"
+                                        />
                                       </span>
+                                      {/* Grouped Links */}
+                                      <div className="flex flex-col gap-0.5 pl-4 mb-1">
+                                        {surveyItem.vendorLink && (
+                                          <a href={surveyItem.vendorLink} target="_blank" rel="noopener noreferrer" className="text-[9px] text-indigo-650 hover:text-indigo-850 underline font-medium">Tautan Toko</a>
+                                        )}
+                                      </div>
                                       {(() => {
                                         const location = (comparisons[surveyItem.id] && comparisons[surveyItem.id].lokasi) 
                                            || (surveyItem.vendor && vendorLocationMap[surveyItem.vendor.toUpperCase().trim()]) 
@@ -1517,7 +1669,7 @@ export default function Step3RincianHPS() {
                                           </span>
                                         );
                                       })()}
-                                      <a href={surveyItem.link} target="_blank" rel="noopener noreferrer" className="text-[9px] text-indigo-600 hover:text-indigo-800 underline">Tautan Produk</a>
+
                                       {surveyItem.isFallbackScreenshot && (
                                         <span className="text-[8px] font-bold text-amber-600 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 w-fit mt-0.5" title="Menggunakan screenshot hasil pencarian karena halaman detail error/diblokir">⚠️ Mode Pencarian</span>
                                       )}
@@ -1765,6 +1917,19 @@ export default function Step3RincianHPS() {
                                                     className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] focus:ring-1 focus:ring-indigo-500"
                                                     disabled={isLoading}
                                                   />
+                                                  {customTargets[dpaIdx] && (
+                                                    <div className="mt-1 flex items-center gap-1">
+                                                      <Globe className="w-3 h-3 text-indigo-500" />
+                                                      <a
+                                                        href={getDynamicProductLink(customTargets[dpaIdx], keyword)}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-[9px] text-indigo-600 hover:text-indigo-850 underline font-bold"
+                                                      >
+                                                        Tautan Produk
+                                                      </a>
+                                                    </div>
+                                                  )}
                                                 </div>
                                                 <div className="flex gap-2">
                                                   <div className="flex-1">
@@ -2011,6 +2176,12 @@ export default function Step3RincianHPS() {
                                     <Store className="w-3 h-3 text-slate-400" />
                                     <span className="truncate" title={p.vendor}>{p.vendor}</span>
                                   </div>
+                                  {p.vendorLink && (
+                                    <div className="text-[9px] text-indigo-650 hover:text-indigo-850 underline truncate pt-0.5 flex items-center gap-1">
+                                      <Globe className="w-3 h-3 text-indigo-500" />
+                                      <a href={p.vendorLink} target="_blank" rel="noopener noreferrer">Tautan Toko</a>
+                                    </div>
+                                  )}
                                   <div className="text-[9px] text-indigo-600 hover:text-indigo-700 underline truncate pt-0.5 flex items-center gap-1">
                                     <Globe className="w-3 h-3 text-indigo-500" />
                                     <a href={p.link} target="_blank" rel="noopener noreferrer">Lihat di e-Katalog</a>
@@ -2075,6 +2246,19 @@ export default function Step3RincianHPS() {
                                   className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                                   disabled={isLoading}
                                 />
+                                {customTargets[dpaIdx] && (
+                                  <div className="mt-1 flex items-center gap-1">
+                                    <Globe className="w-3 h-3 text-indigo-500" />
+                                    <a
+                                      href={getDynamicProductLink(customTargets[dpaIdx], keyword)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-[9px] text-indigo-600 hover:text-indigo-850 underline font-bold"
+                                    >
+                                      Tautan Produk
+                                    </a>
+                                  </div>
+                                )}
                               </div>
                               <div>
                                 <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Harga Minimal (Opsional)</label>

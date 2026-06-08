@@ -1,19 +1,159 @@
 const express = require('express');
 const cors = require('cors');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
 const fs = require('fs');
 const path = require('path');
-const { Queue, Worker } = require('bullmq');
-const IORedis = require('ioredis');
 
-const connection = new IORedis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: process.env.REDIS_PORT || 6379,
-  maxRetriesPerRequest: null
-});
 
-const surveyQueue = new Queue('survey-jobs', { connection });
 
+
+
+
+
+
+
+
+// IN-MEMORY QUEUE REPLACEMENT
+const surveyJobs = new Map();
+let currentJobId = 1;
+const surveyQueue = {
+  add: async (name, data) => {
+    const jobId = currentJobId++;
+    surveyJobs.set(jobId.toString(), {
+      id: jobId.toString(),
+      data: data,
+      progress: 0,
+      status: 'waiting',
+      results: null,
+      error: null
+    });
+    // Mulai proses secara asinkron
+    setTimeout(() => processJob(jobId.toString(), data), 100);
+    return { id: jobId.toString() };
+  }
+};
+
+async function processJob(jobId, data) {
+  const job = surveyJobs.get(jobId);
+  job.status = 'active';
+  
+  const updateProgress = async (percent) => {
+     job.progress = percent;
+  };
+  
+  try {
+     const results = await runSurveyTask(data, updateProgress);
+     job.results = results;
+     job.status = 'completed';
+     job.progress = 100;
+  } catch (err) {
+     job.error = err.message;
+     job.status = 'failed';
+  }
+}
+
+// --- ANTI-BOT HELPERS ---
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/121.0',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+];
+
+async function randomDelay(min, max) {
+  const ms = Math.floor(Math.random() * (max - min + 1)) + min;
+  return new Promise(r => setTimeout(r, ms));
+}
+
+async function autoScroll(page) {
+  try {
+    await page.evaluate(async () => {
+      await new Promise((resolve) => {
+        let totalHeight = 0;
+        let distance = 150;
+        let timer = setInterval(() => {
+          let scrollHeight = document.body.scrollHeight;
+          window.scrollBy(0, distance);
+          totalHeight += distance;
+          if (totalHeight >= scrollHeight - window.innerHeight || totalHeight > 5000) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 120);
+      });
+    });
+  } catch (e) {
+    // Ignore scroll errors
+  }
+}
+// -----------------------
+
+// --- BROWSER POOL (Singleton + Isolated Context) ---
+let _sharedBrowser = null;
+
+async function getSharedBrowser() {
+  if (_sharedBrowser && _sharedBrowser.isConnected()) return _sharedBrowser;
+  console.log('[BrowserPool] Meluncurkan browser instance baru...');
+  _sharedBrowser = await puppeteer.launch({
+    headless: 'new',
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--window-size=1280,900',
+      '--disable-blink-features=AutomationControlled',
+      '--max_old_space_size=512',
+    ]
+  });
+  _sharedBrowser.on('disconnected', () => {
+    console.warn('[BrowserPool] Browser terputus, akan diluncurkan ulang saat diperlukan.');
+    _sharedBrowser = null;
+  });
+  return _sharedBrowser;
+}
+
+/**
+ * Buat halaman terisolasi (incognito context) dari shared browser.
+ * Setiap context memiliki cookie, cache, dan storage sendiri.
+ * Panggil closePage(context) setelah selesai untuk membebaskan memori.
+ */
+async function createIsolatedPage() {
+  const browser = await getSharedBrowser();
+  const context = await browser.createBrowserContext();
+  const page = await context.newPage();
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.setUserAgent(USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)]);
+
+  // Request Interception: Blokir aset tidak relevan untuk mempercepat loading
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    const type = req.resourceType();
+    const url = req.url();
+    const blockedDomains = [
+      'google-analytics', 'googletagmanager', 'gtag', 'hotjar',
+      'facebook.net', 'clarity.ms', 'doubleclick.net'
+    ];
+    const isBlockedType = ['font', 'media'].includes(type);
+    const isBlockedDomain = blockedDomains.some(d => url.includes(d));
+    if (isBlockedType || isBlockedDomain) {
+      req.abort();
+    } else {
+      req.continue();
+    }
+  });
+
+  return { page, context };
+}
+
+async function closePage(context) {
+  try { await context.close(); } catch (e) { /* ignore */ }
+}
+// ---------------------------------------------------
 
 const app = express();
 app.use(cors());
@@ -26,6 +166,29 @@ if (!fs.existsSync(screenshotDir)) {
 
 // BUKA AKSES: Izinkan peramban mengakses folder screenshot secara publik
 app.use('/screenshots', express.static(screenshotDir));
+
+// --- AUTO CLEANUP SCREENSHOTS (> 30 hari) ---
+setInterval(() => {
+  try {
+    const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 hari dalam ms
+    const now = Date.now();
+    const files = fs.readdirSync(screenshotDir);
+    let deleted = 0;
+    for (const file of files) {
+      const filePath = path.join(screenshotDir, file);
+      const stat = fs.statSync(filePath);
+      if (now - stat.mtimeMs > maxAge) {
+        fs.unlinkSync(filePath);
+        deleted++;
+      }
+    }
+    if (deleted > 0) console.log(`[Cleanup] Menghapus ${deleted} screenshot lama (> 30 hari).`);
+  } catch (e) {
+    console.error('[Cleanup] Error:', e.message);
+  }
+}, 24 * 60 * 60 * 1000); // Jalankan setiap 24 jam
+// -------------------------------------------
+
 
 /**
  * Membersihkan nama barang dari spesifikasi kurung, stopwords pengadaan, dan satuan kemasan.
@@ -121,8 +284,9 @@ function resolvePriceRange(item) {
   }
 
   // Mode massal: hitung dari fallbackPrice ± toleransi %
+  // Default 30% agar cakupan pencarian cukup lebar untuk variasi harga di e-Katalog
   if (item.fallbackPrice && item.fallbackPrice > 0) {
-    const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.025;
+    const tolerance = item.priceTolerance !== undefined ? parseFloat(item.priceTolerance) / 100 : 0.30;
     return {
       minPrice: Math.floor(item.fallbackPrice * (1 - tolerance)),
       maxPrice: Math.floor(item.fallbackPrice * (1 + tolerance)),
@@ -224,19 +388,21 @@ async function searchItem(page, item, index) {
 
     // --- BYPASS: URL Spesifik ---
     if (item.targetUrl && item.targetUrl.startsWith('http')) {
-      // Tentukan apakah ini URL produk spesifik atau hanya halaman toko
       let urlPath = '';
       try { urlPath = new URL(item.targetUrl).pathname; } catch(e) {}
       const pathSegments = urlPath.split('/').filter(Boolean);
-      const isProductUrl = pathSegments.length >= 2; // /{vendor}/{produk} = produk spesifik
-      const isStoreUrl   = pathSegments.length === 1;  // /{vendor} saja = halaman toko
+      
+      const isSearchUrl = urlPath.startsWith('/search') || item.targetUrl.includes('?keyword=') || item.targetUrl.includes('catalogueSearch=');
+      // LKPP V6 Product URL is usually /{vendor-slug}/{product-slug} -> length 2. Or /produk/...
+      const isProductUrl = (!isSearchUrl && pathSegments.length >= 2) || urlPath.includes('/produk/') || urlPath.includes('/product/');
+      const isStoreUrl = !isSearchUrl && !isProductUrl && pathSegments.length === 1 && !['login', 'register', 'dashboard'].includes(pathSegments[0].toLowerCase());
 
       if (isProductUrl) {
-        // URL produk spesifik → BYPASS langsung buka dan ambil data
-        console.log(`  → BYPASS (Produk Spesifik): Mengunjungi URL langsung: ${item.targetUrl}`);
+        // BYPASS: Jika user memasukkan link produk langsung
+        console.log(`  → BYPASS (Produk): Mengunjungi URL referensi langsung: ${item.targetUrl}`);
         try {
           await page.goto(item.targetUrl, { waitUntil: 'networkidle2', timeout: 45000 });
-          await new Promise(r => setTimeout(r, 4000));
+          await randomDelay(3500, 6500); await autoScroll(page);
           const detailFile = path.join(screenshotDir, safeId + '_detail.png');
           await injectWatermark(page);
           await page.screenshot({ path: detailFile, fullPage: false });
@@ -255,7 +421,7 @@ async function searchItem(page, item, index) {
             return { price, vendor };
           });
 
-          // Validasi harga terhadap batas eksplisit PP sebelum bypass return
+          // Validasi harga
           const { minPrice: bpMin, maxPrice: bpMax } = resolvePriceRange(item);
           const bpPrice = detailData.price || item.fallbackPrice;
           if (bpMin !== null && bpMin !== undefined && bpPrice < bpMin) {
@@ -278,13 +444,12 @@ async function searchItem(page, item, index) {
           console.log(`  ❌ BYPASS gagal: ${err.message}. Lanjut pencarian manual...`);
         }
       } else if (isStoreUrl) {
-        // URL toko penyedia → extract slug, gunakan sebagai targetVendor jika belum diisi
+        // URL toko penyedia (/{slug})
         const storeSlug = pathSegments[0].toLowerCase();
-        console.log(`  ℹ️ [BYPASS] URL toko terdeteksi (/${storeSlug}), digunakan sebagai target vendor (bukan bypass)`);
+        console.log(`  ℹ️ [BYPASS] URL toko terdeteksi (/${storeSlug}), digunakan sebagai target vendor`);
         if (!item.targetVendor || !item.targetVendor.trim()) {
           item.targetVendor = storeSlug;
         }
-        // Tidak bypass — lanjut pencarian normal di bawah
       }
     }
 
@@ -327,6 +492,17 @@ async function searchItem(page, item, index) {
           query: q,
           type: 'vendor'
         });
+        searchScenarios.push({
+          url: `https://katalog.inaproc.id/${vendorSlug}?keyword=${encodeURIComponent(q)}`,
+          query: q,
+          type: 'vendor'
+        });
+      });
+      // Fallback: Kunjungi halaman utama toko tanpa parameter pencarian (memindai etalase terdepan)
+      searchScenarios.push({
+        url: `https://katalog.inaproc.id/${vendorSlug}`,
+        query: item.query,
+        type: 'vendor'
       });
     }
 
@@ -416,10 +592,13 @@ async function searchItem(page, item, index) {
       
       try {
         await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 60000 });
-        await new Promise(r => setTimeout(r, 4000));
+        await randomDelay(3500, 6500); await autoScroll(page);
 
         // Ekstrak kandidat produk dari halaman pencarian
-        const candidates = await page.evaluate(() => {
+        const scenarioType = scenario.type;
+        const currentTargetSlug = item._resolvedVendorSlug ? item._resolvedVendorSlug.replace(/-/g, ' ').toUpperCase() : (item.targetVendor ? item.targetVendor.toUpperCase() : 'PENYEDIA INAPROC');
+
+        const candidates = await page.evaluate(({ type, defaultVendor }) => {
           const anchors = Array.from(document.querySelectorAll('a[href]'));
           const list = [];
 
@@ -459,8 +638,20 @@ async function searchItem(page, item, index) {
               }
             }
 
-            const vendorSlug = segments[0];
-            const vendor = vendorSlug.replace(/-/g, ' ').toUpperCase();
+            let vendor = defaultVendor;
+            if (type !== 'vendor') {
+               // Pada halaman pencarian global LKPP, URL bisa jadi /vendor-slug/product-slug
+               // Tapi bisa juga /produk/id/slug, jika /produk/ maka kita harus mengekstrak vendor dari elemen card jika ada
+               const vendorSlug = segments[0];
+               if (vendorSlug.toLowerCase() === 'produk' || vendorSlug.toLowerCase() === 'product') {
+                  // Coba cari elemen vendor di dalam card, biasanya ada di elemen div atau text biasa
+                  const vendorLine = lines.find(l => !l.includes('Rp') && !l.includes('Kab.') && !l.includes('Kota') && !l.includes('Prov.') && l.length > 5 && l !== title);
+                  vendor = vendorLine ? vendorLine.trim().toUpperCase() : 'PENYEDIA INAPROC';
+               } else {
+                  vendor = vendorSlug.replace(/-/g, ' ').toUpperCase();
+               }
+            }
+
             const locationLine = lines.find(line => line.includes('Kab.') || line.includes('Kota') || line.includes('Prov.'));
             const location = locationLine ? locationLine.trim() : '';
 
@@ -473,7 +664,7 @@ async function searchItem(page, item, index) {
             });
           }
           return list;
-        });
+        }, { type: scenarioType, defaultVendor: currentTargetSlug });
 
         if (candidates && candidates.length > 0) {
           if (scenario.type === 'global-noprice') {
@@ -656,9 +847,89 @@ async function searchItem(page, item, index) {
             alasan: 'Alternatif pembanding e-Katalog dengan harga lebih tinggi',
             status: 'Dalam Katalog'
           });
-          console.log(`  ⚖️ Auto-Comparator 2 Ditemukan: ${comparators[1].vendor} - Rp ${comparators[1].price}`);
+          }
         }
-      }
+
+        if (item.autoComparator && comparators.length < 2) {
+          console.log(`  🔍 Memulai pencarian spesifik untuk Pembanding tanpa batas maxPrice...`);
+          let compUrl = 'https://katalog.inaproc.id/search?keyword=' + encodeURIComponent(successfulQuery || searchTarget);
+          
+          if (item.locations && item.locations.length > 0) {
+            let rNames = [];
+            let rCodes = [];
+            item.locations.forEach(loc => {
+              let lLower = (typeof loc === 'string' ? loc : loc.name || '').toLowerCase();
+              if (lLower.includes('kota') && lLower.includes('probolinggo')) { 
+                if (!rNames.includes('Kota Probolinggo')) { rNames.push('Kota Probolinggo'); rCodes.push('35.74'); }
+              } else if (lLower.includes('probolinggo')) { 
+                if (!rNames.includes('Kab. Probolinggo')) { rNames.push('Kab. Probolinggo'); rCodes.push('35.13'); }
+              } else if (lLower.includes('surabaya')) { 
+                if (!rNames.includes('Kota Surabaya')) { rNames.push('Kota Surabaya'); rCodes.push('35.78'); }
+              }
+            });
+            if (rNames.length > 0) {
+              compUrl += `&regionNames=${encodeURIComponent(rNames.join(','))}&regionCode=${encodeURIComponent(rCodes.join(','))}`;
+            }
+          }
+          
+          // JANGAN include maxPrice agar menemukan produk kompetitor yang lebih mahal
+          if (!item.ignorePriceLimit) {
+            const { minPrice } = resolvePriceRange(item);
+            if (minPrice !== null && minPrice !== undefined) compUrl += `&minPrice=${minPrice}`;
+          }
+
+          try {
+            await page.goto(compUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+            await randomDelay(3500, 6500); await autoScroll(page);
+            
+            const extraCandidates = await page.evaluate(() => {
+              const cards = document.querySelectorAll('.card');
+              return Array.from(cards).map(card => {
+                const titleEl = card.querySelector('.card-title');
+                const priceEl = card.querySelector('.price');
+                const aEl = card.querySelector('a');
+                const vendorEl = card.querySelector('.card-text');
+                
+                let p = 0;
+                if (priceEl && priceEl.textContent) {
+                  const cleaned = priceEl.textContent.replace(/Rp\.?|rp\.?|,00/g, '').replace(/\./g, '').trim();
+                  p = parseInt(cleaned, 10) || 0;
+                }
+                let vendor = vendorEl ? vendorEl.textContent.trim() : '';
+                const parts = vendor.split(/[\r\n]+/);
+                if (parts.length > 0) {
+                  vendor = parts[0].trim().toUpperCase();
+                }
+                return {
+                  title: titleEl ? titleEl.textContent.trim() : '',
+                  price: p,
+                  productHref: aEl ? aEl.getAttribute('href') : '',
+                  vendor: vendor
+                };
+              });
+            });
+            
+            for (let c of extraCandidates) {
+              if (c.title && c.vendor && c.vendor !== bestCandidate.vendor && c.price >= bestCandidate.price) {
+                if (!comparators.find(comp => comp.vendor === c.vendor)) {
+                  comparators.push({
+                    name: c.title,
+                    vendor: c.vendor,
+                    price: c.price,
+                    link: 'https://katalog.inaproc.id' + c.productHref,
+                    alasan: 'Alternatif pembanding e-Katalog',
+                    status: 'Dalam Katalog'
+                  });
+                  console.log(`  ⚖️ Extra Auto-Comparator Ditemukan: ${c.vendor} - Rp ${c.price}`);
+                  if (comparators.length >= 2) break;
+                }
+              }
+            }
+          } catch (e) {
+            console.log(`  ⚠️ Gagal mencari extra comparator: ${e.message}`);
+          }
+        }
+
     } else {
       if (bestCandidate) {
         console.log(`  ⚠️ Produk terdekat "${bestCandidate.title}" memiliki skor terlalu rendah (${highestScore.toFixed(3)}).`);
@@ -706,7 +977,7 @@ async function searchItem(page, item, index) {
       try {
         console.log(`  → Membuka halaman detail produk terpilih: ${directUrl}`);
         await page.goto(directUrl, { waitUntil: 'networkidle2', timeout: 45000 });
-        await new Promise(r => setTimeout(r, 4000));
+        await randomDelay(3500, 6500); await autoScroll(page);
 
         // --- SMART VALIDATION (Deteksi Soft 404) ---
         const isSoft404 = await page.evaluate(() => {
@@ -787,7 +1058,7 @@ async function searchItem(page, item, index) {
         console.log(`  → Menyuntikkan KOTAK MERAH pada hasil pencarian global...`);
         try {
            await page.goto(originalSearchUrl, { waitUntil: 'networkidle2', timeout: 45000 });
-           await new Promise(r => setTimeout(r, 4000));
+           await randomDelay(3500, 6500); await autoScroll(page);
            
            await page.evaluate((targetTitle) => {
               const anchors = Array.from(document.querySelectorAll('a[href]'));
@@ -840,17 +1111,17 @@ async function searchItem(page, item, index) {
     }
 
     const isDetailShot = detailFile !== searchFile;
+    const isSuccess = !!bestCandidate;
+
     return {
       name: item.name,
-      vendor: finalVendor.toUpperCase(),
-      price: finalPrice || item.fallbackPrice,
+      vendor: isSuccess ? finalVendor.toUpperCase() : 'TIDAK TERSEDIA',
+      price: isSuccess ? (finalPrice || item.fallbackPrice) : 0,
       link: detailUrl,
       location: bestCandidate ? bestCandidate.location : '',
-      img: isDetailShot 
-        ? `/screenshots/${safeId}_detail.png` 
-        : `/screenshots/${safeId}_search.png`,
-      searchImg: `/screenshots/${safeId}_search.png`,
-      success: true,
+      img: isSuccess && isDetailShot ? `/screenshots/${safeId}_detail.png` : (fs.existsSync(searchFile) ? `/screenshots/${safeId}_search.png` : null),
+      searchImg: fs.existsSync(searchFile) ? `/screenshots/${safeId}_search.png` : null,
+      success: isSuccess,
       comparators: comparators,
       isFallbackScreenshot: !isDetailShot && isValidMatch
     };
@@ -894,20 +1165,19 @@ app.post('/api/survey/run', async (req, res) => {
 });
 
 app.get('/api/survey/status/:id', async (req, res) => {
-  const job = await surveyQueue.getJob(req.params.id);
-  if (!job) return res.status(404).json({ error: 'Job not found' });
-  
-  const state = await job.getState();
-  const progress = job.progress || 0;
-  const isCanceled = await connection.get(`cancel_job_${req.params.id}`);
-  
-  res.json({ 
-    status: state, 
-    progress: progress, 
-    results: job.returnvalue || null,
-    error: job.failedReason || null,
-    isCanceled: !!isCanceled
-  });
+  const job = surveyJobs.get(req.params.id);
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found' });
+  }
+
+  let state = job.status;
+  if (state === 'completed') {
+    return res.json({ status: 'completed', results: job.results, isCanceled: false });
+  } else if (state === 'failed') {
+    return res.json({ status: 'failed', error: job.error, isCanceled: false });
+  } else {
+    return res.json({ status: state, progress: job.progress, isCanceled: false });
+  }
 });
 
 app.post('/api/survey/find-comparator', async (req, res) => {
@@ -915,30 +1185,14 @@ app.post('/api/survey/find-comparator', async (req, res) => {
   if (!query) return res.status(400).json({ error: 'Query is required' });
   
   const jobId = Date.now().toString() + '_' + Math.floor(Math.random() * 1000);
-  let browser;
+  let context;
   try {
-    browser = await puppeteer.launch({
-      headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--window-size=1280,900',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process'
-      ]
-    });
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 900 });
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    );
+    const { page, context: _ctx } = await createIsolatedPage();
+    context = _ctx;
     
     console.log(`[Comparator] Searching for: ${query}`);
-    await page.goto(`https://katalog.inaproc.id/search?keyword=${encodeURIComponent(query)}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await new Promise(r => setTimeout(r, 4000));
+    await page.goto(`https://katalog.inaproc.id/search?keyword=${encodeURIComponent(query)}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await randomDelay(3500, 6500); await autoScroll(page);
     
     const extractCandidates = () => {
         const rpElements = Array.from(document.querySelectorAll('*')).filter(el => {
@@ -1003,10 +1257,67 @@ app.post('/api/survey/find-comparator', async (req, res) => {
     }
     
     const detailUrl = `https://katalog.inaproc.id${bestResult.href}`;
+    let finalUrl = detailUrl;
     console.log(`[Comparator] Found: ${detailUrl}`);
     
-    await page.goto(detailUrl, { waitUntil: 'networkidle2', timeout: 30000 });
-    await new Promise(r => setTimeout(r, 4000));
+    try {
+        await page.goto(detailUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+        await randomDelay(3500, 6500); await autoScroll(page);
+        
+        // --- SMART VALIDATION (Deteksi Soft 404) ---
+        const isSoft404 = await page.evaluate(() => {
+          const bodyText = document.body.innerText || '';
+          if (bodyText.includes('Produk Tidak Ditemukan') || bodyText.includes('Page Not Found') || !bodyText.includes('Rp')) {
+            return true;
+          }
+          return false;
+        });
+
+        if (isSoft404) {
+          throw new Error('Halaman detail kosong atau produk tidak ditemukan (Soft 404)');
+        }
+    } catch (err) {
+        console.log(`[Comparator] ⚠️ Gagal buka detail (${err.message}), menggunakan data hasil pencarian`);
+        const searchUrl = `https://katalog.inaproc.id/search?keyword=${encodeURIComponent(query)}`;
+        finalUrl = searchUrl;
+        
+        // --- VISUAL HIGHLIGHT FALLBACK ---
+        await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+        await randomDelay(3500, 6500); await autoScroll(page);
+        
+        await page.evaluate((targetHref) => {
+            const anchors = Array.from(document.querySelectorAll('a[href]'));
+            let targetElement = null;
+            
+            for (const a of anchors) {
+                if (a.getAttribute('href') === targetHref) {
+                    targetElement = a;
+                    break;
+                }
+            }
+            
+            if (targetElement) {
+                anchors.forEach(card => {
+                    if (card.getAttribute('href') && card.getAttribute('href').startsWith('/') && card.getAttribute('href') !== '/' && card.getAttribute('href') !== '/search') {
+                        card.style.opacity = '0.35';
+                        card.style.filter = 'blur(1px)';
+                        card.style.transition = 'all 0.3s';
+                    }
+                });
+                
+                targetElement.style.opacity = '1';
+                targetElement.style.filter = 'none';
+                targetElement.style.border = '4px solid #ef4444';
+                targetElement.style.borderRadius = '8px';
+                targetElement.style.boxShadow = '0 0 20px rgba(239,68,68,0.8)';
+                targetElement.style.position = 'relative';
+                targetElement.style.zIndex = '9999';
+                targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, bestResult.href);
+        
+        await new Promise(r => setTimeout(r, 1500)); // Tunggu render efek css
+    }
     
     await injectWatermark(page);
     
@@ -1014,19 +1325,20 @@ app.post('/api/survey/find-comparator', async (req, res) => {
     const screenshotPath = path.join(screenshotDir, screenshotName);
     await page.screenshot({ path: screenshotPath, fullPage: false });
     
-    await browser.close();
+    await closePage(context);
+    context = null;
     
     res.json({
        success: true,
        name: bestResult.name,
        vendor: bestResult.vendor,
        price: bestResult.price,
-       detailUrl: detailUrl,
+       detailUrl: finalUrl,
        screenshotUrl: `/screenshots/${screenshotName}`
     });
     
   } catch (error) {
-    if (browser) await browser.close().catch(() => {});
+    if (context) await closePage(context).catch(() => {});
     console.error('[Comparator] Error:', error);
     res.status(500).json({ error: error.message || 'Failed to find comparator' });
   }
@@ -1049,17 +1361,17 @@ app.post('/api/survey/screenshot', async (req, res) => {
         '--window-size=1280,900',
         '--disable-web-security',
         '--disable-features=IsolateOrigins,site-per-process'
-      ]
+      , '--disable-blink-features=AutomationControlled']
     });
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
     
     // Tambah waktu tunggu agar konten (misal gambar produk) selesai dimuat
-    await new Promise(r => setTimeout(r, 4000));
+    await randomDelay(3500, 6500); await autoScroll(page);
     
     // Gunakan metode yang aman (inject watermark) seperti survei di PPK
     await injectWatermark(page);
@@ -1093,14 +1405,14 @@ app.post('/api/survey/analyze', async (req, res) => {
         '--window-size=1280,900',
         '--disable-web-security',
         '--disable-features=IsolateOrigins,site-per-process'
-      ]
+      , '--disable-blink-features=AutomationControlled']
     });
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
-    await page.goto(`https://katalog.inaproc.id/search?keyword=${encodeURIComponent(keyword)}`, { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.goto(`https://katalog.inaproc.id/search?keyword=${encodeURIComponent(keyword)}`, { waitUntil: 'networkidle2', timeout: 60000 });
     
     // Tunggu render
     await new Promise(r => setTimeout(r, 3000));
@@ -1217,38 +1529,23 @@ app.post('/api/survey/cancel/:id', async (req, res) => {
   res.json({ success: true, message: `Job ${jobId} cancellation requested` });
 });
 
-// ── REDIS WORKER (BACKGROUND PROCESS) ──────────────────────────────────────────
-const worker = new Worker('survey-jobs', async job => {
+async function runSurveyTask(data, updateProgress) {
+  const job = { data, updateProgress, id: 'in-memory' };
   const items = job.data.items;
   console.log(`\n========================================`);
   console.log(`🚀 [Worker] Memulai job ${job.id} untuk ${items.length} item`);
   console.log(`========================================`);
 
-  let browser;
+  let context;
   try {
-    browser = await puppeteer.launch({
-      headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--window-size=1280,900',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process'
-      ]
-    });
-
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 900 });
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    );
+    const { page: workerPage, context: workerContext } = await createIsolatedPage();
+    context = workerContext;
+    // Alias agar kompatibel dengan kode searchItem yang menerima 'page'
+    const page = workerPage;
 
     const results = [];
     for (let i = 0; i < items.length; i++) {
-      const isCanceled = await connection.get(`cancel_job_${job.id}`);
+      const isCanceled = false; // await connection.get(`cancel_job_${job.id}`);
       if (isCanceled) {
         console.log(`\n🛑 [Worker] Job ${job.id} dibatalkan oleh pengguna pada item ke-${i+1}`);
         break; // Stop immediately, return what we have so far
@@ -1273,19 +1570,50 @@ const worker = new Worker('survey-jobs', async job => {
     console.error(`[Worker] Fatal error on job ${job.id}:`, err);
     throw err;
   } finally {
-    if (browser) await browser.close();
+    if (context) await closePage(context);
   }
-}, { connection, concurrency: 1 }); // concurrency 1: hanya buka 1 browser sekaligus agar RAM hemat
+}
 
-worker.on('failed', (job, err) => {
-  console.error(`[Worker] Job ${job.id} gagal:`, err);
+
+app.get('/api/survey/sirup/:satkerId', async (req, res) => {
+  const { satkerId } = req.params;
+  const tahun = req.query.tahun || new Date().getFullYear();
+  let context = null;
+  try {
+    const { page, context: _ctx } = await createIsolatedPage();
+    context = _ctx;
+    const url = `https://sirup.inaproc.id/sirup/datatablectr/dataruppenyediasatker?tahun=${tahun}&idSatker=${satkerId}&sEcho=1&iColumns=7&iDisplayStart=0&iDisplayLength=2000`;
+    console.log(`[SIRUP] Fetching via Puppeteer: ${url}`);
+    
+    const response = await page.goto(url, { waitUntil: 'networkidle0', timeout: 45000 });
+    const text = await response.text();
+    // Inaproc might wrap json inside pre tag if viewed as HTML, but since it's a JSON endpoint, text should be pure JSON
+    let cleanText = text;
+    if (text.includes('<pre')) {
+      const match = text.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+      if (match) cleanText = match[1];
+    }
+    
+    try {
+      const data = JSON.parse(cleanText);
+      res.json(data);
+    } catch (parseErr) {
+      console.error(`[SIRUP] Error parsing JSON. Response body starts with: \n\n${text.substring(0, 1000)}`);
+      await page.screenshot({ path: `/app/screenshots/sirup-error-${Date.now()}.png` });
+      throw new Error(`Invalid JSON received: ${parseErr.message}`);
+    }
+  } catch (err) {
+    console.error('[SIRUP] Error fetching data:', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    if (context) await closePage(context);
+  }
 });
-
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'pbj-survey-service' }));
 
 const PORT = 3001;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🟢 Survey service berjalan di port ${PORT}`);
   console.log(`📁 Screenshot tersimpan di: ${screenshotDir}`);
 });

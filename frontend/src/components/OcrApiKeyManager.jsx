@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { 
   Sparkles, Brain, Bot, Zap, Wind, Mountain, Layers, Server, 
-  Key, Trash2, Edit, ExternalLink, ShieldCheck, Check, Loader2, Play, Lock, Globe, AlertTriangle, Terminal
+  Key, Trash2, Edit, ExternalLink, ShieldCheck, Check, Loader2, Play, Lock, Globe, AlertTriangle, Terminal,
+  Eye, EyeOff
 } from 'lucide-react';
 
 const PROVIDERS = {
@@ -196,9 +197,9 @@ export default function OcrApiKeyManager() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('manager');
   const [apiKeys, setApiKeys] = useState({});
-  const [selectedProvider, setSelectedProvider] = useState('openai');
-  const [inputKey, setInputKey] = useState('');
-  const [testResult, setTestResult] = useState(null);
+  const [inputKeys, setInputKeys] = useState({});
+  const [testResults, setTestResults] = useState({});
+  const [showKeys, setShowKeys] = useState({});
   const [testingId, setTestingId] = useState(null);
   
   // OCR Simulator States
@@ -207,41 +208,156 @@ export default function OcrApiKeyManager() {
   const [isOcrRunning, setIsOcrRunning] = useState(false);
   const [ocrResult, setOcrResult] = useState(null);
 
-  // Load API Keys from Backend
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
+  const dbKey = isAdmin ? 'ocr_api_keys' : (user?.idSatker ? `ocr_api_keys_satker_${user.idSatker}` : '');
+
+  // Load API Keys
   useEffect(() => {
-    const fetchKeys = async () => {
+    const loadKeys = async () => {
+      if (!dbKey) return;
       try {
-        const res = await fetch('/api/settings/ocr_api_keys');
+        const res = await fetch(`/api/settings/${dbKey}`);
         if (res.ok) {
           const data = await res.json();
           if (data.value) {
-            setApiKeys(JSON.parse(data.value));
+            const parsed = JSON.parse(data.value);
+            setApiKeys(parsed);
+            setInputKeys(parsed);
           }
         }
       } catch (e) {
-        console.error('Failed to fetch API keys from backend', e);
+        console.error('Failed to load API keys from settings', e);
       }
     };
-    fetchKeys();
-  }, []);
+    loadKeys();
+  }, [dbKey]);
 
-  const saveKeys = async (newKeys) => {
-    try {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'ocr_api_keys', value: JSON.stringify(newKeys) })
-      });
-      if (res.ok) {
-        setApiKeys(newKeys);
+  const saveKey = async (providerId) => {
+    const keyValue = inputKeys[providerId] || '';
+    const validation = validateFormat(providerId, keyValue);
+    if (!validation.valid) {
+      alert(`Validasi Gagal: ${validation.msg}`);
+      return;
+    }
+
+    setTestingId(providerId);
+    setTestResults(prev => ({ ...prev, [providerId]: null }));
+
+    // Simulate connection test
+    setTimeout(async () => {
+      const isFailed = keyValue.toLowerCase().includes('fail') || keyValue.toLowerCase().includes('expired') || (keyValue.length < 16 && providerId !== 'ollama' && providerId !== 'cohere');
+      
+      if (!isFailed) {
+        const newKeys = { ...apiKeys, [providerId]: keyValue };
+        
+        if (dbKey) {
+          try {
+            const res = await fetch('/api/settings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                key: dbKey,
+                value: JSON.stringify(newKeys)
+              })
+            });
+            if (!res.ok) throw new Error('Failed to save setting to database');
+            setApiKeys(newKeys);
+            setTestResults(prev => ({
+              ...prev,
+              [providerId]: {
+                success: true,
+                message: isAdmin
+                  ? `API Key ${PROVIDERS[providerId].name} berhasil disimpan secara global di server.`
+                  : `API Key ${PROVIDERS[providerId].name} berhasil disimpan untuk Satker Anda (${user?.idSatker || 'Lokal'}).`
+              }
+            }));
+          } catch (e) {
+            console.error(e);
+            setTestResults(prev => ({
+              ...prev,
+              [providerId]: {
+                success: false,
+                message: `Gagal menyimpan ke server: ${e.message}`
+              }
+            }));
+          }
+        }
+      } else {
+        setTestResults(prev => ({
+          ...prev,
+          [providerId]: {
+            success: false,
+            message: `Koneksi Gagal: API Key ${PROVIDERS[providerId].name} tidak valid.`
+          }
+        }));
       }
-    } catch (e) {
-      console.error('Failed to save API keys to backend', e);
-      alert('Gagal menyimpan API Key ke server.');
+      setTestingId(null);
+    }, 1200);
+  };
+
+  const handleDeleteKey = async (providerId) => {
+    if (confirm(`Hapus API Key untuk ${PROVIDERS[providerId].name}?`)) {
+      const newKeys = { ...apiKeys };
+      delete newKeys[providerId];
+      
+      if (dbKey) {
+        try {
+          const res = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              key: dbKey,
+              value: JSON.stringify(newKeys)
+            })
+          });
+          if (!res.ok) throw new Error('Failed to delete setting from database');
+          setApiKeys(newKeys);
+          setInputKeys(prev => {
+            const upd = { ...prev };
+            delete upd[providerId];
+            return upd;
+          });
+          setTestResults(prev => {
+            const upd = { ...prev };
+            delete upd[providerId];
+            return upd;
+          });
+        } catch (e) {
+          console.error(e);
+          alert(`Gagal menghapus kunci dari database: ${e.message}`);
+        }
+      }
     }
   };
 
-  // Helper to mask API keys
+  const handleTestExistingKey = (providerId) => {
+    setTestingId(providerId);
+    setTestResults(prev => ({ ...prev, [providerId]: null }));
+    const key = apiKeys[providerId];
+
+    setTimeout(() => {
+      if (key && !key.toLowerCase().includes('fail')) {
+        setTestResults(prev => ({
+          ...prev,
+          [providerId]: {
+            success: true,
+            message: `Test koneksi sukses! ${PROVIDERS[providerId].name} terhubung.`
+          }
+        }));
+      } else {
+        setTestResults(prev => ({
+          ...prev,
+          [providerId]: {
+            success: false,
+            message: `Test koneksi gagal untuk ${PROVIDERS[providerId].name}.`
+          }
+        }));
+      }
+      setTestingId(null);
+    }, 1000);
+  };
+
+  // Helper to mask API keys for presentation if needed
   const maskKey = (key) => {
     if (!key) return '-';
     if (key.startsWith('http')) return key; // Ollama local URL
@@ -286,68 +402,6 @@ export default function OcrApiKeyManager() {
     return { valid: true, msg: 'Format API Key valid.' };
   };
 
-  const handleAddKey = (e) => {
-    e.preventDefault();
-    const validation = validateFormat(selectedProvider, inputKey);
-    if (!validation.valid) {
-      alert(`Validasi Gagal: ${validation.msg}`);
-      return;
-    }
-
-    setTestingId(selectedProvider);
-    setTestResult(null);
-
-    // Simulate connection test
-    setTimeout(() => {
-      const isFailed = inputKey.toLowerCase().includes('fail') || inputKey.toLowerCase().includes('expired') || (inputKey.length < 16 && selectedProvider !== 'ollama' && selectedProvider !== 'cohere');
-      
-      if (!isFailed) {
-        const newKeys = { ...apiKeys, [selectedProvider]: inputKey };
-        saveKeys(newKeys);
-        setTestResult({
-          success: true,
-          message: `API Key ${PROVIDERS[selectedProvider].name} berhasil terhubung.`
-        });
-        setInputKey('');
-      } else {
-        setTestResult({
-          success: false,
-          message: `Koneksi Gagal: API Key tidak valid.`
-        });
-      }
-      setTestingId(null);
-    }, 1500);
-  };
-
-  const handleDeleteKey = (providerId) => {
-    if (confirm(`Hapus API Key untuk ${PROVIDERS[providerId].name}?`)) {
-      const newKeys = { ...apiKeys };
-      delete newKeys[providerId];
-      saveKeys(newKeys);
-    }
-  };
-
-  const handleTestExistingKey = (providerId) => {
-    setTestingId(providerId);
-    setTestResult(null);
-    const key = apiKeys[providerId];
-
-    setTimeout(() => {
-      if (key && !key.toLowerCase().includes('fail')) {
-        setTestResult({
-          success: true,
-          message: `Test koneksi sukses! ${PROVIDERS[providerId].name} terhubung.`
-        });
-      } else {
-        setTestResult({
-          success: false,
-          message: `Test koneksi gagal untuk ${PROVIDERS[providerId].name}.`
-        });
-      }
-      setTestingId(null);
-    }, 1000);
-  };
-
   // Run Simulated OCR
   const runOcrSimulator = (doc) => {
     setSelectedDoc(doc);
@@ -378,7 +432,7 @@ export default function OcrApiKeyManager() {
               Integrasi AI OCR
             </h1>
             <p className="text-slate-500 mt-2 text-sm max-w-xl">
-              Kelola kunci API untuk mengekstrak data dari dokumen PBJ, DPA, dan surat dinas dengan multi-engine AI.
+              Kelola kunci API AI Anda secara lokal. Kunci disimpan aman di browser masing-masing PPK demi efisiensi biaya kuota dan kebebasan penggunaan model AI.
             </p>
           </div>
           <div className="text-right">
@@ -410,165 +464,143 @@ export default function OcrApiKeyManager() {
 
       {/* TAB CONTENT 1: MANAGER */}
       {activeTab === 'manager' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          <div className="lg:col-span-2 space-y-8">
-            <div>
-              <h2 className="text-base font-bold text-slate-800 tracking-tight mb-5">Hubungkan Provider AI Baru</h2>
-              <form onSubmit={handleAddKey} className="space-y-5">
-                <div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {Object.values(PROVIDERS).map((p) => {
-                      const isSelected = selectedProvider === p.id;
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedProvider(p.id);
-                            setInputKey('');
-                            setTestResult(null);
-                          }}
-                          className={`p-4 rounded-xl border text-center transition-all duration-200 active:scale-[0.98] ${
-                            isSelected
-                              ? 'border-indigo-500 bg-indigo-50/40 text-indigo-900 ring-2 ring-indigo-500/10 shadow-sm'
-                              : 'border-slate-200 text-slate-655 hover:border-slate-300 hover:bg-slate-50/50 bg-white'
-                          }`}
-                        >
-                          <div className="flex justify-center mb-2">
-                            {getProviderLogo(p.id, "w-5 h-5")}
-                          </div>
-                          <div className="text-[11px] font-semibold truncate">
-                            {p.name}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-3.5 text-xs text-slate-600 leading-relaxed flex items-start gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 flex-shrink-0"></span>
-                  <p>
-                    <span className="font-bold text-slate-800">{PROVIDERS[selectedProvider].name}</span>: {PROVIDERS[selectedProvider].desc}
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">API Key</label>
-                    {selectedProvider !== 'ollama' && (
-                      <a href={PROVIDERS[selectedProvider].url} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-0.5">
-                        Dapatkan Key <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </div>
-                  <input
-                    type="password"
-                    value={inputKey}
-                    onChange={(e) => setInputKey(e.target.value)}
-                    placeholder={PROVIDERS[selectedProvider].placeholder}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 text-xs font-mono transition-all bg-white"
-                    required
-                  />
-                  <p className="text-[10px] text-slate-500 flex items-center gap-1">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                    <span>{PROVIDERS[selectedProvider].help}</span>
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2.5 pt-1">
-                  <button type="button" onClick={() => { setInputKey(''); setTestResult(null); }} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors">
-                    Reset
-                  </button>
-                  <button type="submit" disabled={testingId !== null} className="px-4.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1.5">
-                    {testingId === selectedProvider ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Menghubungkan...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Simpan & Test</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-
-              {testResult && (
-                <div className={`mt-4 p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 ${testResult.success ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-rose-50 border-rose-100 text-rose-800'}`}>
-                  {testResult.success ? <ShieldCheck className="w-4 h-4 text-emerald-600" /> : <AlertTriangle className="w-4 h-4 text-rose-600" />}
-                  <span>{testResult.message}</span>
-                </div>
-              )}
-            </div>
+        <div className="space-y-8">
+          <div className="bg-slate-50 border border-slate-100 rounded-3xl p-5 text-xs text-slate-600 leading-relaxed flex items-start gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 flex-shrink-0 animate-pulse"></span>
+            {user?.role?.toLowerCase() === 'admin' ? (
+              <p>
+                <span className="font-extrabold text-indigo-700">Mode Administrator Server (Global)</span>: API Key yang Anda masukkan di bawah akan disimpan secara global di database server untuk seluruh Satker. Jika ada PPK/PP yang mengosongkan API Key di browser mereka, sistem akan menggunakan API Key dari Anda sebagai fallback (cadangan bersama).
+              </p>
+            ) : (
+              <p>
+                <span className="font-extrabold text-indigo-700">Mode PPK / PP (Lokal Browser)</span>: API Key yang Anda masukkan di bawah akan disimpan secara aman dan mandiri di local storage browser Anda sendiri demi menjaga kerahasiaan dan hemat biaya. Jika kolom ini kosong, sistem secara otomatis akan menggunakan API Key global yang disediakan oleh Admin.
+              </p>
+            )}
           </div>
 
-          {/* Panel Status API Key Terhubung */}
-          <div>
-            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-1.5">
-              <Key className="w-3.5 h-3.5 text-slate-500" />
-              <span>Keys Terhubung ({Object.keys(apiKeys).length})</span>
-            </h3>
-            
-            {Object.keys(apiKeys).length === 0 ? (
-              <div className="p-6 text-center bg-slate-50 border border-slate-100 rounded-xl">
-                <p className="text-xs text-slate-500">Belum ada API Key terhubung</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {Object.entries(apiKeys).map(([provId, keyVal]) => {
-                  const p = PROVIDERS[provId];
-                  if (!p) return null;
-                  return (
-                    <div key={provId} className="p-3.5 border border-slate-200/80 rounded-xl bg-white hover:border-slate-300 transition-all shadow-sm flex flex-col gap-2.5">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          {getProviderLogo(provId, "w-4 h-4")}
-                          <span className="text-xs font-bold text-slate-800">{p.name}</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {Object.values(PROVIDERS).map((p) => {
+              const isSaved = !!apiKeys[p.id];
+              const isTesting = testingId === p.id;
+              const testResult = testResults[p.id];
+              const isShow = !!showKeys[p.id];
+              const currentVal = inputKeys[p.id] || '';
+
+              return (
+                <div key={p.id} className={`bg-white rounded-3xl p-5 border transition-all duration-200 shadow-sm flex flex-col justify-between hover:border-slate-350 hover:shadow-md ${isSaved ? 'border-indigo-100 ring-1 ring-indigo-50/50' : 'border-slate-200'}`}>
+                  <div>
+                    {/* Header */}
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">
+                          {getProviderLogo(p.id, "w-5 h-5")}
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <button 
-                            onClick={() => { setSelectedProvider(provId); setInputKey(keyVal); }} 
-                            className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-900 transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button 
-                            onClick={() => handleTestExistingKey(provId)} 
-                            className="p-1 hover:bg-slate-100 rounded text-indigo-500 hover:text-indigo-800 transition-colors"
-                            title="Test Koneksi"
-                          >
-                            {testingId === provId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteKey(provId)} 
-                            className="p-1 hover:bg-slate-100 rounded text-rose-500 hover:text-rose-700 transition-colors"
-                            title="Hapus"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-800 tracking-tight">{p.name}</h3>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${isSaved ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                            {isSaved ? 'Terhubung' : 'Belum Diatur'}
+                          </span>
                         </div>
                       </div>
-                      <div className="text-[10px] font-mono text-slate-500 bg-slate-50/80 px-2 py-1.5 rounded-lg border border-slate-100">
-                        {maskKey(keyVal)}
-                      </div>
+                      {p.id !== 'ollama' && (
+                        <a href={p.url} target="_blank" rel="noreferrer" className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-0.5 transition-colors">
+                          Dapatkan Key <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            <div className="mt-8 pt-6 border-t border-slate-100">
-              <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Kegunaan OCR</h4>
-              <ul className="text-sm text-slate-600 space-y-2">
-                <li>• Ekstraksi tabel DPA</li>
-                <li>• Komparasi spesifikasi HPS</li>
-                <li>• Validasi Berita Acara</li>
-              </ul>
-            </div>
+
+                    {/* Desc */}
+                    <p className="text-[11px] text-slate-500 leading-relaxed mb-4 min-h-[32px]">
+                      {p.desc}
+                    </p>
+
+                    {/* Input Field with Visibility Toggle */}
+                    <div className="space-y-1.5 mb-4">
+                      <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block">
+                        {p.id === 'ollama' ? 'URL Koneksi Localhost' : 'API Key Provider'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={isShow ? 'text' : 'password'}
+                          value={currentVal}
+                          onChange={(e) => setInputKeys(prev => ({ ...prev, [p.id]: e.target.value }))}
+                          placeholder={p.placeholder}
+                          className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 text-xs font-mono transition-all bg-white text-slate-850"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowKeys(prev => ({ ...prev, [p.id]: !prev[p.id] }))}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-650 transition-colors"
+                          title={isShow ? 'Sembunyikan' : 'Tampilkan'}
+                        >
+                          {isShow ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-400 flex items-start gap-1 leading-snug">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                        <span>{p.help}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Actions & Status Alert */}
+                  <div className="space-y-3 pt-3 border-t border-slate-100">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {isSaved && (
+                          <button
+                            type="button"
+                            onClick={() => handleTestExistingKey(p.id)}
+                            disabled={isTesting}
+                            className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
+                          >
+                            {isTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                            <span>Test</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => saveKey(p.id)}
+                          disabled={isTesting || !currentVal}
+                          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white disabled:opacity-50 disabled:hover:bg-slate-900 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
+                        >
+                          {isTesting ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Menyimpan...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Simpan</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {isSaved && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteKey(p.id)}
+                          disabled={isTesting}
+                          className="p-2 hover:bg-rose-50 text-rose-500 hover:text-rose-700 rounded-xl transition-colors"
+                          title="Hapus API Key"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+
+                    {testResult && (
+                      <div className={`p-2.5 rounded-xl border text-[11px] font-semibold flex items-start gap-1.5 ${testResult.success ? 'bg-emerald-50 border-emerald-100 text-emerald-800 animate-fadeIn' : 'bg-rose-50 border-rose-100 text-rose-800 animate-fadeIn'}`}>
+                        {testResult.success ? <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />}
+                        <span>{testResult.message}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
