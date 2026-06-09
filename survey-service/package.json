@@ -7,14 +7,18 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "axios": "^1.17.0",
     "bullmq": "^5.77.1",
     "cors": "^2.8.5",
     "express": "^4.18.2",
+    "http-proxy-agent": "^9.1.0",
+    "https-proxy-agent": "^9.1.0",
     "ioredis": "^5.10.1",
     "puppeteer": "^22.15.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "puppeteer-real-browser": "^1.4.4"
+    "puppeteer-real-browser": "^1.4.4",
+    "socks-proxy-agent": "^10.1.0"
   },
   "keywords": [],
   "author": "",

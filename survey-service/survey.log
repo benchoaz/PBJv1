@@ -140,3 +140,4 @@ Received payload items: [
   → Detail terverifikasi: harga=30000, vendor=DWI RATNA ANGGRAENI
 
 ✅ [Worker] Job in-memory selesai! 1/1 berhasil.
+[BrowserPool] Browser terputus, akan diluncurkan ulang saat diperlukan.

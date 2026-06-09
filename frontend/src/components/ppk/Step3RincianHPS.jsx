@@ -547,6 +547,9 @@ export default function Step3RincianHPS() {
       // Load Gemini API Key using helper
       const geminiKey = await fetchGeminiKeyHelper();
 
+      // Load Proxy dari localStorage jika user sudah menentukannya via Proxy Tester
+      const userProxy = localStorage.getItem('pbj_scraper_proxy') || null;
+
       // Server ini sekarang menggunakan Service Node.js baru di port 3001
       const response = await fetch('/api/survey/run', {
         method: 'POST',
@@ -557,7 +560,8 @@ export default function Step3RincianHPS() {
           geminiKey: geminiKey,
           locations: searchLocations.split(',').map(s => s.trim()).filter(Boolean),
           ignorePriceLimit: ignorePriceLimit,
-          autoComparator: autoComparator
+          autoComparator: autoComparator,
+          proxy: userProxy
         })
       });
 
@@ -751,6 +755,8 @@ export default function Step3RincianHPS() {
 
     try {
       const geminiKey = await fetchGeminiKeyHelper();
+      const userProxy = localStorage.getItem('pbj_scraper_proxy') || null;
+      
       const response = await fetch('/api/survey/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -760,7 +766,8 @@ export default function Step3RincianHPS() {
           geminiKey: geminiKey,
           locations: searchLocations.split(',').map(s => s.trim()).filter(Boolean),
           ignorePriceLimit: ignorePriceLimit,
-          autoComparator: autoComparator
+          autoComparator: autoComparator,
+          proxy: userProxy
         })
       });
 

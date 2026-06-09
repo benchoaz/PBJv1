@@ -5,10 +5,10 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 const fs = require('fs');
 const path = require('path');
-
-
-
-
+const axios = require('axios');
+const { HttpProxyAgent } = require('http-proxy-agent');
+const { HttpsProxyAgent } = require('https-proxy-agent');
+const { SocksProxyAgent } = require('socks-proxy-agent');
 
 
 
@@ -93,22 +93,39 @@ async function autoScroll(page) {
 
 // --- BROWSER POOL (Singleton + Isolated Context) ---
 let _sharedBrowser = null;
+let _currentProxy = null; // Menyimpan status proxy saat ini
 
-async function getSharedBrowser() {
+async function getSharedBrowser(proxyUrl = null) {
+  // Jika browser sudah jalan tapi setting proxynya BERBEDA, kita matikan dulu
+  if (_sharedBrowser && _sharedBrowser.isConnected() && _currentProxy !== proxyUrl) {
+    console.log(`[BrowserPool] Mengganti proxy dari ${_currentProxy || 'TIDAK ADA'} menjadi ${proxyUrl || 'TIDAK ADA'}. Mematikan browser lama...`);
+    try { await _sharedBrowser.close(); } catch(e) {}
+    _sharedBrowser = null;
+  }
+
   if (_sharedBrowser && _sharedBrowser.isConnected()) return _sharedBrowser;
-  console.log('[BrowserPool] Meluncurkan browser instance baru...');
+  
+  console.log(`[BrowserPool] Meluncurkan browser instance baru... (Proxy: ${proxyUrl || 'TIDAK ADA'})`);
+  _currentProxy = proxyUrl;
+  
+  const args = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--window-size=1280,900',
+    '--disable-blink-features=AutomationControlled',
+    '--max_old_space_size=512',
+  ];
+
+  if (proxyUrl) {
+    args.push(`--proxy-server=${proxyUrl}`);
+  }
+
   _sharedBrowser = await puppeteer.launch({
     headless: 'new',
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--window-size=1280,900',
-      '--disable-blink-features=AutomationControlled',
-      '--max_old_space_size=512',
-    ]
+    args: args
   });
   _sharedBrowser.on('disconnected', () => {
     console.warn('[BrowserPool] Browser terputus, akan diluncurkan ulang saat diperlukan.');
@@ -122,8 +139,8 @@ async function getSharedBrowser() {
  * Setiap context memiliki cookie, cache, dan storage sendiri.
  * Panggil closePage(context) setelah selesai untuk membebaskan memori.
  */
-async function createIsolatedPage() {
-  const browser = await getSharedBrowser();
+async function createIsolatedPage(proxyUrl = null) {
+  const browser = await getSharedBrowser(proxyUrl);
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
   await page.setViewport({ width: 1280, height: 900 });
@@ -1536,9 +1553,11 @@ async function runSurveyTask(data, updateProgress) {
   console.log(`🚀 [Worker] Memulai job ${job.id} untuk ${items.length} item`);
   console.log(`========================================`);
 
+  const proxyUrl = job.data.proxy || null; // Ambil proxy dari payload jika ada
+
   let context;
   try {
-    const { page: workerPage, context: workerContext } = await createIsolatedPage();
+    const { page: workerPage, context: workerContext } = await createIsolatedPage(proxyUrl);
     context = workerContext;
     // Alias agar kompatibel dengan kode searchItem yang menerima 'page'
     const page = workerPage;
@@ -1574,6 +1593,56 @@ async function runSurveyTask(data, updateProgress) {
   }
 }
 
+app.post('/api/survey/test-proxies', async (req, res) => {
+  const { proxies } = req.body;
+  if (!proxies || !Array.isArray(proxies)) {
+    return res.status(400).json({ error: 'Array proxies dibutuhkan' });
+  }
+
+  // Uji maksimal 20 proxy sekaligus untuk efisiensi
+  const proxiesToTest = proxies.slice(0, 20);
+  console.log(`[Proxy Tester] Menguji ${proxiesToTest.length} proxy...`);
+
+  const results = await Promise.all(proxiesToTest.map(async (proxyStr) => {
+    let cleanProxy = proxyStr.trim();
+    if (!cleanProxy) return null;
+
+    let agent;
+    try {
+      if (cleanProxy.startsWith('socks')) {
+        agent = new SocksProxyAgent(cleanProxy);
+      } else {
+        if (!cleanProxy.startsWith('http')) cleanProxy = 'http://' + cleanProxy;
+        agent = new HttpsProxyAgent(cleanProxy); // E-katalog is HTTPS
+      }
+    } catch (e) {
+      return { proxy: proxyStr, status: 'invalid_format' };
+    }
+
+    const start = Date.now();
+    try {
+      const response = await axios.get('https://e-katalog.lkpp.go.id/', {
+        httpsAgent: agent,
+        httpAgent: agent,
+        timeout: 10000,
+        headers: {
+          'User-Agent': USER_AGENTS[0],
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
+        }
+      });
+      const latency = Date.now() - start;
+      return { proxy: proxyStr, status: 'alive', latency, code: response.status };
+    } catch (err) {
+      const latency = Date.now() - start;
+      if (err.response && err.response.status === 403) {
+        return { proxy: proxyStr, status: 'blocked_waf', latency, code: 403 };
+      }
+      return { proxy: proxyStr, status: 'dead', latency, error: err.code || err.message };
+    }
+  }));
+
+  res.json({ results: results.filter(Boolean) });
+});
 
 app.get('/api/survey/sirup/:satkerId', async (req, res) => {
   const { satkerId } = req.params;

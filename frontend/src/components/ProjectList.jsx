@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import ProxyTesterModal from './ProxyTesterModal'
 
 const STATUS_CONFIG = {
   'Draft':               { color: 'text-sky-700 bg-sky-50 border-sky-200',         dot: 'bg-sky-400',      label: 'Draft' },
@@ -19,6 +20,7 @@ export default function ProjectList() {
   const [filterStatus, setFilterStatus] = useState('Semua')
   const [isUpdating, setIsUpdating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isProxyTesterOpen, setIsProxyTesterOpen] = useState(false)
   const [view, setView]           = useState('table') // 'table' | 'card'
   const [ppkSignModal, setPpkSignModal] = useState(null) // project object or null
   const [ppkSignMethod, setPpkSignMethod] = useState('scan')
@@ -248,21 +250,30 @@ export default function ProjectList() {
               <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 hidden sm:block">Dokumen Persiapan Pengadaan (DPP) &amp; Riwayat Survei HPS</p>
             </div>
           </div>
-          {user?.role !== 'PP' && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => {
-                localStorage.removeItem('pbj_current_project_id');
-                navigate('/ppk/persiapan');
-              }}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl shadow-md shadow-indigo-200 transition-all hover:scale-[1.02] active:scale-95"
+              onClick={() => setIsProxyTesterOpen(true)}
+              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-slate-200 transition-all hover:scale-[1.02] active:scale-95"
             >
-              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              <span className="hidden sm:inline">Buat DPP Baru</span>
-              <span className="sm:hidden">Buat DPP</span>
+              <span className="text-lg">🛡️</span>
+              <span className="hidden sm:inline">Proxy Tester</span>
             </button>
-          )}
+            {user?.role !== 'PP' && (
+              <button
+                onClick={() => {
+                  localStorage.removeItem('pbj_current_project_id');
+                  navigate('/ppk/persiapan');
+                }}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl shadow-md shadow-indigo-200 transition-all hover:scale-[1.02] active:scale-95"
+              >
+                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                <span className="hidden sm:inline">Buat DPP Baru</span>
+                <span className="sm:hidden">Buat DPP</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -644,6 +655,11 @@ export default function ProjectList() {
           Sistem Manajemen PBJ — E-Purchasing Katalog Elektronik LKPP
         </div>
       </div>
+      <ProxyTesterModal 
+        isOpen={isProxyTesterOpen} 
+        onClose={() => setIsProxyTesterOpen(false)} 
+        onSave={() => console.log('Proxy saved')}
+      />
     </div>
     {/* ═══════════════════════════════════════════════════════════
         MODAL TANDA TANGAN PPK
