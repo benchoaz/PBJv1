@@ -162,6 +162,8 @@ class ParseResult(BaseModel):
     rekening: List[RekeningDPA]
     pesan: str
 
+from rak_parser import ParseRakResult, refine_rak_with_ai, native_parse_rak
+
 
 def clean_uraian(text: str) -> str:
     lines = []
@@ -475,7 +477,7 @@ def refine_rincian_with_ai(block_text: str, provider: str, api_key: str, is_cust
         prompt = block_text
     else:
         prompt = f"""Bapak adalah asisten AI ahli keuangan daerah dan pengadaan barang/jasa (PBJ) Indonesia.
-Tugas Anda adalah mem-parsing secara deterministik struktur rincian belanja dari potongan teks DPA (RKA Belanja SKPD) berikut ini menggunakan alur struktur pohon (Tree Structure).
+Tugas Anda adalah mem-parsing secara deterministik struktur rincian belanja dari potongan teks DPA (RAK Belanja SKPD) berikut ini menggunakan alur struktur pohon (Tree Structure).
 
 STRUKTUR POHON DPA (PARENT-CHILD-GRANDCHILD):
 - LEVEL 1 (Parent): Kode Rekening & Uraian Rekening (misal: 5.1.02.01.001.00024 - Belanja Alat Tulis Kantor). Ini adalah anchor utama.
@@ -497,7 +499,7 @@ SPAM FILTERING & GARBAGE EXCLUSION:
 - JIKA di teks DPA terdapat item dengan nominal harga/jumlah Rp 0,00 (atau Rp 0), itu berarti item tersebut sudah terhapus/dihapus, sehingga JANGAN dimasukkan ke dalam hasil ekstraksi!
 
 ATURAN KALKULASI VOLUME & HARGA:
-- Jika volume dalam bentuk perkalian (misal: "50 Orang x 10 Kali"), Anda WAJIB mengalikan angkanya (50 x 10 = 500) dan memasukkan hasil akhirnya (500) ke field "volume". Satuan menjadi gabungannya (misal: "Orang / Kali").
+- Jika volume dalam bentuk peraklian (misal: "50 Orang x 10 Kali"), Anda WAJIB mengalikan angkanya (50 x 10 = 500) dan memasukkan hasil akhirnya (500) ke field "volume". Satuan menjadi gabungannya (misal: "Orang / Kali").
 - Pastikan rumus `volume * harga_satuan = harga_total` selalu akurat!
 
 Format output WAJIB berupa JSON ARRAY murni yang berisi objek dengan format berikut (tanpa kata pengantar, penjelasan, atau pembungkus markdown ```json):
@@ -597,6 +599,91 @@ Potongan Teks DPA:
                     print(f"⚠️ Groq model '{model_name}' failed with: {str(e)}. Trying next model...")
                     continue
             return []
+        elif provider == "deepseek":
+            url = "https://api.deepseek.com/chat/completions"
+            headers["Authorization"] = f"Bearer {api_key}"
+            req_body = {
+                "model": "deepseek-chat",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.1,
+                "response_format": {"type": "json_object"}
+            }
+            data_bytes = json.dumps(req_body).encode("utf-8")
+            req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=60) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                ai_text = res_data["choices"][0]["message"]["content"].strip()
+                if ai_text.startswith("```"):
+                    ai_text = re.sub(r"^```(?:json)?\n|```$", "", ai_text, flags=re.MULTILINE).strip()
+                parsed = json.loads(ai_text)
+                items_list = []
+                if isinstance(parsed, list):
+                    items_list = parsed
+                elif isinstance(parsed, dict):
+                    for val in parsed.values():
+                        if isinstance(val, list):
+                            items_list = val
+                            break
+                    if not items_list:
+                        items_list = [parsed]
+                
+                result_items = []
+                for idx, item in enumerate(items_list):
+                    vol = float(item.get("volume", 1.0) or 1.0)
+                    harga_sat = int(item.get("harga_satuan", 0) or 0)
+                    harga_tot = int(item.get("harga_total", 0) or (vol * harga_sat))
+                    if harga_sat == 0 or harga_tot == 0: continue
+                    result_items.append(RincianItem(
+                        no=len(result_items) + 1,
+                        nama=str(item.get("nama", "Item Detail DPA") or "Item Detail DPA")[:120],
+                        volume=vol,
+                        satuan=normalize_satuan(str(item.get("satuan", "Buah") or "Buah")),
+                        harga_satuan=harga_sat,
+                        harga_total=harga_tot
+                    ))
+                return result_items
+        elif provider == "cohere":
+            url = "https://api.cohere.com/v1/chat"
+            headers["Authorization"] = f"Bearer {api_key}"
+            req_body = {
+                "model": "command-r-plus-08-2024",
+                "message": prompt,
+                "temperature": 0.1
+            }
+            data_bytes = json.dumps(req_body).encode("utf-8")
+            req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=60) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                ai_text = res_data["text"].strip()
+                if ai_text.startswith("```"):
+                    ai_text = re.sub(r"^```(?:json)?\n|```$", "", ai_text, flags=re.MULTILINE).strip()
+                parsed = json.loads(ai_text)
+                items_list = []
+                if isinstance(parsed, list):
+                    items_list = parsed
+                elif isinstance(parsed, dict):
+                    for val in parsed.values():
+                        if isinstance(val, list):
+                            items_list = val
+                            break
+                    if not items_list:
+                        items_list = [parsed]
+                
+                result_items = []
+                for idx, item in enumerate(items_list):
+                    vol = float(item.get("volume", 1.0) or 1.0)
+                    harga_sat = int(item.get("harga_satuan", 0) or 0)
+                    harga_tot = int(item.get("harga_total", 0) or (vol * harga_sat))
+                    if harga_sat == 0 or harga_tot == 0: continue
+                    result_items.append(RincianItem(
+                        no=len(result_items) + 1,
+                        nama=str(item.get("nama", "Item Detail DPA") or "Item Detail DPA")[:120],
+                        volume=vol,
+                        satuan=normalize_satuan(str(item.get("satuan", "Buah") or "Buah")),
+                        harga_satuan=harga_sat,
+                        harga_total=harga_tot
+                    ))
+                return result_items
         elif provider == "anthropic":
             url = "https://api.anthropic.com/v1/messages"
             headers["x-api-key"] = api_key
@@ -730,6 +817,24 @@ def call_ai_api(prompt: str, provider: str, api_key: str, json_format: bool = Fa
         }
         if json_format:
             req_body["response_format"] = {"type": "json_object"}
+    elif provider == "deepseek":
+        url = "https://api.deepseek.com/chat/completions"
+        headers["Authorization"] = f"Bearer {api_key}"
+        req_body = {
+            "model": "deepseek-chat",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1
+        }
+        if json_format:
+            req_body["response_format"] = {"type": "json_object"}
+    elif provider == "cohere":
+        url = "https://api.cohere.com/v1/chat"
+        headers["Authorization"] = f"Bearer {api_key}"
+        req_body = {
+            "model": "command-r-plus-08-2024",
+            "message": prompt,
+            "temperature": 0.1
+        }
     else:
         return ""
 
@@ -739,8 +844,10 @@ def call_ai_api(prompt: str, provider: str, api_key: str, json_format: bool = Fa
         res_data = json.loads(response.read().decode("utf-8"))
         if provider == "gemini":
             return res_data["candidates"][0]["content"]["parts"][0]["text"]
-        elif provider in ["groq", "openai"]:
+        elif provider in ["groq", "openai", "deepseek"]:
             return res_data["choices"][0]["message"]["content"]
+        elif provider == "cohere":
+            return res_data["text"]
         elif provider == "anthropic":
             return res_data["content"][0]["text"]
     return ""
@@ -754,7 +861,7 @@ def validate_rincian_with_ai(rincian: List[RincianItem], block_text: str, provid
         return True, "Validasi dilewati karena data rincian kosong atau API key belum dikonfigurasi."
 
     prompt = f"""Bapak adalah AI Auditor Pengadaan Barang/jasa Pemerintah yang sangat teliti.
-Tugas Anda adalah memeriksa apakah hasil ekstraksi rincian item belanja dari potongan teks DPA (RKA Belanja SKPD) berikut ini mengalami PEMOTONGAN (truncation) atau kalimat menggantung di tengah jalan sebelum selesai.
+Tugas Anda adalah memeriksa apakah hasil ekstraksi rincian item belanja dari potongan teks DPA (RAK Belanja SKPD) berikut ini mengalami PEMOTONGAN (truncation) atau kalimat menggantung di tengah jalan sebelum selesai.
 
 POTONGAN TEKS DPA ASLI:
 {block_text}
@@ -790,7 +897,7 @@ Kembalikan HANYA respons berupa JSON objek murni tanpa penjelasan pembuka/penutu
 
 
 # ── Pipeline Ekstraksi Utama ─────────────────────────────────────────────────
-def run_extraction_pipeline(doc: fitz.Document, full_ocr_text: str, use_ocr: bool, ai_provider: str = "", api_key: str = "") -> List[RekeningDPA]:
+def run_extraction_pipeline(doc: fitz.Document, full_ocr_text: str, use_ocr: bool, ai_provider: str = "", api_key: str = "", esc_provider: str = "", esc_key: str = "") -> List[RekeningDPA]:
     rekening_map = {}  # kode → RekeningDPA
 
     if use_ocr:
@@ -821,7 +928,7 @@ def run_extraction_pipeline(doc: fitz.Document, full_ocr_text: str, use_ocr: boo
     if not all_occurrences:
         return []
 
-    # Urutkan berdasarkan posisi dalam teks
+    # Urutkan berdasarakn posisi dalam teks
     sorted_occurrences = sorted(all_occurrences, key=lambda x: x[1])
 
     rekening_candidates = []
@@ -908,6 +1015,66 @@ def run_extraction_pipeline(doc: fitz.Document, full_ocr_text: str, use_ocr: boo
         if ai_provider and api_key and rincian:
             print(f"🔍 Menjalankan AI Validator (Phase 4) untuk rekening {kode}...")
             is_valid, validation_reason = validate_rincian_with_ai(rincian, block_after, ai_provider, api_key)
+            
+            # --- CONDITIONAL ESCALATION (Jalan Tengah Consensus) ---
+            if not is_valid and esc_provider and esc_key:
+                print(f"🚨 Hasil validation LOW/INCOMPLETE untuk {kode}. Melakukan eskalasi otomatis ke AI Auditor ({esc_provider})...")
+                # Run the escalation audit prompt on the secondary model (AI-2)
+                rincian_json = json.dumps([item.dict() for item in rincian], indent=2)
+                prompt = f"""Anda adalah AI Auditor Senior dan ahli verifikasi pengadaan barang/jasa pemerintah.
+Model AI pertama ({ai_provider}) telah mencoba mengekstrak item rincian DPA dari potongan teks berikut, namun terdeteksi bahwa hasil ekstraksinya TIDAK LENGKAP atau TERPOTONG.
+
+ALASAN TIDAK LENGKAP:
+{validation_reason}
+
+POTONGAN TEKS DPA ASLI:
+\"\"\"
+{block_after}
+\"\"\"
+
+HASIL EKSTRAKSI AWAL YANG TIDAK LENGKAP:
+{rincian_json}
+
+Tugas Anda:
+1. Analisis teks asli dan hasil ekstraksi awal yang salah/tidak lengkap tersebut.
+2. Temukan semua item rincian belanja (nama spesifikasi, volume, satuan, harga satuan, harga total) yang belum terekstrak atau salah hitung.
+3. Hasilkan daftar rincian barang yang LENGKAP dan BENAR secara keseluruhan. Gabungkan baris spesifikasi detail langsung ke nama barang utamanya.
+4. Kembalikan HANYA array JSON murni dengan format elemen:
+[
+  {{ "no": 1, "nama": "Uraian Spesifikasi Lengkap", "volume": 1.0, "satuan": "Buah", "harga_satuan": 1000, "harga_total": 1000 }}
+]
+Jangan tulis teks penjelasan apa pun, kembalikan hanya JSON array.
+"""
+                try:
+                    raw_res = call_ai_api(prompt, esc_provider, esc_key, json_format=True)
+                    raw_res = raw_res.strip()
+                    if raw_res.startswith("```"):
+                        raw_res = re.sub(r"^```(?:json)?\n|```$", "", raw_res, flags=re.MULTILINE).strip()
+                    
+                    parsed = json.loads(raw_res)
+                    if isinstance(parsed, list) and len(parsed) > 0:
+                        escalated_items = []
+                        for idx, item in enumerate(parsed):
+                            # parse to RincianItem
+                            vol = float(item.get("volume", 1) or 1)
+                            harga_sat = int(item.get("harga_satuan", 0) or 0)
+                            harga_tot = int(item.get("harga_total", 0) or int(round(vol * harga_sat)))
+                            
+                            escalated_items.append(RincianItem(
+                                no=len(escalated_items) + 1,
+                                nama=str(item.get("nama", "Item Detail DPA") or "Item Detail DPA")[:120],
+                                volume=vol,
+                                satuan=normalize_satuan(str(item.get("satuan", "Buah") or "Buah")),
+                                harga_satuan=harga_sat,
+                                harga_total=harga_tot
+                            ))
+                        if len(escalated_items) > 0:
+                            rincian = escalated_items
+                            is_valid = True
+                            validation_reason = f"Rincian diperbaiki dan diselaraskan oleh AI Auditor ({esc_provider.upper()}) melalui eskalasi otomatis."
+                            print(f"✅ Eskalasi berhasil! Menghasilkan {len(rincian)} item rincian yang valid.")
+                except Exception as esc_err:
+                    print(f"⚠️ Gagal melakukan eskalasi ke AI Auditor: {str(esc_err)}")
 
         rekening_candidates.append(RekeningDPA(
             kode_rekening=kode,
@@ -924,7 +1091,7 @@ def run_extraction_pipeline(doc: fitz.Document, full_ocr_text: str, use_ocr: boo
             raw_text_block=block_after
         ))
 
-    # Kelompokkan kandidat berdasarkan kode rekening untuk memilih yang terbaik (yang memiliki rincian paling lengkap)
+    # Kelompokkan kandidat berdasarakn kode rekening untuk memilih yang terbaik (yang memiliki rincian paling lengkap)
     best_rekening = {}
     for candidate in rekening_candidates:
         kode = candidate.kode_rekening
@@ -1040,7 +1207,9 @@ def extract_global_metadata(text: str) -> dict:
         "kegiatan": None,
         "sub_kegiatan": None,
         "lokasi": None,
-        "waktu_pelaksanaan": None
+        "waktu_pelaksanaan": None,
+        "nama_skpd": None,
+        "nilai_anggaran": None
     }
     if not text:
         return meta
@@ -1132,6 +1301,22 @@ def extract_global_metadata(text: str) -> dict:
                     if re.search(r'(Mulai|Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember|Bulan|Hari)', lines[j], re.IGNORECASE):
                         meta["waktu_pelaksanaan"] = lines[j].replace(':', '', 1).strip()
                         break
+
+        # 6. SKPD
+        if not meta["nama_skpd"] and re.search(r'SKPD\s*:', line, re.IGNORECASE):
+            match = re.search(r'SKPD\s*:\s*(.+)', line, re.IGNORECASE)
+            if match and match.group(1).strip():
+                meta["nama_skpd"] = match.group(1).strip()
+
+        # 7. Nilai Anggaran
+        if not meta["nilai_anggaran"] and re.search(r'Nilai\s*Anggaran\s*:', line, re.IGNORECASE):
+            match = re.search(r'Nilai\s*Anggaran\s*:\s*(?:Rp\.?)?\s*([\d\.,]+)', line, re.IGNORECASE)
+            if match and match.group(1).strip():
+                clean_val = match.group(1).replace('.', '').replace(',', '.')
+                try:
+                    meta["nilai_anggaran"] = float(clean_val)
+                except:
+                    pass
     
     # Fallback: cari dengan regex multi-baris jika belum ketemu
     if not meta["program"]:
@@ -1180,11 +1365,11 @@ def health():
     }
 
 @app.post('/parse-dpa', response_model=ParseResult)
-async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] = Header(None), x_ai_key: Optional[str] = Header(None)):
+async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] = Header(None), x_ai_key: Optional[str] = Header(None), x_ai_escalation_provider: Optional[str] = Header(None), x_ai_escalation_key: Optional[str] = Header(None)):
     filename = file.filename.lower()
     file_bytes = await file.read()
     if not file_bytes:
-        raise HTTPException(400, 'Berkas kosong.')
+        raise HTTPException(400, 'Beraks kosong.')
 
     import os
     os.makedirs('logs', exist_ok=True)
@@ -1204,7 +1389,7 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
     if filename.endswith('.xlsx') or filename.endswith('.xls'):
         try:
             excel_text, _ = parse_excel(file_bytes)
-            rekening = run_extraction_pipeline(None, excel_text, use_ocr=True, ai_provider=x_ai_provider, api_key=x_ai_key)
+            rekening = run_extraction_pipeline(None, excel_text, use_ocr=True, ai_provider=x_ai_provider, api_key=x_ai_key, esc_provider=x_ai_escalation_provider, esc_key=x_ai_escalation_key)
             write_log(1, len(rekening), 'pandas', 'ok', file_bytes)
             meta = extract_global_metadata(excel_text)
             return ParseResult(
@@ -1224,7 +1409,7 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
     elif filename.endswith('.png') or filename.endswith('.jpg') or filename.endswith('.jpeg'):
         try:
             image_text, ocr_conf = ocr_image(file_bytes)
-            rekening = run_extraction_pipeline(None, image_text, use_ocr=True, ai_provider=x_ai_provider, api_key=x_ai_key)
+            rekening = run_extraction_pipeline(None, image_text, use_ocr=True, ai_provider=x_ai_provider, api_key=x_ai_key, esc_provider=x_ai_escalation_provider, esc_key=x_ai_escalation_key)
             write_log(1, len(rekening), 'paddleocr-image', 'ok', file_bytes)
             meta = extract_global_metadata(image_text)
             return ParseResult(
@@ -1254,7 +1439,7 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
             if is_scan:
                 doc.close()
                 ocr_text, ocr_conf = ocr_pdf(file_bytes)
-                rekening = run_extraction_pipeline(None, ocr_text, use_ocr=True, ai_provider=x_ai_provider, api_key=x_ai_key)
+                rekening = run_extraction_pipeline(None, ocr_text, use_ocr=True, ai_provider=x_ai_provider, api_key=x_ai_key, esc_provider=x_ai_escalation_provider, esc_key=x_ai_escalation_key)
                 write_log(total_pages, len(rekening), 'paddleocr', 'ok', file_bytes)
                 with open('logs/debug_ocr_text.txt', 'w') as f:
                     f.write(ocr_text)
@@ -1271,13 +1456,13 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
                 )
 
             # Native PDF
-            rekening = run_extraction_pipeline(doc, '', use_ocr=False, ai_provider=x_ai_provider, api_key=x_ai_key)
+            rekening = run_extraction_pipeline(doc, '', use_ocr=False, ai_provider=x_ai_provider, api_key=x_ai_key, esc_provider=x_ai_escalation_provider, esc_key=x_ai_escalation_key)
             avg_conf = sum(r.confidence for r in rekening) / len(rekening) if rekening else 0
 
             # Fallback ke OCR jika confidence rendah atau tidak ada rekening
             if not rekening or avg_conf < 60:
                 ocr_text, ocr_conf = ocr_pdf(file_bytes)
-                rekening_ocr = run_extraction_pipeline(None, ocr_text, use_ocr=True, ai_provider=x_ai_provider, api_key=x_ai_key)
+                rekening_ocr = run_extraction_pipeline(None, ocr_text, use_ocr=True, ai_provider=x_ai_provider, api_key=x_ai_key, esc_provider=x_ai_escalation_provider, esc_key=x_ai_escalation_key)
                 if len(rekening_ocr) >= len(rekening):
                     rekening = rekening_ocr
                 write_log(total_pages, len(rekening), 'paddleocr-fallback', 'ok', file_bytes)
@@ -1314,10 +1499,149 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
             if doc is not None and not getattr(doc, 'is_closed', False):
                 try: doc.close()
                 except: pass
-            raise HTTPException(500, f'Gagal mengekstrak berkas DPA: {str(e)}')
+            raise HTTPException(500, f'Gagal mengekstrak beraks DPA: {str(e)}')
             
     else:
-        raise HTTPException(400, 'Format berkas tidak didukung. Harap unggah berkas PDF, Gambar (.png/.jpg/.jpeg), atau Excel (.xlsx/.xls).')
+        raise HTTPException(400, 'Format beraks tidak didukung. Harap unggah beraks PDF, Gambar (.png/.jpg/.jpeg), atau Excel (.xlsx/.xls).')
+
+import uuid
+
+parse_jobs = {}
+
+class ParseJobResponse(BaseModel):
+    job_id: str
+    status: str
+
+def background_parse_rak(job_id: str, file_bytes: bytes, filename: str, x_ai_provider: str, x_ai_key: str, x_ai_escalation_provider: str, x_ai_escalation_key: str):
+    try:
+        import os
+        os.makedirs('logs', exist_ok=True)
+        
+        filename_lower = filename.lower()
+        ext = 'xlsx' if (filename_lower.endswith('.xlsx') or filename_lower.endswith('.xls')) else 'pdf'
+        with open(f'logs/debug_uploaded_rak.{ext}', 'wb') as f:
+            f.write(file_bytes)
+
+        text_to_parse = ""
+        pdf_type = ""
+
+        # EXCEL Parsing
+        if filename_lower.endswith('.xlsx') or filename_lower.endswith('.xls'):
+            try:
+                text_to_parse, _ = parse_excel(file_bytes)
+                pdf_type = 'excel'
+            except Exception as e:
+                parse_jobs[job_id] = {"status": "error", "error": f'Gagal memproses file Excel: {str(e)}'}
+                return
+        
+        # PDF Parsing
+        elif filename_lower.endswith('.pdf'):
+            doc = None
+            try:
+                doc = fitz.open(stream=file_bytes, filetype='pdf')
+                total_chars = sum(len(p.get_text().strip()) for p in doc)
+                is_scan = total_chars < 100
+                
+                if is_scan:
+                    doc.close()
+                    text_to_parse, _ = ocr_pdf(file_bytes)
+                    pdf_type = 'scan'
+                else:
+                    text_to_parse = "\n".join(page.get_text() for page in doc)
+                    pdf_type = 'native'
+                    try: doc.close()
+                    except: pass
+            except Exception as e:
+                if doc is not None and not getattr(doc, 'is_closed', False):
+                    try: doc.close()
+                    except: pass
+                parse_jobs[job_id] = {"status": "error", "error": f'Gagal mengekstrak beraks PDF RAK: {str(e)}'}
+                return
+        else:
+            parse_jobs[job_id] = {"status": "error", "error": 'Format beraks tidak didukung.'}
+            return
+
+        # Coba gunakan Native Regex Parsing terlebih dahulu
+        all_items = native_parse_rak(text_to_parse)
+        pesan_error = ""
+
+        # Jika native parser gagal mendeteksi baris RAK (kemungkinan karena format kacau),
+        # baru kita gunakan AI sebagai fallback
+        if len(all_items) == 0:
+            print("Native Regex gagal, fallback menggunakan AI Parsing...")
+            lines = text_to_parse.split('\n')
+            chunk_size = 150
+            chunks = ['\n'.join(lines[i:i + chunk_size]) for i in range(0, len(lines), chunk_size)]
+            
+            import time
+            for idx, chunk in enumerate(chunks):
+                if len(chunk.strip()) < 50:
+                    continue
+                    
+                print(f"RAK Parsing chunk {idx+1}/{len(chunks)}")
+                items = refine_rak_with_ai(chunk, x_ai_provider, x_ai_key)
+                
+                # Fallback
+                if not items and x_ai_escalation_provider and x_ai_escalation_key:
+                    print(f"RAK Fallback to {x_ai_escalation_provider}")
+                    time.sleep(1) # delay before fallback
+                    items = refine_rak_with_ai(chunk, x_ai_escalation_provider, x_ai_escalation_key)
+                    
+                if items:
+                    all_items.extend(items)
+                else:
+                    pesan_error = " Beberapa chunk gagal di ekstrak oleh AI."
+                    
+                if idx < len(chunks) - 1:
+                    time.sleep(3)
+
+        if not all_items:
+            parse_jobs[job_id] = {"status": "error", "error": 'Gagal mengekstrak data RAK menggunakan AI.'}
+            return
+
+        meta = extract_global_metadata(text_to_parse)
+
+        result = ParseRakResult(
+            success=True,
+            filename=filename,
+            pdf_type=pdf_type,
+            program=meta.get("program"),
+            kegiatan=meta.get("kegiatan"),
+            sub_kegiatan=meta.get("sub_kegiatan"),
+            nama_skpd=meta.get("nama_skpd"),
+            nilai_anggaran=meta.get("nilai_anggaran"),
+            rak_items=all_items,
+            pesan=f"Berhasil mengekstrak {len(all_items)} baris RAK.{pesan_error}"
+        )
+        parse_jobs[job_id] = {"status": "completed", "result": result.dict()}
+    except Exception as e:
+        parse_jobs[job_id] = {"status": "error", "error": f"Unhandled error: {str(e)}"}
+
+from fastapi import BackgroundTasks
+
+@app.post('/parse-rak', response_model=ParseJobResponse)
+async def parse_rak(background_tasks: BackgroundTasks, file: UploadFile = File(...), x_ai_provider: Optional[str] = Header(None), x_ai_key: Optional[str] = Header(None), x_ai_escalation_provider: Optional[str] = Header(None), x_ai_escalation_key: Optional[str] = Header(None)):
+    if not file:
+        raise HTTPException(400, 'Beraks kosong.')
+    if not x_ai_provider or not x_ai_key:
+        raise HTTPException(400, 'AI Provider dan AI Key wajib dikirimkan untuk RAK.')
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(400, 'Beraks kosong.')
+        
+    job_id = str(uuid.uuid4())
+    parse_jobs[job_id] = {"status": "processing", "result": None, "error": None}
+    
+    background_tasks.add_task(background_parse_rak, job_id, file_bytes, file.filename, x_ai_provider, x_ai_key, x_ai_escalation_provider, x_ai_escalation_key)
+    return ParseJobResponse(job_id=job_id, status="processing")
+
+@app.get('/parse-rak/status/{job_id}')
+def get_parse_rak_status(job_id: str):
+    if job_id not in parse_jobs:
+        raise HTTPException(404, "Job not found")
+    return parse_jobs[job_id]
+
 
 
 # ── AI Rincian Alignment Endpoint ──────────────────────────────────────────
@@ -1367,7 +1691,7 @@ async def align_rincian(req: AlignRequest):
             delta = req.target_pagu - current_total
             
             if delta != 0 and len(upd) > 0:
-                # Distribusi proporsional: sebarkan selisih ke semua item secara proporsional
+                # Distribusi proporsional: sebarakn selisih ke semua item secara proporsional
                 if current_total > 0:
                     for i in range(len(upd)):
                         proportion = upd[i]['harga_total'] / current_total

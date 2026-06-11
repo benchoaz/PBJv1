@@ -1201,7 +1201,7 @@ export default function Step3RincianHPS() {
   return (
     <>
       {/* Step 3: HPS Formulation & Technical Specification */}
-          <div className={`bg-white border border-slate-200 rounded-2xl p-8 shadow-sm transition-all duration-300 ${step < 3 ? 'opacity-50 pointer-events-none' : 'animate-slide-up'}`}>
+          <div className={`bg-white border border-slate-200 rounded-2xl p-4 sm:p-8 shadow-sm transition-all duration-300 ${step < 3 ? 'opacity-50 pointer-events-none' : 'animate-slide-up'}`}>
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-300 flex items-center justify-center shrink-0">
@@ -1510,9 +1510,9 @@ export default function Step3RincianHPS() {
                     })()}
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left border-collapse">
-                      <thead>
+                  <div className="w-full">
+                    <table className="w-full text-xs text-left border-collapse block md:table md:min-w-[800px]">
+                      <thead className="hidden md:table-header-group">
                         <tr className="text-slate-500 border-b border-slate-200 font-bold uppercase text-[9px] tracking-wider bg-slate-50/50">
                           <th className="py-2.5 px-3 w-8 text-center rounded-l-xl">No</th>
                           <th className="py-2.5 px-2">Nama Barang / Rincian DPA</th>
@@ -1523,7 +1523,7 @@ export default function Step3RincianHPS() {
                           <th className="py-2.5 px-3 text-right rounded-r-xl">Total Tayang E-Katalog (Rp)</th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="block md:table-row-group">
                         {(() => {
                           const items = getPackageItems(selectedPack)
                           const activeData = getActiveSurveyData()
@@ -1544,9 +1544,12 @@ export default function Step3RincianHPS() {
 
                             return (
                               <React.Fragment key={item.no || idx}>
-                              <tr className={`border-b border-slate-100 hover:bg-slate-50/60 transition-colors ${isOverbudget ? 'bg-rose-50/50' : ''}`}>
-                                <td className="py-3 px-3 text-center text-slate-400 font-bold">{idx + 1}</td>
-                                <td className="py-3 px-2 text-slate-800">
+                              <tr className={`block md:table-row bg-white md:bg-transparent border border-slate-200 md:border-x-0 md:border-t-0 md:border-b-slate-100 rounded-xl md:rounded-none mb-4 md:mb-0 p-4 md:p-0 relative hover:bg-slate-50/60 transition-colors ${isOverbudget ? 'bg-rose-50/50' : ''}`}>
+                                <td className="hidden md:table-cell py-3 px-3 text-center text-slate-400 font-bold">{idx + 1}</td>
+                                <td className="block md:table-cell py-2 md:py-3 px-0 md:px-2 text-slate-800">
+                                  <div className="md:hidden flex justify-between items-center mb-2 border-b border-dashed border-slate-200 pb-2">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Item #{idx + 1}</span>
+                                  </div>
                                   <div className="font-bold">{item.name}</div>
                                   <span className="text-[10px] text-slate-450 block font-normal mt-0.5 mb-2">Satuan: {item.unit}</span>
                                   
@@ -1588,7 +1591,8 @@ export default function Step3RincianHPS() {
                                     </div>
                                   </div>
                                 </td>
-                                <td className="py-3 px-2">
+                                <td className="block md:table-cell py-3 px-0 md:px-2 border-t border-dashed border-slate-200 md:border-0 mt-3 md:mt-0 pt-3 md:pt-0">
+                                  <div className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Referensi e-Katalog:</div>
                                   {surveyItem && surveyItem.success && surveyItem.vendor !== 'TIDAK DITEMUKAN' ? (
                                     <div className="flex flex-col gap-0.5">
                                       <span className="text-[10px] font-bold text-slate-700 truncate max-w-[150px] flex items-center gap-1" title={surveyItem.vendor}>
@@ -1702,8 +1706,10 @@ export default function Step3RincianHPS() {
                                     </button>
                                   )}
                                 </td>
-                                <td className="py-3 px-2 text-center font-bold text-slate-700">
-                                  <input
+                                <td className="block md:table-cell py-2 md:py-3 px-0 md:px-2 text-left md:text-center font-bold text-slate-700">
+                                  <div className="flex md:block items-center justify-between mt-2 md:mt-0 pt-2 md:pt-0 border-t border-dashed border-slate-200 md:border-0">
+                                    <span className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider inline-block w-32">Qty:</span>
+                                    <input
                                     type="number"
                                     value={item.qty === undefined ? '' : item.qty}
                                     onChange={(e) => {
@@ -1720,15 +1726,20 @@ export default function Step3RincianHPS() {
                                         setIsSigned(false);
                                       }
                                     }}
-                                    className="w-16 mx-auto bg-slate-50 border border-slate-200 text-slate-800 rounded-lg py-1 px-2 text-xs font-bold text-center focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                                    className="w-16 mx-0 md:mx-auto bg-slate-50 border border-slate-200 text-slate-800 rounded-lg py-1 px-2 text-xs font-bold text-center focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                                     min="0"
                                     title="Ketik 0 jika item ini tidak jadi dipesan di paket ini"
                                   />
+                                  </div>
                                 </td>
-                                <td className={`py-3 px-2 text-right font-mono transition-colors ${unitHpsPrice !== item.price ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  Rp&nbsp;{(item.price || 0).toLocaleString()}
+                                <td className={`block md:table-cell py-2 md:py-3 px-0 md:px-2 text-left md:text-right font-mono transition-colors ${unitHpsPrice !== item.price ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  <div className="flex md:block items-center justify-between">
+                                    <span className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider inline-block w-32 font-sans">Pagu DPA:</span>
+                                    <span>Rp&nbsp;{(item.price || 0).toLocaleString()}</span>
+                                  </div>
                                 </td>
-                                <td className="py-3 px-4 text-right">
+                                <td className="block md:table-cell py-2 md:py-3 px-0 md:px-4 text-right mt-2 md:mt-0">
+                                  <div className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-left">Harga Tayang Survei:</div>
                                   <div className="relative inline-block w-full">
                                     <span className={`absolute left-3 top-1/2 -translate-y-1/2 font-bold text-[10px] ${isOverbudget ? 'text-rose-500' : (unitHpsPrice < item.price ? 'text-emerald-500' : 'text-slate-400')}`}>Rp</span>
                                     <input
@@ -1748,15 +1759,18 @@ export default function Step3RincianHPS() {
                                   </div>
                                   {isOverbudget && <div className="text-[9px] font-bold text-rose-500 text-right mt-1 animate-pulse">⚠️ Melebihi Pagu</div>}
                                 </td>
-                                <td className={`py-3 px-3 text-right font-mono font-bold transition-colors ${isOverbudget ? 'text-rose-600' : (unitHpsPrice < item.price ? 'text-emerald-600' : 'text-indigo-650')}`}>
-                                  Rp&nbsp;{totalHpsItem.toLocaleString()}
+                                <td className={`block md:table-cell py-2 md:py-3 px-0 md:px-3 text-right font-mono font-bold transition-colors ${isOverbudget ? 'text-rose-600' : (unitHpsPrice < item.price ? 'text-emerald-600' : 'text-indigo-650')}`}>
+                                  <div className="flex md:block items-center justify-between mt-2 md:mt-0 pt-2 md:pt-0 border-t border-dashed border-slate-200 md:border-0">
+                                    <span className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider font-sans">Total Tayang:</span>
+                                    <span className="text-sm md:text-xs">Rp&nbsp;{totalHpsItem.toLocaleString()}</span>
+                                  </div>
                                 </td>
                               </tr>
                               
                               {/* EXPANDED ACCORDION ROW */}
                               {isRowExpanded && surveyItem && (
-                                <tr>
-                                  <td colSpan="7" className="p-0 border-b border-slate-100">
+                                <tr className="block md:table-row">
+                                  <td colSpan="7" className="block md:table-cell p-0 border-b border-slate-100 md:mt-0">
                                     <div className="bg-slate-50/80 p-4 border-l-4 border-l-indigo-400 shadow-inner">
                                       <div className="flex flex-col lg:flex-row gap-6">
                                         
@@ -2813,10 +2827,10 @@ export default function Step3RincianHPS() {
 
                       
                       {isAiEditorOpen && (
-                        <div className="bg-white rounded-xl border border-blue-100 p-5 mt-4 shadow-sm animate-fade-in space-y-5">
-                          <div className="flex items-center justify-between mb-2">
+                        <div className="bg-white rounded-xl border border-blue-100 p-3 sm:p-5 mt-4 shadow-sm animate-fade-in space-y-5">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
                             <h4 className="text-sm font-bold text-slate-800">Penyusunan Klausul & Spesifikasi Teknis</h4>
-                            <button onClick={handleApplyDefaults} className="text-[10px] text-slate-500 hover:text-slate-700 underline font-medium">Reset ke Teks Standar</button>
+                            <button onClick={handleApplyDefaults} className="text-[10px] text-slate-500 hover:text-slate-700 underline font-medium self-start sm:self-auto">Reset ke Teks Standar</button>
                           </div>
                           
                           {/* Justifikasi Teknis Merek */}

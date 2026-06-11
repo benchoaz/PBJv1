@@ -46,7 +46,7 @@ func (h *SirupHandler) GetSirupPackages(w http.ResponseWriter, r *http.Request) 
 
 	// Fetch up to 2000 records via survey-service (Puppeteer) to bypass IP block
 	lkppURL := fmt.Sprintf(
-		"http://survey-service:3001/api/survey/sirup/%s?tahun=%s",
+		"http://127.0.0.1:3001/api/survey/sirup/%s?tahun=%s",
 		satkerID,
 		tahun,
 	)

@@ -12,6 +12,8 @@ import ProcurementPanel from './components/ProcurementPanel'
 import OcrApiKeyManager from './components/OcrApiKeyManager'
 import TemplateSuratManager from './components/TemplateSuratManager'
 import VendorPerformance from './components/VendorPerformance'
+import ProxyTester from './pages/ProxyTester'
+import RAKDashboard from './components/budget/RAKDashboard'
 
 import { Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
@@ -79,6 +81,7 @@ function App() {
         }`}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/proxy-tester" element={<ProxyTester />} />
             <Route path="/" element={<ProtectedRoute><ProjectList /></ProtectedRoute>} />
             <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
             <Route path="/reports/absorption" element={<ProtectedRoute><RealisasiAnggaranPanel /></ProtectedRoute>} />
@@ -88,6 +91,7 @@ function App() {
             <Route path="/pp/panel" element={<ProtectedRoute allowedRoles={['Admin', 'PP']}><ProcurementPanel /></ProtectedRoute>} />
             <Route path="/admin/ocr" element={<ProtectedRoute allowedRoles={['Admin', 'PPK', 'PP']}><OcrApiKeyManager /></ProtectedRoute>} />
             <Route path="/admin/templates" element={<ProtectedRoute allowedRoles={['Admin', 'PPK', 'PP']}><TemplateSuratManager /></ProtectedRoute>} />
+            <Route path="/budget" element={<ProtectedRoute allowedRoles={['Admin', 'PPK', 'PP']}><RAKDashboard /></ProtectedRoute>} />
           </Routes>
         </main>
       </div>

@@ -95,18 +95,26 @@ async function autoScroll(page) {
 let _sharedBrowser = null;
 let _currentProxy = null; // Menyimpan status proxy saat ini
 
-async function getSharedBrowser(proxyUrl = null) {
+async function getSharedBrowser(proxyStr = null) {
+  let proxyHostPort = proxyStr;
+  
+  // Deteksi format IP:PORT:USER:PASS
+  if (proxyStr && proxyStr.split(':').length === 4) {
+    const parts = proxyStr.split(':');
+    proxyHostPort = `${parts[0]}:${parts[1]}`;
+  }
+
   // Jika browser sudah jalan tapi setting proxynya BERBEDA, kita matikan dulu
-  if (_sharedBrowser && _sharedBrowser.isConnected() && _currentProxy !== proxyUrl) {
-    console.log(`[BrowserPool] Mengganti proxy dari ${_currentProxy || 'TIDAK ADA'} menjadi ${proxyUrl || 'TIDAK ADA'}. Mematikan browser lama...`);
+  if (_sharedBrowser && _sharedBrowser.isConnected() && _currentProxy !== proxyStr) {
+    console.log(`[BrowserPool] Mengganti proxy dari ${_currentProxy || 'TIDAK ADA'} menjadi ${proxyStr || 'TIDAK ADA'}. Mematikan browser lama...`);
     try { await _sharedBrowser.close(); } catch(e) {}
     _sharedBrowser = null;
   }
 
   if (_sharedBrowser && _sharedBrowser.isConnected()) return _sharedBrowser;
   
-  console.log(`[BrowserPool] Meluncurkan browser instance baru... (Proxy: ${proxyUrl || 'TIDAK ADA'})`);
-  _currentProxy = proxyUrl;
+  console.log(`[BrowserPool] Meluncurkan browser instance baru... (Proxy: ${proxyHostPort || 'TIDAK ADA'})`);
+  _currentProxy = proxyStr;
   
   const args = [
     '--no-sandbox',
@@ -118,8 +126,8 @@ async function getSharedBrowser(proxyUrl = null) {
     '--max_old_space_size=512',
   ];
 
-  if (proxyUrl) {
-    args.push(`--proxy-server=${proxyUrl}`);
+  if (proxyHostPort) {
+    args.push(`--proxy-server=${proxyHostPort}`);
   }
 
   _sharedBrowser = await puppeteer.launch({
@@ -139,12 +147,17 @@ async function getSharedBrowser(proxyUrl = null) {
  * Setiap context memiliki cookie, cache, dan storage sendiri.
  * Panggil closePage(context) setelah selesai untuk membebaskan memori.
  */
-async function createIsolatedPage(proxyUrl = null) {
-  const browser = await getSharedBrowser(proxyUrl);
+async function createIsolatedPage(proxyStr = null) {
+  const browser = await getSharedBrowser(proxyStr);
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
   await page.setViewport({ width: 1280, height: 900 });
   await page.setUserAgent(USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)]);
+
+  if (proxyStr && proxyStr.split(':').length === 4) {
+    const parts = proxyStr.split(':');
+    await page.authenticate({ username: parts[2], password: parts[3] });
+  }
 
   // Request Interception: Blokir aset tidak relevan untuk mempercepat loading
   await page.setRequestInterception(true);
@@ -1599,49 +1612,118 @@ app.post('/api/survey/test-proxies', async (req, res) => {
     return res.status(400).json({ error: 'Array proxies dibutuhkan' });
   }
 
-  // Uji maksimal 20 proxy sekaligus untuk efisiensi
-  const proxiesToTest = proxies.slice(0, 20);
-  console.log(`[Proxy Tester] Menguji ${proxiesToTest.length} proxy...`);
+  const proxiesToTest = proxies.slice(0, 20); // Batasi 20 untuk menghindari timeout
+  console.log(`[Proxy Tester] Menguji ${proxiesToTest.length} proxy terhadap E-Katalog + INAPROC...`);
 
-  const results = await Promise.all(proxiesToTest.map(async (proxyStr) => {
-    let cleanProxy = proxyStr.trim();
+  const categorizeSpeed = (latency) => {
+    if (latency < 1500) return 'fast';
+    if (latency < 4000) return 'medium';
+    return 'slow';
+  };
+
+  const getCountry = async (ip) => {
+    try {
+      const r = await axios.get(`http://ip-api.com/json/${ip}?fields=countryCode`, { timeout: 3000 });
+      return r.data && r.data.countryCode ? r.data.countryCode : '--';
+    } catch (e) { return '--'; }
+  };
+
+  const testProxy = async (proxyStr) => {
+    const cleanProxy = proxyStr.trim();
     if (!cleanProxy) return null;
 
-    let agent;
+    const parts = cleanProxy.split(':');
+    const ip = parts[0];
+    const port = parts[1] || '80';
+    const user = parts[2] || '';
+    const pass = parts[3] || '';
+
+    let proxyUrl = `http://${ip}:${port}`;
+    if (user && pass) {
+      proxyUrl = `http://${user}:${pass}@${ip}:${port}`;
+    }
+
+    let agentHttp, agentHttps;
     try {
       if (cleanProxy.startsWith('socks')) {
-        agent = new SocksProxyAgent(cleanProxy);
+        agentHttp = new SocksProxyAgent(cleanProxy);
+        agentHttps = new SocksProxyAgent(cleanProxy);
       } else {
-        if (!cleanProxy.startsWith('http')) cleanProxy = 'http://' + cleanProxy;
-        agent = new HttpsProxyAgent(cleanProxy); // E-katalog is HTTPS
+        agentHttp = new HttpProxyAgent(proxyUrl);
+        agentHttps = new HttpsProxyAgent(proxyUrl);
       }
     } catch (e) {
-      return { proxy: proxyStr, status: 'invalid_format' };
+      return { proxy: cleanProxy, ip, port, status: 'invalid', level: '-', speed: '-', country: '--', https: false, inaproc: false, latency: 0 };
     }
+
+    const reqHeaders = {
+      'User-Agent': USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)],
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'id-ID,id;q=0.9,en;q=0.8',
+    };
+
+    let ekatalogStatus = 'dead';
+    let latency = 9999;
+    let httpsOk = false;
 
     const start = Date.now();
     try {
-      const response = await axios.get('https://e-katalog.lkpp.go.id/', {
-        httpsAgent: agent,
-        httpAgent: agent,
-        timeout: 10000,
-        headers: {
-          'User-Agent': USER_AGENTS[0],
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
-        }
+      const resp = await axios.get('https://e-katalog.lkpp.go.id/', {
+        httpsAgent: agentHttps, httpAgent: agentHttp,
+        timeout: 5000, headers: reqHeaders, validateStatus: () => true,
       });
-      const latency = Date.now() - start;
-      return { proxy: proxyStr, status: 'alive', latency, code: response.status };
+      latency = Date.now() - start;
+      if (resp.status === 200) { ekatalogStatus = 'alive'; httpsOk = true; }
+      else if (resp.status === 403) { ekatalogStatus = 'blocked_waf'; }
+      else { ekatalogStatus = 'dead'; }
     } catch (err) {
-      const latency = Date.now() - start;
-      if (err.response && err.response.status === 403) {
-        return { proxy: proxyStr, status: 'blocked_waf', latency, code: 403 };
-      }
-      return { proxy: proxyStr, status: 'dead', latency, error: err.code || err.message };
+      latency = Date.now() - start;
+      if (err.response && err.response.status === 403) ekatalogStatus = 'blocked_waf';
+      else ekatalogStatus = 'dead';
     }
-  }));
 
-  res.json({ results: results.filter(Boolean) });
+    let inaprocStatus = false;
+    try {
+      const iResp = await axios.get('https://inaproc.lkpp.go.id/', {
+        httpsAgent: agentHttps, httpAgent: agentHttp,
+        timeout: 5000, headers: reqHeaders, validateStatus: () => true,
+      });
+      inaprocStatus = (iResp.status === 200 || iResp.status === 302);
+    } catch (e) { inaprocStatus = false; }
+
+    const country = '--'; // Country lookup dinonaktifkan untuk mengurangi waktu
+
+    const level = ekatalogStatus === 'alive' ? 'Anonymous' : (ekatalogStatus === 'blocked_waf' ? 'Detected' : '-');
+    return {
+      proxy: cleanProxy, ip, port,
+      status: ekatalogStatus,
+      level,
+      speed: latency < 9999 ? categorizeSpeed(latency) : '-',
+      country, https: httpsOk, inaproc: inaprocStatus,
+      latency: latency < 9999 ? latency : null,
+    };
+  };
+
+  const results = [];
+  const batchSize = 10;
+  for (let i = 0; i < proxiesToTest.length; i += batchSize) {
+    const batch = proxiesToTest.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(testProxy));
+    results.push(...batchResults.filter(Boolean));
+  }
+
+  results.sort((a, b) => {
+    const score = (r) => {
+      if (r.inaproc && r.status === 'alive') return 4;
+      if (r.status === 'alive') return 3;
+      if (r.status === 'blocked_waf') return 2;
+      if (r.status === 'dead') return 1;
+      return 0;
+    };
+    return score(b) - score(a) || (a.latency || 9999) - (b.latency || 9999);
+  });
+
+  res.json({ results });
 });
 
 app.get('/api/survey/sirup/:satkerId', async (req, res) => {

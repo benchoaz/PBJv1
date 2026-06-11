@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import ProxyTesterModal from './ProxyTesterModal'
 
 const STATUS_CONFIG = {
   'Draft':               { color: 'text-sky-700 bg-sky-50 border-sky-200',         dot: 'bg-sky-400',      label: 'Draft' },
@@ -20,7 +19,6 @@ export default function ProjectList() {
   const [filterStatus, setFilterStatus] = useState('Semua')
   const [isUpdating, setIsUpdating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [isProxyTesterOpen, setIsProxyTesterOpen] = useState(false)
   const [view, setView]           = useState('table') // 'table' | 'card'
   const [ppkSignModal, setPpkSignModal] = useState(null) // project object or null
   const [ppkSignMethod, setPpkSignMethod] = useState('scan')
@@ -251,13 +249,6 @@ export default function ProjectList() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsProxyTesterOpen(true)}
-              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-slate-200 transition-all hover:scale-[1.02] active:scale-95"
-            >
-              <span className="text-lg">🛡️</span>
-              <span className="hidden sm:inline">Proxy Tester</span>
-            </button>
             {user?.role !== 'PP' && (
               <button
                 onClick={() => {
@@ -655,11 +646,6 @@ export default function ProjectList() {
           Sistem Manajemen PBJ — E-Purchasing Katalog Elektronik LKPP
         </div>
       </div>
-      <ProxyTesterModal 
-        isOpen={isProxyTesterOpen} 
-        onClose={() => setIsProxyTesterOpen(false)} 
-        onSave={() => console.log('Proxy saved')}
-      />
     </div>
     {/* ═══════════════════════════════════════════════════════════
         MODAL TANDA TANGAN PPK

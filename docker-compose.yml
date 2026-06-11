@@ -3,20 +3,17 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    networks:
-      - pbj-network
+    network_mode: "host"
+    volumes:
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf
     restart: unless-stopped
+
 
   dpa-parser:
     build:
       context: ./dpa-parser
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    networks:
-      - pbj-network
+    network_mode: "host"
     restart: unless-stopped
     volumes:
       - paddlex-cache:/root/.paddlex
@@ -26,25 +23,18 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "8081:8081"
-    networks:
-      - pbj-network
+    network_mode: "host"
     environment:
-      - DATABASE_URL=host=db port=5432 user=postgres password=${DB_PASSWORD} dbname=${DB_NAME} sslmode=disable
+      - DATABASE_URL=host=localhost port=5432 user=postgres password=${DB_PASSWORD} dbname=${DB_NAME} sslmode=disable
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
       - PORT=8081
-      - DPA_PARSER_URL=http://dpa-parser:8000
-    depends_on:
-      - db
-      - dpa-parser
+      - DPA_PARSER_URL=http://localhost:8000
     restart: unless-stopped
 
   db:
     image: docker.io/library/postgres:17-alpine
-    networks:
-      - pbj-network
+    network_mode: "host"
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -57,66 +47,49 @@ services:
     build:
       context: ./scraper
       dockerfile: Dockerfile
-    networks:
-      - pbj-network
+    network_mode: "host"
     environment:
-      - DB_HOST=db
+      - DB_HOST=localhost
       - DB_PORT=5432
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - N8N_WEBHOOK_URL=http://n8n:5678/webhook/sirup-data
       - SCRAPE_INTERVAL=${SCRAPE_INTERVAL}
-    depends_on:
-      - db
-    restart: unless-stopped
-
-  n8n:
-    image: n8nio/n8n:latest
-    ports:
-      - "5678:5678"
-    networks:
-      - pbj-network
-    environment:
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_ADMIN_USER}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_ADMIN_PASSWORD}
-      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=db
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=n8n_db
-      - DB_POSTGRESDB_USER=${DB_USER}
-      - DB_POSTGRESDB_PASSWORD=${DB_PASSWORD}
-    depends_on:
-      - db
+#    links:
+#      - db
+#      - dpa-parser
+#    depends_on:
+#      - db
     restart: unless-stopped
 
   survey-service:
     build:
       context: ./survey-service
       dockerfile: Dockerfile
-    networks:
-      - pbj-network
+    network_mode: "host"
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=localhost
       - REDIS_PORT=6379
+      - PUPPETEER_EXECUTABLE_PATH=/home/pptruser/.cache/puppeteer/chrome/linux-149.0.7827.22/chrome-linux64/chrome
     volumes:
       - ./frontend/public/screenshots:/app/screenshots
       - ./survey-service/server.js:/app/server.js
-    depends_on:
-      - redis
+#    links:
+#      - db
+#      - dpa-parser
+#    depends_on:
+#      - redis
     restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    networks:
-      - pbj-network
+    network_mode: "host"
     restart: unless-stopped
 
-networks:
-  pbj-network:
-    driver: bridge
+# networks:
+#   podman:
+#     external: true
 
 volumes:
   paddlex-cache:

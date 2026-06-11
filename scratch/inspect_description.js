@@ -7,19 +7,18 @@ const client = new Client({
   port: 5432,
 });
 client.connect().then(async () => {
-  const res = await client.query("SELECT id, name, description FROM projects ORDER BY id DESC LIMIT 2");
+  const res = await client.query("SELECT id, name, status, description FROM projects");
   for (const row of res.rows) {
-    console.log(`\n================= Project ID ${row.id} (${row.name}) =================`);
-    const parsed = JSON.parse(row.description);
-    console.log("Keys in description:", Object.keys(parsed));
-    if (parsed.items) {
-      console.log("Items in description:", parsed.items.map(item => ({
-        name: item.name,
-        qty: item.qty,
-        price: item.price,
-        paguDpa: item.paguDpa,
-        dpa_price: item.dpa_price
-      })));
+    console.log(`ID: ${row.id}, Name: ${row.name}, Status: ${row.status}`);
+    try {
+      const parsed = JSON.parse(row.description);
+      console.log("  Keys:", Object.keys(parsed));
+      console.log("  has comparisons:", !!parsed.comparisons);
+      if (parsed.comparisons) {
+        console.log("  comparisons:", JSON.stringify(parsed.comparisons, null, 2));
+      }
+    } catch(e) {
+      console.log("  Error parsing JSON");
     }
   }
   client.end();

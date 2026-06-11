@@ -43,10 +43,17 @@ func main() {
 		&models.PackageItem{},
 		&models.SurveyResult{},
 		&models.AppSetting{},
-		&models.Project{}, // Added Project here
+		&models.Project{},
 		&models.ProjectItem{},
 		&models.ProjectItemSurvey{},
 		&models.VendorLocation{},
+		// Budget Integration (SIRUP-DPA-RKA)
+		&models.RakDocument{},
+		&models.BudgetAccount{},
+		&models.DpaAccountSaved{},
+		&models.DpaItemSaved{},
+		&models.SirupPackageSaved{},
+		&models.BudgetRealization{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate models: %v", err)
@@ -85,6 +92,7 @@ func main() {
 	reportHandler := handlers.NewReportHandler(gormDB)
 	vendorReportHandler := handlers.NewVendorReportHandler(gormDB)
 	sirupHandler := handlers.NewSirupHandler(gormDB)
+	budgetHandler := handlers.NewBudgetHandler(gormDB)
 
 	mux := http.NewServeMux()
 
@@ -160,6 +168,35 @@ func main() {
 	mux.HandleFunc("GET /api/sirup/satker/{id}", sirupHandler.GetSirupPackages)
 	mux.HandleFunc("POST /api/sirup/satker/{id}", sirupHandler.ImportSirupPackages)
 	mux.HandleFunc("OPTIONS /api/sirup/satker/{id}", sirupHandler.Options)
+
+	// ── Budget Integration: DPA saved to DB ──────────────────────────────────
+	mux.HandleFunc("POST /api/dpa/accounts/save", budgetHandler.SaveDpaAccounts)
+	mux.HandleFunc("GET /api/dpa/accounts", budgetHandler.GetDpaAccounts)
+	mux.HandleFunc("OPTIONS /api/dpa/accounts", budgetHandler.Options)
+	mux.HandleFunc("OPTIONS /api/dpa/accounts/save", budgetHandler.Options)
+
+	// ── Budget Integration: SIRUP saved to DB ────────────────────────────────
+	mux.HandleFunc("POST /api/sirup/save", budgetHandler.SaveSirupPackages)
+	mux.HandleFunc("GET /api/sirup/saved", budgetHandler.GetSirupPackagesSaved)
+	mux.HandleFunc("OPTIONS /api/sirup/save", budgetHandler.Options)
+	mux.HandleFunc("OPTIONS /api/sirup/saved", budgetHandler.Options)
+
+	// ── Budget Integration: RKA Anggaran Kas ─────────────────────────────────
+	mux.HandleFunc("POST /api/rak/accounts", budgetHandler.SaveRakAccounts)
+	mux.HandleFunc("GET /api/rak/accounts", budgetHandler.GetRakAccounts)
+	mux.HandleFunc("POST /api/rak/parse-ai", budgetHandler.ParseRakAi)
+	mux.HandleFunc("GET /api/rak/parse-status", budgetHandler.GetRakParseStatus)
+	mux.HandleFunc("OPTIONS /api/rak/accounts", budgetHandler.Options)
+	mux.HandleFunc("OPTIONS /api/rak/parse-ai", budgetHandler.Options)
+	mux.HandleFunc("OPTIONS /api/rak/parse-status", budgetHandler.Options)
+
+	// ── Budget Integration: Realization ──────────────────────────────────────
+	mux.HandleFunc("POST /api/rak/realization", budgetHandler.SaveRealization)
+	mux.HandleFunc("OPTIONS /api/rak/realization", budgetHandler.Options)
+
+	// ── Budget Integration: Rekening Dashboard ───────────────────────────────
+	mux.HandleFunc("GET /api/rekening/{kode}", budgetHandler.GetRekeningSummary)
+	mux.HandleFunc("OPTIONS /api/rekening/{kode}", budgetHandler.Options)
 
 	// AI Survey endpoint
 	mux.HandleFunc("POST /api/survey/run", handlers.RunSurvey)

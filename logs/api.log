@@ -1,0 +1,44 @@
+nohup: ignoring input
+
+2026/06/09 19:28:00 [35m/home/beni/PBJ/backend/cmd/server/main.go:23
+[0m[31m[error] [0mfailed to initialize database, got error failed to connect to `user=postgres database=pbj`: 127.0.0.1:5432 (localhost): server error: FATAL: database "pbj" does not exist (SQLSTATE 3D000)
+2026/06/09 19:28:00 Failed to connect to database via GORM: failed to connect to `user=postgres database=pbj`: 127.0.0.1:5432 (localhost): server error: FATAL: database "pbj" does not exist (SQLSTATE 3D000)
+nohup: ignoring input
+2026/06/09 19:35:59 Connected to PostgreSQL via GORM
+
+2026/06/09 19:35:59 [32m/home/beni/PBJ/backend/cmd/server/main.go:40 [33mSLOW SQL >= 200ms
+[0m[31;1m[242.607ms] [33m[rows:1][35m SELECT count(*) FROM information_schema.tables WHERE table_schema = CURRENT_SCHEMA() AND table_name = 'users' AND table_type = 'BASE TABLE'[0m
+2026/06/09 19:36:00 Server starting on :8081
+
+2026/06/09 19:38:11 [31;1m/home/beni/PBJ/backend/internal/handlers/setting_handler.go:29 [35;1mrecord not found
+[0m[33m[5.539ms] [34;1m[rows:0][0m SELECT * FROM "app_settings" WHERE key = 'ocr_api_keys_satker_67081' ORDER BY "app_settings"."key" LIMIT 1
+
+2026/06/09 19:38:11 [31;1m/home/beni/PBJ/backend/internal/handlers/setting_handler.go:29 [35;1mrecord not found
+[0m[33m[0.732ms] [34;1m[rows:0][0m SELECT * FROM "app_settings" WHERE key = 'ocr_api_keys' ORDER BY "app_settings"."key" LIMIT 1
+
+2026/06/09 19:39:40 [31;1m/home/beni/PBJ/backend/internal/handlers/setting_handler.go:29 [35;1mrecord not found
+[0m[33m[1.027ms] [34;1m[rows:0][0m SELECT * FROM "app_settings" WHERE key = 'ocr_api_keys_satker_67081' ORDER BY "app_settings"."key" LIMIT 1
+
+2026/06/09 20:24:09 [31;1m/home/beni/PBJ/backend/internal/handlers/setting_handler.go:29 [35;1mrecord not found
+[0m[33m[62.749ms] [34;1m[rows:0][0m SELECT * FROM "app_settings" WHERE key = 'ocr_api_keys_satker_67081' ORDER BY "app_settings"."key" LIMIT 1
+
+2026/06/09 20:24:11 [32m/home/beni/PBJ/backend/internal/repository/projects.go:152 [33mSLOW SQL >= 200ms
+[0m[31;1m[428.514ms] [33m[rows:8][35m SELECT * FROM "project_items" WHERE project_id = 2[0m
+
+2026/06/09 20:27:03 [31;1m/home/beni/PBJ/backend/internal/handlers/setting_handler.go:29 [35;1mrecord not found
+[0m[33m[0.952ms] [34;1m[rows:0][0m SELECT * FROM "app_settings" WHERE key = 'ocr_api_keys_satker_67081' ORDER BY "app_settings"."key" LIMIT 1
+
+2026/06/09 21:26:59 [31;1m/home/beni/PBJ/backend/internal/handlers/setting_handler.go:29 [35;1mrecord not found
+[0m[33m[24.307ms] [34;1m[rows:0][0m SELECT * FROM "app_settings" WHERE key = 'ocr_api_keys_satker_67081' ORDER BY "app_settings"."key" LIMIT 1
+
+2026/06/09 21:26:59 [31;1m/home/beni/PBJ/backend/internal/handlers/setting_handler.go:29 [35;1mrecord not found
+[0m[33m[1.061ms] [34;1m[rows:0][0m SELECT * FROM "app_settings" WHERE key = 'ocr_api_keys' ORDER BY "app_settings"."key" LIMIT 1
+
+2026/06/09 21:27:54 [31;1m/home/beni/PBJ/backend/internal/handlers/setting_handler.go:29 [35;1mrecord not found
+[0m[33m[0.746ms] [34;1m[rows:0][0m SELECT * FROM "app_settings" WHERE key = 'ocr_api_keys_satker_67081' ORDER BY "app_settings"."key" LIMIT 1
+
+2026/06/09 21:28:03 [32m/home/beni/PBJ/backend/internal/repository/projects.go:231 [33mSLOW SQL >= 200ms
+[0m[31;1m[699.005ms] [33m[rows:1][35m DELETE FROM "project_items" WHERE project_id = 3[0m
+
+2026/06/09 21:28:12 [31;1m/home/beni/PBJ/backend/internal/handlers/setting_handler.go:29 [35;1mrecord not found
+[0m[33m[14.136ms] [34;1m[rows:0][0m SELECT * FROM "app_settings" WHERE key = 'ocr_api_keys_satker_67081' ORDER BY "app_settings"."key" LIMIT 1

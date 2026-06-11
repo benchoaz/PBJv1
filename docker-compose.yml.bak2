@@ -1,0 +1,106 @@
+services:
+#  frontend:
+#    build:
+#      context: ./frontend
+#      dockerfile: Dockerfile
+#    ports:
+#      - "3000:3000"
+#    networks:
+#      - podman
+#    restart: unless-stopped
+
+
+  dpa-parser:
+    build:
+      context: ./dpa-parser
+      dockerfile: Dockerfile
+    network_mode: "host"
+    restart: unless-stopped
+    volumes:
+      - paddlex-cache:/root/.paddlex
+      - ./dpa-parser/main.py:/app/main.py
+
+#  api:
+#    build:
+#      context: ./backend
+#      dockerfile: Dockerfile
+#    ports:
+#      - "8081:8081"
+#    networks:
+#      - podman
+#    environment:
+#      - DATABASE_URL=host=db port=5432 user=postgres password=${DB_PASSWORD} dbname=${DB_NAME} sslmode=disable
+#      - JWT_SECRET=${JWT_SECRET}
+#      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+#      - PORT=8081
+#      - DPA_PARSER_URL=http://dpa-parser:8000
+#    links:
+#      - db
+#      - dpa-parser
+#    depends_on:
+#      - db
+#      - dpa-parser
+#    restart: unless-stopped
+
+  db:
+    image: docker.io/library/postgres:17-alpine
+    network_mode: "host"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  scraper:
+    build:
+      context: ./scraper
+      dockerfile: Dockerfile
+    network_mode: "host"
+    environment:
+      - DB_HOST=localhost
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/sirup-data
+      - SCRAPE_INTERVAL=${SCRAPE_INTERVAL}
+#    links:
+#      - db
+#      - dpa-parser
+#    depends_on:
+#      - db
+    restart: unless-stopped
+
+  survey-service:
+    build:
+      context: ./survey-service
+      dockerfile: Dockerfile
+    network_mode: "host"
+    environment:
+      - REDIS_HOST=localhost
+      - REDIS_PORT=6379
+      - PUPPETEER_EXECUTABLE_PATH=/home/pptruser/.cache/puppeteer/chrome/linux-149.0.7827.22/chrome-linux64/chrome
+    volumes:
+      - ./frontend/public/screenshots:/app/screenshots
+      - ./survey-service/server.js:/app/server.js
+#    links:
+#      - db
+#      - dpa-parser
+#    depends_on:
+#      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    network_mode: "host"
+    restart: unless-stopped
+
+# networks:
+#   podman:
+#     external: true
+
+volumes:
+  paddlex-cache:
+  pgdata:

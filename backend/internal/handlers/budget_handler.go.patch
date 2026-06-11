@@ -1,0 +1,166 @@
+--- backend/internal/handlers/budget_handler.go
++++ backend/internal/handlers/budget_handler.go
+@@ -496,125 +496,52 @@
+ 
+ func (h *BudgetHandler) ParseRkaAi(w http.ResponseWriter, r *http.Request) {
+-var body struct {
+-RawExcelJSON interface{} `json:"raw_excel_json"`
+-}
+-if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+-http.Error(w, "Format JSON tidak valid: "+err.Error(), http.StatusBadRequest)
+-return
+-}
+-
+-jsonBytes, err := json.Marshal(body.RawExcelJSON)
+-if err != nil {
+-http.Error(w, "Gagal melakukan parsing array", http.StatusInternalServerError)
+-return
+-}
+-
+-prompt := `Anda adalah AI ahli yang mengekstrak data Rencana Anggaran Kas (RKA) dari tabel JSON mentah (hasil dari export file Excel yang berantakan karena konversi PDF-ke-Excel).
+-
+-Input JSON adalah array 2 dimensi. Beberapa kolom mungkin tersembunyi/menyatu.
+-Tugas Anda: Cari baris data yang berisi "Kode Rekening" (seperti 5.1, 5.1.02, 5.1.02.01.0001, dst), lalu ekstrak Uraian, Total Anggaran, serta 12 nilai bulanan (Januari - Desember) yang berada di baris tersebut.
+-Jika nilai kosong, jadikan 0. Bersihkan semua titik/koma (misal "250.000,00" menjadi 250000 angka integer).
+-
+-Hanya kembalikan JSON array valid seperti format berikut, TANPA teks lain (tidak boleh ada markdown):
+-[
+-  {
+-    "kodeRekening": "5.1",
+-    "uraian": "BELANJA OPERASI",
+-    "total": 3500000,
+-    "Januari": 250000,
+-    "Februari": 250000,
+-    "Maret": 250000,
+-    "April": 1000000,
+-    "Mei": 250000,
+-    "Juni": 250000,
+-    "Juli": 250000,
+-    "Agustus": 250000,
+-    "September": 250000,
+-    "Oktober": 250000,
+-    "November": 250000,
+-    "Desember": 250000
+-  }
+-]
+-
+-Berikut Data Mentahnya:
+-` + string(jsonBytes)
+-
+-provider := r.Header.Get("X-AI-Provider")
+-apiKey := r.Header.Get("X-AI-Key")
+-
+-if apiKey == "" {
+-apiKey = os.Getenv("GEMINI_API_KEY")
+-provider = "gemini"
+-}
+-if apiKey == "" {
+-apiKey = os.Getenv("GROQ_API_KEY")
+-provider = "groq"
+-}
+-
+-if apiKey == "" {
+-http.Error(w, "API Key AI belum diatur", http.StatusInternalServerError)
+-return
+-}
+-
+-var aiResponse string
+-
+-if provider == "groq" {
+-aiResponse, err = callGroqAPI(apiKey, prompt)
+-} else {
+-aiResponse, err = callGeminiAPI(apiKey, prompt)
+-}
+-
+-if err != nil {
+-// Coba fallback ke escalation provider jika ada
+-escProvider := r.Header.Get("X-AI-Escalation-Provider")
+-escKey := r.Header.Get("X-AI-Escalation-Key")
+-if escProvider != "" && escKey != "" {
+-if escProvider == "groq" {
+-aiResponse, err = callGroqAPI(escKey, prompt)
+-} else if escProvider == "gemini" {
+-aiResponse, err = callGeminiAPI(escKey, prompt)
+-}
+-}
+-
+-// Jika masih error setelah fallback
+-if err != nil {
+-http.Error(w, "Gagal menghubungi AI Parser: "+err.Error(), http.StatusInternalServerError)
+-return
+-}
+-}
+-
+-// Clean up Markdown ```json ... ```
+-if len(aiResponse) > 7 && aiResponse[:7] == "```json" {
+-aiResponse = aiResponse[7:]
+-}
+-if len(aiResponse) > 3 && aiResponse[len(aiResponse)-3:] == "```" {
+-aiResponse = aiResponse[:len(aiResponse)-3]
+-}
+-
+-w.Header().Set("Content-Type", "application/json")
+-w.Write([]byte(aiResponse))
++err := r.ParseMultipartForm(10 << 20) // 10MB limit
++if err != nil {
++http.Error(w, "Gagal membaca berkas", http.StatusBadRequest)
++return
++}
++
++file, header, err := r.FormFile("file")
++if err != nil {
++http.Error(w, "Berkas tidak ditemukan", http.StatusBadRequest)
++return
++}
++defer file.Close()
++
++fileBytes, err := io.ReadAll(file)
++if err != nil {
++http.Error(w, "Gagal membaca isi berkas", http.StatusInternalServerError)
++return
++}
++
++var buf bytes.Buffer
++writer := multipart.NewWriter(&buf)
++part, err := writer.CreateFormFile("file", header.Filename)
++if err != nil {
++http.Error(w, "Gagal membuat form", http.StatusInternalServerError)
++return
++}
++part.Write(fileBytes)
++writer.Close()
++
++parserURL := fmt.Sprintf("%s/parse-rka", getDpaParserURL())
++req, err := http.NewRequest(http.MethodPost, parserURL, &buf)
++if err != nil {
++http.Error(w, "Gagal membuat request", http.StatusInternalServerError)
++return
++}
++req.Header.Set("Content-Type", writer.FormDataContentType())
++
++if provider := r.Header.Get("X-AI-Provider"); provider != "" {
++req.Header.Set("X-AI-Provider", provider)
++}
++if key := r.Header.Get("X-AI-Key"); key != "" {
++req.Header.Set("X-AI-Key", key)
++}
++if provider := r.Header.Get("X-AI-Escalation-Provider"); provider != "" {
++req.Header.Set("X-AI-Escalation-Provider", provider)
++}
++if key := r.Header.Get("X-AI-Escalation-Key"); key != "" {
++req.Header.Set("X-AI-Escalation-Key", key)
++}
++
++client := &http.Client{Timeout: 5 * time.Minute}
++resp, err := client.Do(req)
++if err != nil {
++http.Error(w, "Gagal memanggil Python dpa-parser", http.StatusInternalServerError)
++return
++}
++defer resp.Body.Close()
++
++respBody, _ := io.ReadAll(resp.Body)
++w.Header().Set("Content-Type", "application/json")
++w.WriteHeader(resp.StatusCode)
++w.Write(respBody)
+ }

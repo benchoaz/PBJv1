@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 
-COPY main.py .
+COPY main.py rak_parser.py .
 
 EXPOSE 8000
 

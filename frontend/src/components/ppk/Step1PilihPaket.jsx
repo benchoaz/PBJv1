@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePPK } from './PPKContext';
-import { Loader2, RefreshCw, Radio, FileText, AlertTriangle, CheckCircle2, Building2, ClipboardList } from 'lucide-react';
+import { Loader2, RefreshCw, Radio, FileText, AlertTriangle, CheckCircle2, Building2, ClipboardList, Search, Database } from 'lucide-react';
 
 
 export default function Step1PilihPaket() {
@@ -36,18 +36,74 @@ export default function Step1PilihPaket() {
 
   const [sirupSearchQuery, setSirupSearchQuery] = useState('');
   const [isFetchingSirup, setIsFetchingSirup] = useState(false);
+  const [isSearchingByRup, setIsSearchingByRup] = useState(false);
+  const [sirupFromDB, setSirupFromDB] = useState(false); // apakah data dari DB lokal
+  const searchTimeoutRef = useRef(null);
+
+  // ── Load SIRUP dari DB lokal saat mount ───────────────────────────────────
+  useEffect(() => {
+    if (!satkerId) return;
+    const loadFromDB = async () => {
+      try {
+        const res = await fetch(`/api/sirup/saved?satker_id=${satkerId}&tahun=${new Date().getFullYear()}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.success && data.packages?.length > 0) {
+          const mapped = data.packages.map(pkg => ({
+            noSirup: pkg.no_sirup,
+            packName: pkg.nama_paket,
+            pagu: pkg.pagu_sirup,
+            method: pkg.metode_pemilihan,
+            sumberDana: pkg.sumber_dana,
+            mak: pkg.mak,
+            tahun: String(pkg.tahun_anggaran),
+            _from_db: true,
+          }));
+          setSirupPackages(mapped);
+          setSirupFromDB(true);
+        }
+      } catch (e) {
+        console.error('Error loading SIRUP from DB:', e);
+      }
+    };
+    if (sirupPackages.length === 0) loadFromDB();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [satkerId]);
+
+  // ── Pencarian by No. RUP (hanya filter lokal) ────────────────────────────
+  const handleSearchChange = (val) => {
+    setSirupSearchQuery(val);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    
+    // Auto-search lokal sudah berjalan via filter di bagian render.
+    // Jika tidak ada di lokal, user harus menekan tombol "Tarik Ulang LKPP".
+    // Kita matikan auto-fetch ke server agar tidak membebani Puppeteer/LKPP.
+  };
 
   const fetchSirupPackages = async (idSatker) => {
     setIsFetchingSirup(true);
+    setSirupFromDB(false);
     try {
-      const res = await fetch(`/api/sirup/satker/${idSatker}`);
+      const res = await fetch(`/api/sirup/satker/${idSatker}?tahun=${new Date().getFullYear()}`);
       const data = await res.json();
-      if (data && Array.isArray(data.data)) {
-        setSirupPackages(data.data);
-      } else if (data && Array.isArray(data.packages)) {
-        setSirupPackages(data.packages);
-      } else if (data && Array.isArray(data)) {
-        setSirupPackages(data);
+      const pkgs = data.packages || data.data || (Array.isArray(data) ? data : null);
+      if (pkgs) {
+        setSirupPackages(pkgs);
+        // Auto-save ke DB
+        if (pkgs.length > 0) {
+          fetch('/api/sirup/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              satker_id: idSatker,
+              tahun_anggaran: new Date().getFullYear(),
+              packages: pkgs.map(p => ({
+                noSirup: p.noSirup, packName: p.packName, pagu: p.pagu,
+                method: p.method, sumberDana: p.sumberDana, mak: p.mak || ''
+              }))
+            })
+          }).catch(() => {});
+        }
       } else {
         alert('Format respon dari proxy SIRUP tidak sesuai.');
       }
@@ -59,7 +115,7 @@ export default function Step1PilihPaket() {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-8 mb-6 animate-slide-up shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-8 mb-6 animate-slide-up shadow-sm">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-300 flex items-center justify-center shrink-0">
@@ -93,13 +149,20 @@ export default function Step1PilihPaket() {
 
             <div className="flex-1">
               <label className="block text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1.5">Cari Paket / No. RUP</label>
-              <input
-                type="text"
-                value={sirupSearchQuery}
-                onChange={(e) => setSirupSearchQuery(e.target.value)}
-                placeholder="Ketik untuk memfilter..."
-                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-700 focus:border-slate-400 outline-none"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={sirupSearchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  placeholder="Ketik nama paket atau No. RUP..."
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-700 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 outline-none pr-8"
+                />
+                {isSearchingByRup ? (
+                  <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                ) : (
+                  <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
+                )}
+              </div>
             </div>
 
             <button
@@ -197,8 +260,13 @@ export default function Step1PilihPaket() {
           {/* List of Live LKPP Packages */}
           <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
             <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex justify-between items-center">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                Paket RUP LKPP {new Date().getFullYear()} — {sirupPackages.filter(p => (p.packName || '').toLowerCase().includes(sirupSearchQuery.toLowerCase()) || (p.noSirup || '').includes(sirupSearchQuery)).length} paket
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                {sirupFromDB && <Database className="w-3 h-3 text-slate-400" />}
+                Paket RUP LKPP {new Date().getFullYear()} — {sirupPackages.filter(p =>
+                  (p.packName || '').toLowerCase().includes(sirupSearchQuery.toLowerCase()) ||
+                  String(p.noSirup || '').includes(sirupSearchQuery.trim())
+                ).length} paket
+                {sirupFromDB && <span className="text-slate-300 font-normal">(Dari cache server)</span>}
               </span>
               <span className="px-2 py-0.5 text-[9px] rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold">● Live</span>
             </div>
@@ -216,7 +284,10 @@ export default function Step1PilihPaket() {
             ) : (
               <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-100">
                 {sirupPackages
-                  .filter(p => (p.packName || '').toLowerCase().includes(sirupSearchQuery.toLowerCase()) || (p.noSirup || '').includes(sirupSearchQuery))
+                  .filter(p =>
+                    (p.packName || '').toLowerCase().includes(sirupSearchQuery.toLowerCase()) ||
+                    String(p.noSirup || '').includes(sirupSearchQuery.trim())
+                  )
                   .map((p) => (
                     <div key={p.noSirup} className="px-5 py-4 hover:bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-colors">
                       <div className="space-y-1 flex-1 min-w-0">
@@ -378,7 +449,7 @@ export default function Step1PilihPaket() {
         </div>
 
         {/* ── NAMA ACARA/KEGIATAN ─────────────────────── */}
-        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-5">
+        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-5">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
               <ClipboardList className="w-4 h-4 text-amber-600" />
@@ -401,7 +472,7 @@ export default function Step1PilihPaket() {
                     : 'border-amber-300 bg-white text-slate-800 focus:ring-amber-300'
                 }`}
               />
-              <div className="flex items-center justify-between mt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-2 gap-2">
                 <span className="text-[10px] font-semibold">
                   {namaAcara.trim().length < 10 ? (
                     <span className="flex items-center gap-1 text-amber-600">
@@ -413,7 +484,7 @@ export default function Step1PilihPaket() {
                     </span>
                   )}
                 </span>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {[
                     `Rapat Evaluasi - ${new Date().toLocaleDateString('id-ID',{month:'short',year:'numeric'})}`,
                     `Bimtek Pengadaan - ${new Date().toLocaleDateString('id-ID',{month:'short',year:'numeric'})}`,

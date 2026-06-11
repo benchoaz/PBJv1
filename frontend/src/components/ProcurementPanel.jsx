@@ -169,14 +169,14 @@ export default function ProcurementPanel() {
     pemeliharaan: [
       { key: 'ppn', label: 'Harga penawaran sudah termasuk PPN 12%' },
       { key: 'spareparts', label: 'Suku cadang/sparepart pengganti dijamin keasliannya dan memiliki garansi' },
-      { key: 'kunjungan', label: 'Telah disepakati jadwal kunjungan berkala (preventive maintenance)' },
+      { key: 'kunjungan', label: 'Telah disepakati jadwal kunjungan berakla (preventive maintenance)' },
       { key: 'response_time', label: 'Response time penanganan keluhan teknis (SLA) disepakati (maksimal 1x24 jam)' },
       { key: 'garansi_kerja', label: 'Adanya garansi hasil kerja/perbaikan (minimal 1 bulan sejak pengerjaan)' },
       { key: 'backup_unit', label: 'Penyedia menyediakan unit pengganti sementara jika perbaikan memerlukan waktu lama' },
     ],
     konstruksi: [
       { key: 'ppn', label: 'Harga sudah termasuk PPN 12% dan seluruh pajak retribusi yang berlaku' },
-      { key: 'smkk_k3', label: 'Biaya penerapan Sistem Manajemen Keselamatan Konstruksi (SMKK) sudah dianggarkan' },
+      { key: 'smkk_k3', label: 'Biaya penerapan Sistem Manajemen Keselamatan Konstruksi (SMKK) sudah dianggarakn' },
       { key: 'overhead_profit', label: 'Tingkat overhead dan keuntungan penyedia dinilai wajar dan masuk akal' },
       { key: 'retensi', label: 'Ketentuan retensi/jaminan pemeliharaan sebesar 5% nilai kontrak telah disepakati' },
       { key: 'sbu_aktif', label: 'Sertifikat Badan Usaha (SBU) bidang konstruksi aktif dan sesuai subklasifikasi' },
@@ -1190,9 +1190,9 @@ export default function ProcurementPanel() {
     // Generates completely dynamic items matching the pagu perfectly
     if (packNameLower.includes('tulis') || packNameLower.includes('atk')) {
       items.push({ no: 1, name: 'Alas Catatan Kantor', qty: 6, unit: 'Buah', price: Math.round(pack.pagu * 0.05 / 6), vendor: 'CV. Maju Jaya', tayang: Math.round((pack.pagu * 0.05 / 6) * 0.98) })
-      items.push({ no: 2, name: 'Pena Ballpoint Gel', qty: 10, unit: 'Pack', price: Math.round(pack.pagu * 0.45 / 10), vendor: 'Toko ATK Berkah', tayang: Math.round((pack.pagu * 0.45 / 10) * 0.95) })
+      items.push({ no: 2, name: 'Pena Ballpoint Gel', qty: 10, unit: 'Pack', price: Math.round(pack.pagu * 0.45 / 10), vendor: 'Toko ATK Berakh', tayang: Math.round((pack.pagu * 0.45 / 10) * 0.95) })
       items.push({ no: 3, name: 'Kertas Memo Sticky Notes', qty: 15, unit: 'Buah', price: Math.round(pack.pagu * 0.20 / 15), vendor: 'CV. Maju Jaya', tayang: Math.round((pack.pagu * 0.20 / 15) * 0.97) })
-      items.push({ no: 4, name: 'Binder Clip Logam', qty: 8, unit: 'Kotak', price: Math.round(pack.pagu * 0.30 / 8), vendor: 'Toko ATK Berkah', tayang: Math.round((pack.pagu * 0.30 / 8) * 0.96) })
+      items.push({ no: 4, name: 'Binder Clip Logam', qty: 8, unit: 'Kotak', price: Math.round(pack.pagu * 0.30 / 8), vendor: 'Toko ATK Berakh', tayang: Math.round((pack.pagu * 0.30 / 8) * 0.96) })
     } else if (packNameLower.includes('kertas') || packNameLower.includes('cover') || packNameLower.includes('hvs')) {
       items.push({ no: 1, name: 'Kertas HVS F4 70gr Sinar Dunia', qty: 50, unit: 'Rim', price: Math.round(pack.pagu * 0.60 / 50), vendor: 'PT. Distribusi Kertas', tayang: Math.round((pack.pagu * 0.60 / 50) * 0.95) })
       items.push({ no: 2, name: 'Kertas HVS A4 80gr PaperOne', qty: 30, unit: 'Rim', price: Math.round(pack.pagu * 0.40 / 30), vendor: 'PT. Distribusi Kertas', tayang: Math.round((pack.pagu * 0.40 / 30) * 0.95) })
@@ -1272,7 +1272,7 @@ export default function ProcurementPanel() {
         realUrl = 'https://katalog.inaproc.id/aura-mandiri-sejati/pulpen-gel-hitam/barang'
       } else if (packNameLower.includes('kertas') || packNameLower.includes('cover') || packNameLower.includes('hvs')) {
         mockScreenshotUrl = '/screenshots/hvs_a4_detail.png'
-        realUrl = 'https://katalog.inaproc.id/berkah-aulia-ilmu/kertas-hvs-a4-80-gram/barang'
+        realUrl = 'https://katalog.inaproc.id/berakh-aulia-ilmu/kertas-hvs-a4-80-gram/barang'
       } else if (packNameLower.includes('tinta') || packNameLower.includes('komputer') || packNameLower.includes('printer')) {
         mockScreenshotUrl = '/screenshots/tinta_printer_detail.png'
         realUrl = 'https://katalog.inaproc.id/rosida-nasution/tinta-printer-epson/barang'
@@ -1506,8 +1506,9 @@ export default function ProcurementPanel() {
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
                     Rincian Barang Tersinkronisasi (Centang barang yang akan diproses):
                   </div>
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
+                  <div className="overflow-x-auto w-full">
+                    <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                      <thead>
                       <tr className="border-b border-slate-200 font-bold text-slate-500 text-[10px] uppercase">
                         <th className="pb-2 w-10 text-center">
                           <input 
@@ -1568,6 +1569,7 @@ export default function ProcurementPanel() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
                 
                 {/* Documents Section */}
@@ -1745,7 +1747,7 @@ export default function ProcurementPanel() {
 
       {activeTab === 'search' && (
         <div className="space-y-6 animate-slide-up mb-8">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm">
             <h2 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-650"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               Tabel Negosiasi e-Purchasing
@@ -1805,7 +1807,7 @@ export default function ProcurementPanel() {
             )}
             
             <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full text-left text-sm whitespace-nowrap">
+              <table className="w-full text-left text-sm whitespace-nowrap min-w-[800px]">
                 <thead>
                   <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 text-xs uppercase tracking-wider font-bold">
                     <th className="p-3 w-10 text-center">No</th>
@@ -2314,7 +2316,7 @@ export default function ProcurementPanel() {
               });
               if (problemItems.length === 0) return null;
               return (
-                <div className="mt-4 bg-amber-50 border-2 border-amber-300 rounded-2xl p-5">
+                <div className="mt-4 bg-amber-50 border-2 border-amber-300 rounded-2xl p-3 sm:p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 shrink-0"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                     <h3 className="font-bold text-amber-800 text-sm">Ada {problemItems.length} Produk Bermasalah — Diperlukan Catatan Penyimpangan DPP</h3>
@@ -2329,7 +2331,7 @@ export default function ProcurementPanel() {
                     value={exceptionNotes}
                     onChange={e => setExceptionNotes(e.target.value)}
                     rows={3}
-                    placeholder="Contoh: Berdasarkan penelusuran PP di Katalog Elektronik LKPP pada tanggal [...], [nama barang] tidak tersedia/stok kurang. Atas persetujuan PPK, pengadaan dilanjutkan dengan penyesuaian: [...]"
+                    placeholder="Contoh: Berdasarakn penelusuran PP di Katalog Elektronik LKPP pada tanggal [...], [nama barang] tidak tersedia/stok kurang. Atas persetujuan PPK, pengadaan dilanjutkan dengan penyesuaian: [...]"
                     className="w-full text-xs p-3 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
                   />
                   <div className="flex flex-col gap-2 mt-2">
@@ -2370,7 +2372,7 @@ export default function ProcurementPanel() {
 
 
             {/* --- MOVED VALIDATION FORMS --- */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mt-6">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm mt-6">
               <h2 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-800"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
                 Validasi & Pengaturan Negosiasi
@@ -2456,7 +2458,7 @@ export default function ProcurementPanel() {
                       </div>
                       <div>
                         <span className="font-bold text-amber-900 block mb-0.5">2. Penyesuaian Spesifikasi Sajian (Menu Matching)</span>
-                        <p className="leading-relaxed text-[11px] text-justify">Pemilihan penyedia harus disesuaikan dengan kapasitas dan kekhasan menu sajian yang ditawarkan oleh penyedia (misal: nasi kotak, prasmanan, atau snack box) agar selaras dengan kebutuhan jenis kegiatan kedinasan.</p>
+                        <p className="leading-relaxed text-[11px] text-justify">Pemilihan penyedia harus disesuaikan dengan kapasitas dan kekhasan menu sajian yang ditawarakn oleh penyedia (misal: nasi kotak, prasmanan, atau snack box) agar selaras dengan kebutuhan jenis kegiatan kedinasan.</p>
                       </div>
                       <div>
                         <span className="font-bold text-amber-900 block mb-0.5">3. Penentuan Lokasi Pengiriman Riil (Alamat Pengiriman Fleksibel)</span>
@@ -2857,7 +2859,7 @@ export default function ProcurementPanel() {
                       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-500"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
                       Bukti Komunikasi / Chat Negosiasi (Opsional)
                     </div>
-                    <p className="text-[10px] text-slate-500 mb-2">Unggah tangkapan layar percakapan WhatsApp/Email/SMS dengan penyedia terkait negosiasi harga, spesifikasi, atau konfirmasi stok.</p>
+                    <p className="text-[10px] text-slate-500 mb-2">Unggah tangkapan layar percakapan WhatsApp/Email/SMS dengan penyedia terakit negosiasi harga, spesifikasi, atau konfirmasi stok.</p>
                     <label className="flex items-center gap-2 cursor-pointer bg-white border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-xl p-3 transition-all group print:hidden">
                       <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 group-hover:text-indigo-500 transition-colors"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                       <div>
@@ -2955,7 +2957,7 @@ export default function ProcurementPanel() {
                   </div>
                   <p className="text-[9px] text-slate-500 mt-3 flex gap-1.5 items-start">
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-500 mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                    <span>Penentuan zona ini akan muncul di BAHP. Tidak ada pembatasan/lock nominal ongkir. Ongkir disesuaikan dengan kesepakatan final Pejabat Pengadaan dan Penyedia berdasarkan zona yang dipilih.</span>
+                    <span>Penentuan zona ini akan muncul di BAHP. Tidak ada pembatasan/lock nominal ongkir. Ongkir disesuaikan dengan kesepakatan final Pejabat Pengadaan dan Penyedia berdasarakn zona yang dipilih.</span>
                   </p>
                 </div>
 
@@ -3359,7 +3361,7 @@ export default function ProcurementPanel() {
                       {BAHP_TEMPLATE_TYPES.find(t => t.id === bahpTemplateId)?.label || 'Jenis Pengadaan'}
                     </div>
                     <div className="text-[10px] text-slate-500 mt-0.5">
-                      Ditetapkan secara otomatis berdasarkan DPP PPK (Template ID: {submittedPack.dppTemplateId}). Pejabat Pengadaan tidak perlu memilih manual.
+                      Ditetapkan secara otomatis berdasarakn DPP PPK (Template ID: {submittedPack.dppTemplateId}). Pejabat Pengadaan tidak perlu memilih manual.
                     </div>
                   </div>
                 </div>
