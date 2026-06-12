@@ -118,7 +118,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, onNavClick }) {
     { path: '/reports/absorption', label: 'Laporan Realisasi', Icon: Icons.TrendingUp, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/reports/vendors', label: 'Kinerja Penyedia', Icon: Icons.Star, roles: ['Admin', 'PPK', 'PP'] },
     { path: '/', label: 'Daftar Paket', Icon: Icons.FolderOpen, roles: ['Admin', 'PPK', 'PP'] },
-    { path: '/budget', label: 'Integrasi RAK & DPA', Icon: Icons.FileText, roles: ['Admin', 'PPK'] },
+    { path: '/budget', label: 'Dashboard Master RAK', Icon: Icons.FileText, roles: ['Admin', 'PPK'] },
     { path: '/ppk/persiapan', label: 'PPK Persiapan', Icon: Icons.ClipboardEdit, roles: ['Admin', 'PPK'] },
     { path: '/pp/panel', label: 'Panel Pejabat Pengadaan', Icon: Icons.Repeat, roles: ['Admin', 'PP'] },
     { path: '/proxy-tester', label: 'Pengaturan Proxy', Icon: Icons.Shield, roles: ['Admin', 'PPK', 'PP'] },

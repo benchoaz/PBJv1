@@ -116,6 +116,26 @@ export default function Step3RincianHPS() {
   const [surveyProgress, setSurveyProgress] = useState('');
   const [surveyProgressPercent, setSurveyProgressPercent] = useState(0);
   const [vendorLocationMap, setVendorLocationMap] = useState({});
+  const [rakAccounts, setRakAccounts] = useState([]);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1); // 1-12
+
+  useEffect(() => {
+    const fetchRAK = async () => {
+      try {
+        const idSatker = currentUser?.idSatker || satkerId || '67081'; 
+        const res = await fetch(`/api/rak/accounts?satker_id=${idSatker}&tahun=${new Date().getFullYear()}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.has_rka) {
+            setRakAccounts(data.accounts || []);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch RAK:', err);
+      }
+    };
+    fetchRAK();
+  }, [currentUser, satkerId]);
 
   useEffect(() => {
     fetch('/api/vendor-locations')
@@ -472,7 +492,21 @@ export default function Step3RincianHPS() {
     return clean.replace(/\s+/g, ' ').trim();
   };
 
-  const isOverBudget = !isHpsExemptSelected && selectedPack?.pagu > 0 && parseInt(hpsValue || 0) > selectedPack.pagu;
+  const getAnggaranTersedia = () => {
+    if (!selectedPack || rakAccounts.length === 0) return selectedPack?.pagu || 0;
+    const matchedAcc = getMatchingDpaAccount(selectedPack);
+    const kodeRekening = matchedAcc?.account;
+    if (!kodeRekening) return selectedPack?.pagu || 0;
+    
+    const rakAcc = rakAccounts.find(acc => acc.kode_rekening === kodeRekening);
+    if (!rakAcc) return selectedPack?.pagu || 0;
+
+    const months = ['bulan_jan','bulan_feb','bulan_mar','bulan_apr','bulan_mei','bulan_jun','bulan_jul','bulan_ags','bulan_sep','bulan_okt','bulan_nov','bulan_des'];
+    return months.slice(0, currentMonth).reduce((sum, m) => sum + (rakAcc[m] || 0), 0);
+  };
+
+  const anggaranTersedia = getAnggaranTersedia();
+  const isOverBudget = !isHpsExemptSelected && anggaranTersedia > 0 && parseInt(hpsValue || 0) > anggaranTersedia;
   const cancelSurvey = () => setIsSurveying(false);
 
   const fetchGeminiKeyHelper = async () => {
@@ -1486,9 +1520,9 @@ export default function Step3RincianHPS() {
                         return sum + (qty * price)
                       }, 0)
                       const totalPagu = selectedPack?.pagu || 0;
-                      const exceeds = totalHps > totalPagu
+                      const exceeds = totalHps > anggaranTersedia;
                       return (
-                        <div className="text-right">
+                        <div className="text-right flex flex-col items-end gap-1.5">
                           <span className={`text-[10px] font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 ${exceeds
                               ? 'bg-rose-50 text-rose-700 border-rose-200'
                               : 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -1496,15 +1530,19 @@ export default function Step3RincianHPS() {
                             {exceeds ? (
                               <>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-rose-600"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                                Melebihi Pagu DPA
+                                Melebihi Kas Tersedia Bulan Ini
                               </>
                             ) : (
                               <>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-600"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                                HPS Efisien & Valid
+                                HPS Efisien & Kas Valid
                               </>
                             )}
                           </span>
+                          <div className="text-[10px] text-slate-500 flex flex-col items-end gap-0.5 mt-0.5">
+                            <span>Anggaran Tersedia: <b>Rp {anggaranTersedia.toLocaleString()}</b></span>
+                            <span className="opacity-70">Pagu Tahunan: Rp {totalPagu.toLocaleString()}</span>
+                          </div>
                         </div>
                       )
                     })()}
@@ -2090,8 +2128,9 @@ export default function Step3RincianHPS() {
                     const totalPagu = selectedPack?.pagu || 0;
                     return (
                       <div className="flex flex-col sm:flex-row gap-3 justify-between items-center pt-4 border-t border-slate-200 text-xs">
-                        <div className="text-slate-500 font-medium">
-                          Total Pagu DPA: <span className="font-bold font-mono text-slate-850 bg-slate-100 px-2 py-1 rounded-lg">Rp&nbsp;{totalPagu.toLocaleString()}</span>
+                        <div className="text-slate-500 font-medium flex flex-col sm:flex-row gap-3">
+                          <span>Total Pagu Tahunan: <span className="font-bold font-mono text-slate-850 bg-slate-100 px-2 py-1 rounded-lg">Rp&nbsp;{totalPagu.toLocaleString()}</span></span>
+                          <span>Anggaran Tersedia: <span className="font-bold font-mono text-indigo-700 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 shadow-sm">Rp&nbsp;{anggaranTersedia.toLocaleString()}</span></span>
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-3.5">
                           <span className="text-slate-600 font-semibold">Hasil Kalkulasi HPS:</span>

@@ -397,7 +397,7 @@ export const KOLOM_TAMBAHAN_SEKSI_A = {
   konstruksi:            ['SBU', 'Jangka Waktu (HK)', 'Retensi'],
   konsultasi_non:        ['Tenaga Ahli', 'Jangka Waktu', 'Output'],
   konsultasi_konstruksi: ['SBU Konsultansi', 'Tenaga Ahli', 'SPTA'],
-  konsolidasi:           ['Status PDN', 'Volume Total', 'Jml Satker'],
+  konsolidasi:           ['Status PDN/TKDN'],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -664,8 +664,7 @@ export const REKOMENDASI_PP_PPK = {
 2. Memastikan konsultan pengawas aktif menyerahkan laporan berkala mengenai progres pekerjaan fisik.`
   },
   konsolidasi: {
-    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
-    isi: `1. Mengkoordinasikan jadwal kebutuhan masing-masing satker agar penyedia dapat mengoptimalkan jalur distribusi.
-2. Memantau konsistensi kualitas barang yang dikirimkan ke berbagai titik lokasi satker.`
+    judul: 'Catatan Prosedur Pemilihan Penyedia Terkonsolidasi',
+    isi: `1. Pelaksanaan pengadaan terkonsolidasi ini telah dilaksanakan berdasarkan koordinasi antara seluruh Satuan Kerja peserta konsolidasi. Surat Pesanan (SP) selanjutnya diterbitkan secara individual oleh masing-masing PPK Satuan Kerja sesuai volume kebutuhan yang telah dikonfirmasi dan tercantum dalam Daftar Satker Peserta.\n2. Dalam hal terdapat perubahan volume kebutuhan dari Satuan Kerja peserta setelah berita acara ini ditetapkan, perubahan dimaksud wajib dituangkan dalam addendum Surat Pesanan dan dilaporkan kepada Pejabat Pengadaan yang menetapkan berita acara ini.`
   }
 };

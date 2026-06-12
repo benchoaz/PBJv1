@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { usePPK } from './PPKContext';
 import { FileText, CheckCircle2, Edit3, Trash2, PlusCircle, AlertTriangle, XCircle, Loader2, RefreshCw, Zap, Sparkles, FolderOpen, Save, Check, Link } from 'lucide-react';
+import SmartRAKGrid from './SmartRAKGrid';
 
 
 // ─── Utility: fuzzy match rekening DPA ke paket SIRUP ────────────────────────
@@ -1133,6 +1134,16 @@ export default function Step2UploadDPA() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Smart RAK Grid Section */}
+        {dpaAccounts && dpaAccounts.length > 0 && (
+          <SmartRAKGrid 
+            dpaAccounts={dpaAccounts} 
+            satkerId={satkerId} 
+            packageMetadata={packageMetadata}
+            dpaRincian={dpaRincian}
+          />
         )}
 
         {/* Integrasi SIRUP — Sinkronisasi & Pemetaan No. RUP */}

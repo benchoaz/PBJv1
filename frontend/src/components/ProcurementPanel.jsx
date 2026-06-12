@@ -1126,7 +1126,8 @@ export default function ProcurementPanel() {
         if (dppTpl === 'TPL-006C')  return 'modal';
         if (dppTpl === 'TPL-006D')  return 'jasa';
         if (dppTpl === 'TPL-006F')  return 'pemeliharaan';
-        if (dppTpl === 'TPL-006G' || dppTpl === 'TPL-006E') return 'konstruksi';
+        if (dppTpl === 'TPL-006G') return 'konstruksi';
+        if (dppTpl === 'TPL-006E') return 'konsolidasi';
         if (dppTpl === 'TPL-006H')  return 'konsultasi_non';
         if (dppTpl === 'TPL-006I')  return 'konsultasi_konstruksi';
         if (dppTpl === 'TPL-006K')  return 'konsolidasi';

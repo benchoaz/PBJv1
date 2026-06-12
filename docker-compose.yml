@@ -18,6 +18,7 @@ services:
     volumes:
       - paddlex-cache:/root/.paddlex
       - ./dpa-parser/main.py:/app/main.py
+      - ./dpa-parser/rak_parser.py:/app/rak_parser.py
 
   api:
     build:
