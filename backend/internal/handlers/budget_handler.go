@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"os"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -312,24 +313,31 @@ func (h *BudgetHandler) SaveRakAccounts(w http.ResponseWriter, r *http.Request) 
 		tahun = time.Now().Year()
 	}
 
-	// Mark old RKA as inactive
-	h.DB.Model(&models.RakDocument{}).
-		Where("satker_id = ? AND tahun_anggaran = ?", satkerID, tahun).
-		Update("is_active", false)
-
-	// Create new RKA document
-	rkaDoc := models.RakDocument{
-		SatkerID:      satkerID,
-		TahunAnggaran: tahun,
-		NamaSkpd:      body.NamaSkpd,
-		NilaiAnggaran: body.NilaiAnggaran,
-		FileName:      body.FileName,
-		IsActive:      true,
-		UploadedAt:    time.Now(),
+	debugLog := fmt.Sprintf("[%s] [SaveRakAccounts] Payload received for Satker %s, Tahun %d, Total Accounts: %d\n", time.Now().Format(time.RFC3339), satkerID, tahun, len(body.Accounts))
+	f, _ := os.OpenFile("/home/beni/PBJ/backend/api_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if f != nil {
+		f.WriteString(debugLog)
+		f.Close()
 	}
-	if err := h.DB.Create(&rkaDoc).Error; err != nil {
-		http.Error(w, "Gagal menyimpan dokumen RKA: "+err.Error(), http.StatusInternalServerError)
-		return
+	fmt.Print(debugLog)
+
+	// Find active RKA document, or create one if it doesn't exist
+	var rkaDoc models.RakDocument
+	err := h.DB.Where("satker_id = ? AND tahun_anggaran = ? AND is_active = ?", satkerID, tahun, true).First(&rkaDoc).Error
+	if err != nil {
+		rkaDoc = models.RakDocument{
+			SatkerID:      satkerID,
+			TahunAnggaran: tahun,
+			NamaSkpd:      body.NamaSkpd,
+			NilaiAnggaran: body.NilaiAnggaran, // This can be accumulated later
+			FileName:      "Master Data RAK Terintegrasi",
+			IsActive:      true,
+			UploadedAt:    time.Now(),
+		}
+		if err := h.DB.Create(&rkaDoc).Error; err != nil {
+			http.Error(w, "Gagal menyimpan dokumen RKA: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Save accounts
@@ -337,8 +345,8 @@ func (h *BudgetHandler) SaveRakAccounts(w http.ResponseWriter, r *http.Request) 
 		acc.RakDocumentID = rkaDoc.ID
 		acc.SatkerID = satkerID
 		acc.TahunAnggaran = tahun
-		h.DB.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "satker_id"}, {Name: "tahun_anggaran"}, {Name: "kode_rekening"}, {Name: "sub_kegiatan"}},
+		err := h.DB.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "satker_id"}, {Name: "tahun_anggaran"}, {Name: "kode_rekening"}},
 			DoUpdates: clause.AssignmentColumns([]string{
 				"rak_document_id", "uraian", "anggaran_tahun", "total_rak",
 				"program", "kegiatan", 
@@ -346,7 +354,19 @@ func (h *BudgetHandler) SaveRakAccounts(w http.ResponseWriter, r *http.Request) 
 				"bulan_jul", "bulan_ags", "bulan_sep", "bulan_okt", "bulan_nov", "bulan_des",
 				"updated_at",
 			}),
-		}).Create(&acc)
+		}).Create(&acc).Error
+		
+		if err != nil {
+			errLog := fmt.Sprintf("[%s] Error saving account: %v\n", time.Now().Format(time.RFC3339), err)
+			f, _ := os.OpenFile("/home/beni/PBJ/backend/api_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if f != nil {
+				f.WriteString(errLog)
+				f.Close()
+			}
+			fmt.Print(errLog)
+			http.Error(w, "Gagal menyimpan akun RKA: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// After saving RKA, re-run auto-link for DPA accounts
