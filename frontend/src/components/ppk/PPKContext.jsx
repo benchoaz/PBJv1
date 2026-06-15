@@ -200,8 +200,7 @@ export function PPKProvider({ children }) {
     ];
   };
 
-  const resetAll = () => {
-    if (!confirm('Anda yakin ingin mereset semua data? Proses ini tidak dapat dibatalkan.')) return;
+  const silentReset = () => {
     localStorage.removeItem('pbj_dpa_name');
     localStorage.removeItem('pbj_scraped_data');
     localStorage.removeItem('pbj_matched_dpa_types');
@@ -246,25 +245,102 @@ export function PPKProvider({ children }) {
     setStatus('Draft');
   };
 
+  const resetAll = () => {
+    if (!confirm('Anda yakin ingin mereset semua data? Proses ini tidak dapat dibatalkan.')) return;
+    silentReset();
+  };
+
   const loadProjectData = (project) => {
     try {
       const parsed = JSON.parse(project.description || '{}');
       setCurrentProjectId(project.id.toString());
       setStatus(project.status || 'Draft');
       
-      if (parsed.selectedPack) setSelectedPack(parsed.selectedPack);
+      // If it is submitted, parsed has no selectedPack directly but has the flat properties
+      if (parsed.selectedPack) {
+        setSelectedPack(parsed.selectedPack);
+      } else if (parsed.packName || parsed.pagu) {
+        setSelectedPack({
+          packName: parsed.packName,
+          pagu: parsed.pagu,
+          mak: parsed.mak || '',
+          volume: parsed.volume || '1 Paket',
+          spesifikasi: parsed.spesifikasi || '',
+          noSirup: parsed.noSirup || parsed.mak || '',
+          klpd: parsed.klpd || '',
+          satker: parsed.satker || '',
+          uraian: parsed.uraian || parsed.packName || '',
+        });
+      }
+
       if (parsed.namaAcara) setNamaAcara(parsed.namaAcara);
       if (parsed.dpaAccounts) setDpaAccounts(parsed.dpaAccounts);
-      if (parsed.dpaRincian) setDpaRincian(parsed.dpaRincian);
+      
+      if (parsed.dpaRincian) {
+        setDpaRincian(parsed.dpaRincian);
+      } else if (parsed.items) {
+        const key = parsed.noSirup ? `nosirup_${parsed.noSirup}` : (parsed.mak ? `nosirup_${parsed.mak}` : 'nosirup_default');
+        const rincian = parsed.items.map(item => ({
+          nama: item.name,
+          volume: item.qty,
+          satuan: item.unit,
+          harga_satuan: item.price || item.dpa_price || item.paguDpa || 0,
+          spesifikasi: item.spesifikasi || ''
+        }));
+        setDpaRincian({ [key]: rincian });
+      }
+
       if (parsed.docSettings) setDocSettings(parsed.docSettings);
-      if (parsed.step) setStep(parsed.step);
-      if (parsed.surveyData) setSurveyData(parsed.surveyData);
+      
+      if (project.status && project.status !== 'Draft') {
+        setStep(5);
+      } else if (parsed.step) {
+        setStep(parsed.step);
+      }
+      
+      if (parsed.surveyData) {
+        setSurveyData(parsed.surveyData);
+      } else if (parsed.items) {
+        setSurveyData({
+          products: parsed.items.map(item => ({
+            name: item.name,
+            price: item.price,
+            vendor: item.vendor || '',
+            link: item.link || '',
+            img: item.img || ''
+          }))
+        });
+      }
+
       if (parsed.hpsValue) setHpsValue(parsed.hpsValue);
       if (parsed.isHpsExemptSelected !== undefined) setIsHpsExemptSelected(parsed.isHpsExemptSelected);
       if (parsed.dppSpecs) setDppSpecs(parsed.dppSpecs);
-      if (parsed.packageMetadata) setPackageMetadata(parsed.packageMetadata);
+      
+      if (parsed.packageMetadata) {
+        setPackageMetadata(parsed.packageMetadata);
+      } else {
+        setPackageMetadata({
+          lokasi_pekerjaan: parsed.location || '',
+          waktu_penyelesaian: parsed.duration || '14 (empat belas) hari kalender',
+          program: parsed.program || '',
+          kegiatan: parsed.kegiatan || '',
+          sub_kegiatan: parsed.sub_kegiatan || '',
+          nomor_dpp: parsed.nomor_dpp || ''
+        });
+      }
+
       if (parsed.techSpecs) setTechSpecs(parsed.techSpecs);
-      if (parsed.hpsPrices) setHpsPrices(parsed.hpsPrices);
+      
+      if (parsed.hpsPrices) {
+        setHpsPrices(parsed.hpsPrices);
+      } else if (parsed.items) {
+        const prices = {};
+        parsed.items.forEach(item => {
+          prices[item.name] = item.price;
+        });
+        setHpsPrices(prices);
+      }
+
       if (parsed.tanggalSurat) setTanggalSurat(parsed.tanggalSurat);
       if (parsed.comparisons) setComparisons(parsed.comparisons);
       if (parsed.justifications) setJustifications(parsed.justifications);
@@ -299,15 +375,15 @@ export function PPKProvider({ children }) {
         name: namaUtamaDpp,
         budget: totalPagu,
         idSatker: satkerId,
-        status: 'Draft',
-description: JSON.stringify({
+        status: status || 'Draft',
+        description: JSON.stringify({
           selectedPack,
           namaAcara: namaAcara?.trim() || '',
           dpaAccounts,
           dpaRincian,
           docSettings,
           step,
-          status: 'Draft',
+          status: status || 'Draft',
           surveyData,
           hpsValue,
           isHpsExemptSelected,
@@ -369,13 +445,13 @@ description: JSON.stringify({
   // Auto-save silently with a debounce
   // This prevents data loss if they click 'Kembali' or the browser Back button without explicitly saving
   useEffect(() => {
-    if (step > 1 && (selectedPack || Object.keys(dpaRincian).length > 0)) {
+    if (status === 'Draft' && step > 1 && (selectedPack || Object.keys(dpaRincian).length > 0)) {
       const timer = setTimeout(() => {
         handleSimpanPaket(true);
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [step, surveyData, dpaRincian, hpsPrices, dppSpecs, isHpsExemptSelected, comparisons, justifications, autoComparator]);
+  }, [step, surveyData, dpaRincian, hpsPrices, dppSpecs, isHpsExemptSelected, comparisons, justifications, autoComparator, status]);
 
   const value = {
     comparisons, setComparisons,
@@ -408,7 +484,7 @@ description: JSON.stringify({
     surveyLogs, setSurveyLogs,
     aiError, setAiError,
     activeDocPreview, setActiveDocPreview,
-    resetAll, handleSimpanPaket, loadProjectData, currentUser,
+    resetAll, silentReset, handleSimpanPaket, loadProjectData, currentUser,
     tanggalSurat, setTanggalSurat,
     currentProjectId, status
   , getPackageItems};

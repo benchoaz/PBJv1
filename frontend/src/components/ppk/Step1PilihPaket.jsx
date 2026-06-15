@@ -66,7 +66,8 @@ export default function Step1PilihPaket() {
         console.error('Error loading SIRUP from DB:', e);
       }
     };
-    if (sirupPackages.length === 0) loadFromDB();
+    // Selalu muat dari DB saat mount agar data terbaru ditampilkan
+    loadFromDB();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [satkerId]);
 
@@ -113,6 +114,81 @@ export default function Step1PilihPaket() {
       setIsFetchingSirup(false);
     }
   };
+  const handleResolveRup = async () => {
+    const query = sirupSearchQuery.trim();
+    if (!/^\d{7,10}$/.test(query)) {
+      alert("Masukkan nomor RUP yang valid (7-10 digit angka).");
+      return;
+    }
+    
+    setIsSearchingByRup(true);
+    try {
+      const res = await fetch(`/api/sirup/package/${query}`, {
+        headers: {
+          'X-User-Satker': satkerId || ''
+        }
+      });
+      if (!res.ok) {
+        throw new Error(await res.text() || "RUP tidak ditemukan di LKPP.");
+      }
+      const data = await res.json();
+      if (data.success && data.package) {
+        const newPkg = {
+          noSirup: data.package.noSirup,
+          packName: data.package.packName,
+          pagu: data.package.pagu,
+          method: data.package.method,
+          sumberDana: data.package.sumberDana,
+          mak: data.package.mak || '',
+          tahun: data.package.tahun,
+          _from_db: false,
+        };
+        
+        // Tambahkan ke state lokal dulu (langsung tampil)
+        setSirupPackages(prev => {
+          if (prev.some(p => p.noSirup === newPkg.noSirup)) return prev;
+          return [newPkg, ...prev];
+        });
+        
+        // Kosongkan query agar daftar penuh tampil
+        setSirupSearchQuery('');
+        
+        // Reload dari DB untuk sinkronisasi penuh
+        try {
+          const dbRes = await fetch(`/api/sirup/saved?satker_id=${satkerId}&tahun=${new Date().getFullYear()}`);
+          if (dbRes.ok) {
+            const dbData = await dbRes.json();
+            if (dbData.success && dbData.packages?.length > 0) {
+              const mapped = dbData.packages.map(pkg => ({
+                noSirup: pkg.no_sirup,
+                packName: pkg.nama_paket,
+                pagu: pkg.pagu_sirup,
+                method: pkg.metode_pemilihan,
+                sumberDana: pkg.sumber_dana,
+                mak: pkg.mak,
+                tahun: String(pkg.tahun_anggaran),
+                _from_db: true,
+              }));
+              setSirupPackages(mapped);
+              setSirupFromDB(true);
+            }
+          }
+        } catch (dbErr) {
+          console.error('Error reloading from DB:', dbErr);
+        }
+
+        alert(`✅ Sukses menarik Paket RUP #${newPkg.noSirup} dari LKPP!\nPaket telah ditambahkan ke daftar di bawah.`);
+      } else {
+        alert("Gagal menarik data paket RUP dari LKPP.");
+      }
+    } catch (e) {
+      alert("Gagal mencari RUP: " + e.message);
+    } finally {
+      setIsSearchingByRup(false);
+    }
+  };
+
+
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-8 mb-6 animate-slide-up shadow-sm">
@@ -276,19 +352,62 @@ export default function Step1PilihPaket() {
                 <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto" />
                 <p className="text-xs font-semibold">Menghubungkan ke API SIRUP LKPP dan mengambil paket terbaru...</p>
               </div>
-            ) : sirupPackages.length === 0 ? (
-              <div className="p-12 text-center text-slate-400 space-y-2">
-                <Radio className="w-8 h-8 text-slate-400 mx-auto" />
-                <p className="text-xs">Tidak ada data paket LKPP yang berhasil ditarik. Silakan klik tombol "Tarik Ulang LKPP" atau isi manual di bawah.</p>
-              </div>
             ) : (
               <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-100">
-                {sirupPackages
-                  .filter(p =>
-                    (p.packName || '').toLowerCase().includes(sirupSearchQuery.toLowerCase()) ||
-                    String(p.noSirup || '').includes(sirupSearchQuery.trim())
-                  )
-                  .map((p) => (
+                {(() => {
+                  const queryTrim = sirupSearchQuery.trim();
+                  const filtered = sirupPackages.filter(p =>
+                    (p.packName || '').toLowerCase().includes(queryTrim.toLowerCase()) ||
+                    String(p.noSirup || '').includes(queryTrim)
+                  );
+
+                  if (filtered.length === 0 && /^\d{7,10}$/.test(queryTrim)) {
+                    return (
+                      <div className="px-5 py-8 text-center bg-indigo-50/20 flex flex-col items-center justify-center gap-3">
+                        <AlertTriangle className="w-6 h-6 text-indigo-500 animate-bounce" />
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold text-slate-700">Paket RUP #{queryTrim} tidak ditemukan di database lokal</p>
+                          <p className="text-[10px] text-slate-400">Anda dapat langsung mencarinya di portal server LKPP.</p>
+                        </div>
+                        <button
+                          onClick={handleResolveRup}
+                          disabled={isSearchingByRup}
+                          className="bg-indigo-500 hover:bg-indigo-600 disabled:bg-indigo-300 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 active:scale-95 shadow-sm border border-indigo-600"
+                        >
+                          {isSearchingByRup ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Mencari di LKPP...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Search className="w-3.5 h-3.5" />
+                              <span>Cari RUP #{queryTrim} di LKPP</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  if (sirupPackages.length === 0) {
+                    return (
+                      <div className="p-12 text-center text-slate-400 space-y-2">
+                        <Radio className="w-8 h-8 text-slate-400 mx-auto" />
+                        <p className="text-xs">Tidak ada data paket LKPP yang berhasil ditarik. Silakan klik tombol "Tarik Ulang LKPP" atau isi manual di bawah.</p>
+                      </div>
+                    );
+                  }
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="p-8 text-center text-slate-400 text-xs">
+                        Tidak ada paket yang cocok dengan pencarian Anda.
+                      </div>
+                    );
+                  }
+
+                  return filtered.map((p) => (
                     <div key={p.noSirup} className="px-5 py-4 hover:bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-colors">
                       <div className="space-y-1 flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -320,7 +439,7 @@ export default function Step1PilihPaket() {
                               pdn: 'Ya',
                               usahaKecil: 'Ya',
                               jenisPengadaan: 'Barang',
-                              mak: '7.01.01.2.06.0002'
+                              mak: p.mak || '7.01.01.2.06.0002'
                             }
                             setSelectedPack(selected)
                             setHpsValue(p.pagu.toString())
@@ -334,7 +453,8 @@ export default function Step1PilihPaket() {
                         </button>
                       </div>
                     </div>
-                  ))}
+                  ));
+                })()}
               </div>
             )}
           </div>

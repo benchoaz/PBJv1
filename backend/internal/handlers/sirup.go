@@ -230,6 +230,164 @@ func (h *SirupHandler) ImportSirupPackages(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+// GetSirupPackageByID fetches a single package by its RUP ID from DB or LKPP detail page
+func (h *SirupHandler) GetSirupPackageByID(w http.ResponseWriter, r *http.Request) {
+	paketID := r.PathValue("id")
+	if paketID == "" {
+		http.Error(w, "ID RUP wajib diisi", http.StatusBadRequest)
+		return
+	}
+
+	// 1. Coba cari di database lokal terlebih dahulu
+	var dbPackage struct {
+		NoSirup           string `gorm:"column:no_sirup"`
+		PackName          string `gorm:"column:pack_name"`
+		BudgetAllocation  int    `gorm:"column:budget_allocation"`
+		ProcurementMethod string `gorm:"column:procurement_method"`
+		BudgetSource      string `gorm:"column:budget_source"`
+		Year              int    `gorm:"column:year"`
+	}
+
+	err := h.DB.Raw("SELECT no_sirup, pack_name, budget_allocation, procurement_method, budget_source, year FROM procurement_packs WHERE no_sirup = ?", paketID).Scan(&dbPackage).Error
+	log.Printf("[GetSirupPackageByID] Cache check for %s: err=%v, no_sirup=%s", paketID, err, dbPackage.NoSirup)
+	if err == nil && dbPackage.NoSirup != "" {
+		// Ensure it also exists in sirup_package_saveds table
+		var exists int64
+		h.DB.Table("sirup_package_saveds").Where("no_sirup = ? AND tahun_anggaran = ?", dbPackage.NoSirup, dbPackage.Year).Count(&exists)
+		log.Printf("[GetSirupPackageByID] Checking if %s exists in sirup_package_saveds: exists=%d", dbPackage.NoSirup, exists)
+		if exists == 0 {
+			sourceURL := fmt.Sprintf("https://sirup.inaproc.id/sirup/home/detailPaketPenyediaPublic2017?idPaket=%s", dbPackage.NoSirup)
+			satkerID := r.Header.Get("X-User-Satker")
+			if satkerID == "" {
+				satkerID = "67081" // Default Kecamatan Besuk
+			}
+			log.Printf("[GetSirupPackageByID] Syncing cached package %s to sirup_package_saveds for satker=%s", dbPackage.NoSirup, satkerID)
+			dbResult := h.DB.Exec(
+				`INSERT INTO sirup_package_saveds (satker_id, tahun_anggaran, no_sirup, nama_paket, pagu_sirup, sumber_dana, metode_pemilihan, jenis_pengadaan, mak, klpd, satker_nama, volume_pekerjaan, lokasi, uraian, spesifikasi, status_sirup, raw_json, source_url, scraped_at, created_at, updated_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, '', '', '', '', '', '', '', '', 'Live', NULL, ?, NOW(), NOW(), NOW())
+				 ON CONFLICT (no_sirup) DO NOTHING`,
+				satkerID, dbPackage.Year, dbPackage.NoSirup, dbPackage.PackName, dbPackage.BudgetAllocation, dbPackage.BudgetSource, dbPackage.ProcurementMethod, sourceURL,
+			)
+			if dbResult.Error != nil {
+				log.Printf("[GetSirupPackageByID] Error syncing cached package: %v", dbResult.Error)
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"package": SirupPackage{
+				NoSirup:         dbPackage.NoSirup,
+				PackName:        dbPackage.PackName,
+				Pagu:            dbPackage.BudgetAllocation,
+				Method:          dbPackage.ProcurementMethod,
+				SumberDana:      dbPackage.BudgetSource,
+				Tahun:           strconv.Itoa(dbPackage.Year),
+				JadwalPemilihan: "",
+			},
+		})
+		return
+	}
+
+	// 2. Jika tidak ada di lokal, hubungi survey-service proxy
+	lkppURL := fmt.Sprintf("http://127.0.0.1:3001/api/survey/sirup/package/%s", paketID)
+	req, err := http.NewRequest(http.MethodGet, lkppURL, nil)
+	if err != nil {
+		http.Error(w, "Gagal membuat request ke LKPP proxy: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		msg := "Gagal menghubungi LKPP proxy atau data RUP tidak ditemukan"
+		if err != nil {
+			msg += ": " + err.Error()
+		}
+		http.Error(w, msg, http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	var scraped struct {
+		NoSirup    string `json:"noSirup"`
+		PackName   string `json:"packName"`
+		Pagu       int    `json:"pagu"`
+		Method     string `json:"method"`
+		SumberDana string `json:"sumberDana"`
+		Tahun      string `json:"tahun"`
+		SatkerID   string `json:"satkerId"`
+		Satker     string `json:"satker"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&scraped); err != nil {
+		http.Error(w, "Gagal mengurai response RUP detail: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	tahunVal, _ := strconv.Atoi(scraped.Tahun)
+	if tahunVal == 0 {
+		tahunVal = time.Now().Year()
+	}
+
+	// Default satker id if empty
+	satkerID := scraped.SatkerID
+	if satkerID == "" {
+		satkerID = r.Header.Get("X-User-Satker")
+		if satkerID == "" {
+			satkerID = "67081" // Kecamatan Besuk default
+		}
+	}
+
+	// Save to database procurement_packs table
+	h.DB.Exec(
+		`INSERT INTO procurement_packs (no_sirup, pack_name, budget_allocation, procurement_method, budget_source, year, satker_id, pack_status, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, 'Live', NOW(), NOW())
+		 ON CONFLICT (no_sirup) DO UPDATE SET
+			pack_name = EXCLUDED.pack_name,
+			budget_allocation = EXCLUDED.budget_allocation,
+			procurement_method = EXCLUDED.procurement_method,
+			budget_source = EXCLUDED.budget_source,
+			pack_status = 'Live',
+			updated_at = NOW()`,
+		scraped.NoSirup, scraped.PackName, scraped.Pagu, scraped.Method, scraped.SumberDana, tahunVal, satkerID,
+	)
+
+	// Save to database sirup_package_saveds table to make it visible on the page
+	sourceURL := fmt.Sprintf("https://sirup.inaproc.id/sirup/home/detailPaketPenyediaPublic2017?idPaket=%s", scraped.NoSirup)
+	h.DB.Exec(
+		`INSERT INTO sirup_package_saveds (satker_id, tahun_anggaran, no_sirup, nama_paket, pagu_sirup, sumber_dana, metode_pemilihan, jenis_pengadaan, mak, klpd, satker_nama, volume_pekerjaan, lokasi, uraian, spesifikasi, status_sirup, raw_json, source_url, scraped_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, '', '', '', ?, '', '', '', '', 'Live', NULL, ?, NOW(), NOW(), NOW())
+		 ON CONFLICT (no_sirup) DO UPDATE SET
+			nama_paket = EXCLUDED.nama_paket,
+			pagu_sirup = EXCLUDED.pagu_sirup,
+			sumber_dana = EXCLUDED.sumber_dana,
+			metode_pemilihan = EXCLUDED.metode_pemilihan,
+			satker_nama = EXCLUDED.satker_nama,
+			status_sirup = 'Live',
+			source_url = EXCLUDED.source_url,
+			scraped_at = NOW(),
+			updated_at = NOW()`,
+		satkerID, tahunVal, scraped.NoSirup, scraped.PackName, scraped.Pagu, scraped.SumberDana, scraped.Method, scraped.Satker, sourceURL,
+	)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"package": SirupPackage{
+			NoSirup:         scraped.NoSirup,
+			PackName:        scraped.PackName,
+			Pagu:            scraped.Pagu,
+			Method:          scraped.Method,
+			SumberDana:      scraped.SumberDana,
+			Tahun:           scraped.Tahun,
+			JadwalPemilihan: "",
+		},
+	})
+}
+
 // Options handles CORS preflight requests
 func (h *SirupHandler) Options(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")

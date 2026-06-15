@@ -54,6 +54,7 @@ func main() {
 		&models.DpaItemSaved{},
 		&models.SirupPackageSaved{},
 		&models.BudgetRealization{},
+		&models.ProjectAddendum{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate models: %v", err)
@@ -93,6 +94,7 @@ func main() {
 	vendorReportHandler := handlers.NewVendorReportHandler(gormDB)
 	sirupHandler := handlers.NewSirupHandler(gormDB)
 	budgetHandler := handlers.NewBudgetHandler(gormDB)
+	addendumHandler := handlers.NewAddendumHandler(gormDB)
 
 	mux := http.NewServeMux()
 
@@ -148,6 +150,15 @@ func main() {
 	mux.HandleFunc("POST /api/projects/{id}/bahp", bahpHandler.Create)
 	mux.HandleFunc("GET /api/projects/{id}/bahp", bahpHandler.GetByProject)
 
+	// Addendum Routes
+	mux.HandleFunc("OPTIONS /api/projects/{id}/addendum", addendumHandler.Options)
+	mux.HandleFunc("GET /api/projects/{id}/addendum", addendumHandler.GetAddendum)
+	mux.HandleFunc("POST /api/projects/{id}/addendum", addendumHandler.SaveAddendum)
+	mux.HandleFunc("OPTIONS /api/projects/{id}/addendum/verify", addendumHandler.Options)
+	mux.HandleFunc("PUT /api/projects/{id}/addendum/verify", addendumHandler.VerifyAddendum)
+	mux.HandleFunc("OPTIONS /api/projects/{id}/addendum/finalize", addendumHandler.Options)
+	mux.HandleFunc("PUT /api/projects/{id}/addendum/finalize", addendumHandler.FinalizeAddendum)
+
 	// DPA Parser endpoints - proxy to Python PyMuPDF microservice
 	mux.HandleFunc("POST /api/dpa/parse", handlers.ParseDPA)
 	mux.HandleFunc("OPTIONS /api/dpa/parse", handlers.ParseDPAOptions)
@@ -168,6 +179,8 @@ func main() {
 	mux.HandleFunc("GET /api/sirup/satker/{id}", sirupHandler.GetSirupPackages)
 	mux.HandleFunc("POST /api/sirup/satker/{id}", sirupHandler.ImportSirupPackages)
 	mux.HandleFunc("OPTIONS /api/sirup/satker/{id}", sirupHandler.Options)
+	mux.HandleFunc("GET /api/sirup/package/{id}", sirupHandler.GetSirupPackageByID)
+	mux.HandleFunc("OPTIONS /api/sirup/package/{id}", sirupHandler.Options)
 
 	// ── Budget Integration: DPA saved to DB ──────────────────────────────────
 	mux.HandleFunc("POST /api/dpa/accounts/save", budgetHandler.SaveDpaAccounts)
