@@ -31,7 +31,82 @@ func NewSirupHandler(db *gorm.DB) *SirupHandler {
 	return &SirupHandler{DB: db}
 }
 
-// GetSirupPackages fetches live RUP data directly from the official LKPP API, with fallback to local database
+// fetchFromInaproc fetches RUP data directly from sirup.inaproc.id with browser-like headers
+func fetchFromInaproc(satkerID, tahun string) ([]SirupPackage, error) {
+	inaprocURL := fmt.Sprintf(
+		"https://sirup.inaproc.id/sirup/datatablectr/dataruppenyediasatker?tahun=%s&idSatker=%s&sEcho=1&iColumns=7&iDisplayStart=0&iDisplayLength=2000",
+		tahun, satkerID,
+	)
+
+	req, err := http.NewRequest(http.MethodGet, inaprocURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("gagal membuat request: %w", err)
+	}
+	// Set headers yang menyerupai browser asli agar tidak diblokir Cloudflare
+	req.Header.Set("Accept", "application/json, text/javascript, */*; q=0.01")
+	req.Header.Set("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("Referer", fmt.Sprintf("https://sirup.inaproc.id/sirup/home/filterSatker/%s", satkerID))
+	req.Header.Set("Origin", "https://sirup.inaproc.id")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request gagal: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status HTTP: %d", resp.StatusCode)
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("gagal baca response: %w", err)
+	}
+
+	var lkppResponse struct {
+		AaData [][]string `json:"aaData"`
+	}
+	if err := json.Unmarshal(bodyBytes, &lkppResponse); err != nil {
+		return nil, fmt.Errorf("response bukan JSON valid dari inaproc: %w", err)
+	}
+	if len(lkppResponse.AaData) == 0 {
+		return nil, fmt.Errorf("aaData kosong dari inaproc")
+	}
+
+	var packages []SirupPackage
+	for _, raw := range lkppResponse.AaData {
+		if len(raw) < 5 {
+			continue
+		}
+		var paguVal int
+		fmt.Sscanf(raw[2], "%d", &paguVal)
+		method := raw[3]
+		if method == "" || method == "null" {
+			method = "Pengadaan Langsung"
+		}
+		jadwal := ""
+		if len(raw) >= 7 {
+			jadwal = raw[6]
+		}
+		packages = append(packages, SirupPackage{
+			NoSirup:         raw[0],
+			PackName:        raw[1],
+			Pagu:            paguVal,
+			Method:          method,
+			SumberDana:      raw[4],
+			Tahun:           tahun,
+			JadwalPemilihan: jadwal,
+		})
+	}
+	return packages, nil
+}
+
+// GetSirupPackages fetches live RUP data with 3-layer fallback:
+//  1. Direct fetch to sirup.inaproc.id (fastest, browser-headers to bypass Cloudflare)
+//  2. Puppeteer proxy via survey-service (fallback if inaproc blocks server IP)
+//  3. Local database (final fallback)
 func (h *SirupHandler) GetSirupPackages(w http.ResponseWriter, r *http.Request) {
 	satkerID := r.PathValue("id")
 	if satkerID == "" {
@@ -44,66 +119,67 @@ func (h *SirupHandler) GetSirupPackages(w http.ResponseWriter, r *http.Request) 
 		tahun = strconv.Itoa(time.Now().Year())
 	}
 
-	// Fetch up to 2000 records via survey-service (Puppeteer) to bypass IP block
-	lkppURL := fmt.Sprintf(
-		"http://127.0.0.1:3001/api/survey/sirup/%s?tahun=%s",
-		satkerID,
-		tahun,
-	)
-
-	req, err := http.NewRequest(http.MethodGet, lkppURL, nil)
-	if err != nil {
-		http.Error(w, "Gagal membuat request ke LKPP proxy: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	var packages []SirupPackage
 	var useFallback bool
 
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		if err != nil {
-			log.Printf("LKPP Proxy Error: %v", err)
-		} else {
-			log.Printf("LKPP Proxy StatusCode: %d", resp.StatusCode)
-		}
+	// ── Layer 1: Fetch langsung dari sirup.inaproc.id ─────────────────────────
+	pkgs, err := fetchFromInaproc(satkerID, tahun)
+	if err != nil {
+		log.Printf("[SIRUP] inaproc.id gagal: %v — mencoba survey-service", err)
 		useFallback = true
 	} else {
-		defer resp.Body.Close()
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			useFallback = true
-		} else {
-			var lkppResponse struct {
-				AaData [][]string `json:"aaData"`
-			}
-			if err := json.Unmarshal(bodyBytes, &lkppResponse); err != nil {
-				useFallback = true
+		packages = pkgs
+		log.Printf("[SIRUP] inaproc.id berhasil: %d paket untuk satker %s", len(packages), satkerID)
+	}
+
+	// ── Layer 2: Survey-service (Puppeteer) ───────────────────────────────────
+	if useFallback {
+		lkppURL := fmt.Sprintf("http://127.0.0.1:3001/api/survey/sirup/%s?tahun=%s", satkerID, tahun)
+		req, err2 := http.NewRequest(http.MethodGet, lkppURL, nil)
+		if err2 == nil {
+			client := &http.Client{Timeout: 60 * time.Second}
+			resp, err2 := client.Do(req)
+			if err2 != nil || resp.StatusCode != http.StatusOK {
+				if err2 != nil {
+					log.Printf("[SIRUP] survey-service error: %v", err2)
+				} else {
+					log.Printf("[SIRUP] survey-service status: %d", resp.StatusCode)
+				}
 			} else {
-				// Parse raw array to structured JSON
-				for _, raw := range lkppResponse.AaData {
-					if len(raw) < 5 {
-						continue
+				defer resp.Body.Close()
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				var lkppResponse struct {
+					AaData [][]string `json:"aaData"`
+				}
+				if jsonErr := json.Unmarshal(bodyBytes, &lkppResponse); jsonErr == nil && len(lkppResponse.AaData) > 0 {
+					useFallback = false
+					for _, raw := range lkppResponse.AaData {
+						if len(raw) < 5 {
+							continue
+						}
+						var paguVal int
+						fmt.Sscanf(raw[2], "%d", &paguVal)
+						method := raw[3]
+						if method == "" || method == "null" {
+							method = "Pengadaan Langsung"
+						}
+						jadwal := ""
+						if len(raw) >= 7 {
+							jadwal = raw[6]
+						}
+						packages = append(packages, SirupPackage{
+							NoSirup:         raw[0],
+							PackName:        raw[1],
+							Pagu:            paguVal,
+							Method:          method,
+							SumberDana:      raw[4],
+							Tahun:           tahun,
+							JadwalPemilihan: jadwal,
+						})
 					}
-
-					var paguVal int
-					fmt.Sscanf(raw[2], "%d", &paguVal)
-
-					method := raw[3]
-					if method == "" || method == "null" {
-						method = "Pengadaan Langsung"
-					}
-
-					packages = append(packages, SirupPackage{
-						NoSirup:         raw[0],
-						PackName:        raw[1],
-						Pagu:            paguVal,
-						Method:          method,
-						SumberDana:      raw[4],
-						Tahun:           tahun,
-						JadwalPemilihan: raw[6],
-					})
+					log.Printf("[SIRUP] survey-service berhasil: %d paket", len(packages))
+				} else {
+					log.Printf("[SIRUP] survey-service JSON error: %v", jsonErr)
 				}
 			}
 		}
