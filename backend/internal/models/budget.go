@@ -143,7 +143,7 @@ type SirupPackageSaved struct {
 	PaguDiff         float64    `gorm:"type:decimal(18,2);default:0" json:"pagu_diff"`
 
 	// Metadata
-	RawJson          string     `gorm:"type:jsonb" json:"raw_json,omitempty"`
+	RawJson          *string    `gorm:"type:jsonb" json:"raw_json,omitempty"`
 	SourceURL        string     `json:"source_url"`
 	ScrapedAt        time.Time  `json:"scraped_at"`
 	CreatedAt        time.Time  `json:"created_at"`

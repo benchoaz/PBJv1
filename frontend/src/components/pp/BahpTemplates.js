@@ -268,8 +268,8 @@ export const KOMPARASI_KRITERIA = {
     { key: 'penyedia',      label: 'Nama Penyedia Terkonsolidasi' },
     { key: 'jenis_katalog', label: 'Jenis Katalog' },
     { key: 'status_pdn',    label: 'Status PDN / TKDN' },
-    { key: 'stok',          label: 'Ketersediaan Stok (Total Volume)' },
-    { key: 'kesesuaian',    label: 'Kesesuaian Spesifikasi Seluruh Satker' },
+    { key: 'stok',          label: 'Ketersediaan Stok (Volume Satker)' },
+    { key: 'kesesuaian',    label: 'Kesesuaian Spesifikasi Kebutuhan Satker' },
     { key: 'status_pilih',  label: 'Hasil Evaluasi' },
   ],
 };
@@ -337,10 +337,10 @@ Seluruh tenaga ahli yang ditugaskan wajib memiliki Sertifikat Keahlian (SKA) ata
 Biaya personil dihitung berdasarkan Tarif Harga Satuan Orang-Bulan (HSOB) sesuai SBM. Biaya non-personil mencakup laporan pendahuluan, antara, akhir, dan dokumentasi foto. Pembayaran dilakukan berdasarkan kemajuan pekerjaan/deliverable yang diverifikasi.`,
   },
   konsolidasi: {
-    judul: 'Klausul Konsolidasi Pengadaan dan SK Penetapan Penyedia',
-    isi: `Pengadaan ini merupakan Pengadaan Terkonsolidasi sebagaimana diatur dalam Pasal 20 Peraturan Presiden Nomor 12 Tahun 2021, yang dilaksanakan atas dasar Surat Keputusan Penetapan Penyedia Terkonsolidasi dari pejabat yang berwenang. Konsolidasi dilakukan untuk menggabungkan kebutuhan yang sejenis dari beberapa Satuan Kerja/PPK dalam satu proses pengadaan, sehingga diperoleh efisiensi harga dan kemudahan pengelolaan.
+    judul: 'Klausul Konsolidasi Pengadaan dan Pemesanan e-Purchasing',
+    isi: `Pelaksanaan e-Purchasing ini merupakan tindak lanjut atas Pengadaan Terkonsolidasi sebagaimana diatur dalam Pasal 20 Peraturan Presiden Nomor 12 Tahun 2021. Pengadaan ini didasarkan pada hasil konsolidasi pengadaan dan penetapan penyedia melalui Kontrak Payung tingkat instansi yang diterbitkan oleh pejabat yang berwenang (UKPBJ/PA/KPA).
 
-Penyedia yang ditetapkan bertanggung jawab untuk memenuhi kebutuhan seluruh Satuan Kerja peserta konsolidasi sesuai volume dan jadwal pengiriman/layanan yang telah ditetapkan. Masing-masing PPK Satuan Kerja peserta menerbitkan Surat Pesanan (SP) secara terpisah berdasarkan BAHP Terkonsolidasi ini.`,
+Berdasarkan penetapan tersebut, Pejabat Pengadaan Satuan Kerja mengeksekusi pemesanan melalui proses e-Purchasing secara langsung kepada Penyedia Terkonsolidasi yang telah ditetapkan, sesuai dengan rincian kebutuhan spesifikasi, volume, dan ketersediaan pagu pada Dokumen Pelaksanaan Anggaran (DPA) Satuan Kerja.`,
   },
 };
 
@@ -380,9 +380,9 @@ Surat Perintah Kerja (SPK)/Kontrak akan diterbitkan oleh PPK setelah BAHP ini di
 
 Penyedia dinilai memiliki SBU yang sesuai, tenaga ahli dengan SKA yang relevan dan masih berlaku, pengalaman pekerjaan sejenis yang cukup, serta menawarkan biaya yang wajar sesuai SBM. Surat Perintah Mulai Kerja (SPMK) akan diterbitkan oleh PPK setelah kontrak ditandatangani.`,
 
-  konsolidasi: `Berdasarkan hasil penelusuran Katalog Elektronik, verifikasi kemampuan penyedia untuk memenuhi kebutuhan seluruh Satuan Kerja peserta konsolidasi, komparasi harga, dan proses negosiasi terkonsolidasi yang telah dilakukan, Pejabat Pengadaan menetapkan penyedia sebagaimana tercantum dalam berita acara ini sebagai Penyedia Terkonsolidasi. Penetapan mengacu pada Surat Keputusan Konsolidasi yang diterbitkan UKPBJ/PA/KPA yang berwenang.
+  konsolidasi: `Berdasarkan hasil penelusuran Katalog Elektronik, kesesuaian spesifikasi barang/jasa, dan verifikasi ketersediaan stok untuk memenuhi pesanan Satuan Kerja, Pejabat Pengadaan menetapkan pembelian diteruskan kepada Penyedia Terkonsolidasi sebagaimana tercantum dalam berita acara ini. Penetapan ini mengacu pada Surat Keputusan Konsolidasi yang diterbitkan UKPBJ/PA/KPA yang berwenang.
 
-Masing-masing PPK Satuan Kerja peserta selanjutnya menerbitkan Surat Pesanan (SP) secara individual berdasarkan berita acara ini, sesuai volume kebutuhan masing-masing satker yang telah dikonfirmasi.`,
+Selanjutnya, Pejabat Pembuat Komitmen (PPK) Satuan Kerja menindaklanjuti proses ini dengan menerbitkan Surat Pesanan (SP) secara individual sesuai dengan volume kebutuhan Satuan Kerja yang telah dikonfirmasi dan disepakati.`,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -555,22 +555,22 @@ export const VALIDASI_CONFIG = {
     chatPlaceholder: 'Contoh: Konsultan pengawas (PT. Supervisi - Bpk Agus SKA Utama - 0856xxx) via rapat klarifikasi menyepakati penugasan tim, jadwal pelaporan, dan fee bulanan. SBU Konsultansi Konstruksi aktif hingga Maret 2027. SPTA akan diterbitkan direktur...',
   },
   konsolidasi: {
-    d1Label: 'Verifikasi Pagu Per Satker & Kesesuaian Spesifikasi Konsolidasi',
-    d1Desc: 'Apakah pagu masing-masing satker, total volume, dan spesifikasi terkonsolidasi sudah dikonfirmasi?',
-    d1OptYes: 'Ya, pagu dan spesifikasi seluruh satker peserta telah dikonfirmasi dan sesuai',
-    d1OptNo: 'Tidak, ada perbedaan pagu atau spesifikasi antara satker peserta',
-    d3Section: 'satker_peserta',
-    deliveryLabel: 'Jadwal Pengiriman / Layanan Terkonsolidasi',
-    deliveryPlaceholder: 'Contoh: Bertahap per satker sesuai SK Konsolidasi, total selesai dalam 30 hari sejak SP',
+    d1Label: 'Verifikasi Pagu DPA & Kesesuaian Spesifikasi Satker',
+    d1Desc: 'Apakah pagu DPA Satker saat ini, volume, dan spesifikasi pesanan sudah dikonfirmasi?',
+    d1OptYes: 'Ya, spesifikasi pesanan sesuai Kontrak Payung dan pagu Satker mencukupi',
+    d1OptNo: 'Tidak, ada perbedaan spesifikasi atau pagu DPA Satker tidak mencukupi',
+    d3Section: null,
+    deliveryLabel: 'Jadwal Pengiriman ke Satker',
+    deliveryPlaceholder: 'Contoh: Maksimal 14 hari kerja setelah Surat Pesanan diterbitkan PPK',
     warrantyLabel: 'Ketentuan Retur & Penggantian Barang',
-    warrantyPlaceholder: 'Contoh: Penggantian produk rusak/tidak sesuai maksimal 5 hari kerja per satker',
+    warrantyPlaceholder: 'Contoh: Penggantian produk rusak/tidak sesuai maksimal 5 hari kerja',
     paymentOptions: [
-      'Masing-masing satker membayar setelah BAST per satker',
-      'Satu pembayaran terpusat setelah seluruh satker menerima',
-      'Termin per satker sesuai jadwal pengiriman masing-masing',
+      'Lunas setelah serah terima barang dan BAST di Satker',
+      'Termin pembayaran sesuai dengan kemajuan pengiriman ke Satker',
+      'Pembayaran dilakukan setelah penyedia melengkapi BAST dan Faktur',
     ],
-    chatLabel: 'Konfirmasi Penyedia Terkonsolidasi & Koordinasi Pengiriman',
-    chatPlaceholder: 'Contoh: Penyedia terkonsolidasi (CV. Anugrah - Bpk Rudi) via koordinasi menyepakati jadwal pengiriman bertahap ke 5 satker. Total volume 500 rim kertas. Pengiriman mulai Senin, konfirmasi per WA Grup Koordinasi...',
+    chatLabel: 'Konfirmasi Pesanan dengan Penyedia Konsolidasi',
+    chatPlaceholder: 'Contoh: Penyedia terkonsolidasi (CV. Anugrah - Bpk Rudi) via telepon menyepakati ketersediaan stok untuk pesanan satker kami sebanyak 100 rim. Pengiriman dilakukan mulai Senin depan...',
   },
 };
 

@@ -85,8 +85,9 @@ export default function Step2UploadDPA() {
   const fileInputRef = useRef(null);
 
   // ── FUNGSI SIMPAN DPA KE DB ──────────────────────────────────────────────
-  const saveDpaAccountsToDB = async (accounts, fileName) => {
+  const saveDpaAccountsToDB = async (accounts, fileName, currentRincian = null) => {
     if (!accounts || accounts.length === 0) return;
+    const rincianData = currentRincian || dpaRincian;
     const satker = currentUser?.idSatker || satkerId;
     if (!satker) return;
     setIsSavingDpa(true);
@@ -109,7 +110,7 @@ export default function Step2UploadDPA() {
             is_valid: acc.is_valid,
             validation_reason: acc.validation_reason,
             raw_text_block: acc.raw_text_block,
-            items: (dpaRincian[acc.account] || []).map((item, i) => ({
+            items: (rincianData[acc.account] || []).map((item, i) => ({
               no: i + 1,
               nama: item.nama,
               volume: item.volume,
@@ -255,9 +256,8 @@ export default function Step2UploadDPA() {
     if (satkerId) {
       loadDpaFromDB();       // ← Load DPA dari DB terlebih dahulu
       loadSirupFromDB(satkerId);  // ← Load SIRUP dari DB
-      if (sirupPackages.length === 0) {
-        fetchSirupPackages(satkerId);  // ← Fallback fetch live jika tidak ada di DB
-      }
+      // HAPUS fetchSirupPackages fallback di sini karena menyebabkan race condition
+      // dengan Step1PilihPaket yang juga memuat dari DB, sehingga menimpa data menjadi [].
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [satkerId]);
@@ -471,14 +471,57 @@ export default function Step2UploadDPA() {
                     }
                     
                     // 3.5. Otomatis isi Metadata Paket dari hasil DPA (jika ada)
-                    setPackageMetadata(prev => ({
-                      ...prev,
-                      program: result.program || prev.program,
-                      kegiatan: result.kegiatan || prev.kegiatan,
-                      sub_kegiatan: result.sub_kegiatan || prev.sub_kegiatan,
-                      lokasi_pekerjaan: result.lokasi || prev.lokasi_pekerjaan,
-                      waktu_penyelesaian: result.waktu_pelaksanaan || prev.waktu_penyelesaian
-                    }))
+                    setPackageMetadata(prev => {
+                      let subKegiatanStr = result.sub_kegiatan || prev.sub_kegiatan || '';
+                      let nomorSubKegiatan = prev.nomor_sub_kegiatan || '';
+                      let sumberDana = prev.sumber_dana || '';
+                      
+                      let programStr = result.program || prev.program || '';
+                      let nomorProgram = prev.nomor_program || '';
+                      if (result.program) {
+                          const pMatch = programStr.match(/^([\d\.]+)\s*-\s*(.*)/);
+                          if (pMatch) {
+                              nomorProgram = pMatch[1].trim();
+                              programStr = pMatch[2].trim();
+                          }
+                      }
+
+                      let kegiatanStr = result.kegiatan || prev.kegiatan || '';
+                      let nomorKegiatan = prev.nomor_kegiatan || '';
+                      if (result.kegiatan) {
+                          const kMatch = kegiatanStr.match(/^([\d\.]+)\s*-\s*(.*)/);
+                          if (kMatch) {
+                              nomorKegiatan = kMatch[1].trim();
+                              kegiatanStr = kMatch[2].trim();
+                          }
+                      }
+
+                      if (result.sub_kegiatan) {
+                          const sdParts = subKegiatanStr.split(/Sumber Pendanaan\s*:?\s*/i);
+                          if (sdParts.length > 1) {
+                              sumberDana = sdParts[1].trim();
+                              subKegiatanStr = sdParts[0].trim();
+                          }
+                          const numMatch = subKegiatanStr.match(/^([\d\.]+)\s*-\s*(.*)/);
+                          if (numMatch) {
+                              nomorSubKegiatan = numMatch[1].trim();
+                              subKegiatanStr = numMatch[2].trim();
+                          }
+                      }
+
+                      return {
+                        ...prev,
+                        program: programStr,
+                        nomor_program: nomorProgram,
+                        kegiatan: kegiatanStr,
+                        nomor_kegiatan: nomorKegiatan,
+                        sub_kegiatan: subKegiatanStr,
+                        nomor_sub_kegiatan: nomorSubKegiatan,
+                        sumber_dana: sumberDana,
+                        lokasi_pekerjaan: result.lokasi || prev.lokasi_pekerjaan,
+                        waktu_penyelesaian: result.waktu_pelaksanaan || prev.waktu_penyelesaian
+                      };
+                    })
 
                     // 4. Catat mode ekstraksi yang berhasil dilakukan (ai atau local)
                     const returnedMode = result.ocr_mode || (activeKey ? 'ai' : 'local')
@@ -1115,16 +1158,23 @@ export default function Step2UploadDPA() {
                   className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50"
                 >Batal</button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const validItems = rincianModal.items.filter(r => r.nama && r.harga_satuan > 0)
-                    setDpaRincian(prev => ({ ...prev, [rincianModal.kodeRekening]: validItems }))
-                    setDpaAccounts(prev => prev.map(acc =>
+                    const newDpaRincian = { ...dpaRincian, [rincianModal.kodeRekening]: validItems };
+                    const newDpaAccounts = dpaAccounts.map(acc =>
                       acc.account === rincianModal.kodeRekening
                         ? { ...acc, rincianCount: validItems.length, verified: true }
                         : acc
-                    ))
+                    );
+                    
+                    setDpaRincian(newDpaRincian);
+                    setDpaAccounts(newDpaAccounts);
+                    
+                    // Simpan permanen ke Database sebagai Ground Truth
+                    await saveDpaAccountsToDB(newDpaAccounts, dpaName, newDpaRincian);
+                    
                     setRincianModal(null)
-                    alert(`✅ ${validItems.length} item rincian disimpan untuk rekening ${rincianModal.kodeRekening}`)
+                    alert(`✅ ${validItems.length} item rincian disimpan ke Ground Truth untuk rekening ${rincianModal.kodeRekening}!`)
                   }}
                   className="px-5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold shadow-sm flex items-center gap-1.5"
                 >

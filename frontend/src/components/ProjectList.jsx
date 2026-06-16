@@ -407,7 +407,7 @@ export default function ProjectList() {
                 {filtered.map((project, idx) => {
                   let parsedData = {}
                   try { parsedData = JSON.parse(project.description || '{}') } catch (e) {}
-                  const isLocked = project.status === 'Terkirim ke PP' || project.status === 'Selesai (Arsip Lengkap)'
+                  const isLocked = project.status === 'Terkirim ke PP' || project.status === 'Selesai' || project.status === 'Selesai (Arsip Lengkap)' || project.status === 'Selesai (Arsip Belum Lengkap)' || project.status === 'Selesai (Adendum)' || project.status === 'Verifikasi Adendum oleh PP' || project.status === 'Adendum Disetujui PP'
                   const cfg = STATUS_CONFIG[project.status] || STATUS_CONFIG['Draft']
                   const tgl = project.created_at ? new Date(project.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' }) : '-'
 
@@ -477,7 +477,11 @@ export default function ProjectList() {
                               if (user?.role === 'PP') {
                                 navigate(`/pp/panel?paketId=${project.id}`)
                               } else {
-                                navigate(`/ppk/persiapan?paketId=${project.id}`)
+                                if (['Selesai', 'Selesai (Arsip Lengkap)', 'Selesai (Arsip Belum Lengkap)', 'Selesai (Adendum)'].includes(project.status)) {
+                                  handleOpenArchive(project)
+                                } else {
+                                  navigate(`/ppk/persiapan?paketId=${project.id}`)
+                                }
                               }
                             }}
                             title={isLocked ? 'Lihat Arsip DPP' : 'Edit Dokumen'}
@@ -555,14 +559,15 @@ export default function ProjectList() {
               const totalHps = parseFloat(parsedData?.hpsValue || 0) || 0;
               const pagu = project.budget || 0
               const efisiensi = pagu - totalHps
-              const isLocked = project.status === 'Terkirim ke PP' || project.status === 'Selesai (Arsip Lengkap)'
+              const isLocked = project.status === 'Terkirim ke PP' || project.status === 'Selesai' || project.status === 'Selesai (Arsip Lengkap)' || project.status === 'Selesai (Arsip Belum Lengkap)' || project.status === 'Selesai (Adendum)' || project.status === 'Verifikasi Adendum oleh PP' || project.status === 'Adendum Disetujui PP'
               const cfg = STATUS_CONFIG[project.status] || STATUS_CONFIG['Draft']
 
               return (
                 <div key={project.id} className="bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group relative overflow-hidden">
                   {/* Accent line */}
                   <div className={`absolute top-0 left-0 w-full h-1 ${
-                    project.status === 'Selesai (Arsip Lengkap)' ? 'bg-violet-500'
+                    ['Selesai', 'Selesai (Arsip Lengkap)', 'Selesai (Adendum)'].includes(project.status) ? 'bg-violet-500'
+                    : project.status === 'Selesai (Arsip Belum Lengkap)' ? 'bg-rose-500'
                     : project.status === 'Terkirim ke PP' ? 'bg-amber-400'
                     : 'bg-indigo-500'
                   }`}/>
@@ -613,7 +618,11 @@ export default function ProjectList() {
                         if (user?.role === 'PP') {
                           navigate(`/pp/panel?paketId=${project.id}`)
                         } else {
-                          navigate(`/ppk/persiapan?paketId=${project.id}`)
+                          if (['Selesai', 'Selesai (Arsip Lengkap)', 'Selesai (Arsip Belum Lengkap)', 'Selesai (Adendum)'].includes(project.status)) {
+                            handleOpenArchive(project)
+                          } else {
+                            navigate(`/ppk/persiapan?paketId=${project.id}`)
+                          }
                         }
                       }}
                       className="flex-1 inline-flex items-center justify-center gap-1.5 border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600 text-[11px] font-semibold py-2 rounded-lg transition-all"

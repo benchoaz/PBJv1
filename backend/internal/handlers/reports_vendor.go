@@ -105,7 +105,7 @@ func (h *VendorReportHandler) GetVendorPerformance(w http.ResponseWriter, r *htt
 
 	var projects []models.Project
 	// Scan finished projects
-	err := h.DB.Preload("Items").Where("status = ? OR status = ?", "Selesai", "Selesai (Arsip Lengkap)").Find(&projects).Error
+	err := h.DB.Preload("Items").Where("status = ? OR status = ? OR status = ? OR status = ?", "Selesai", "Selesai (Arsip Lengkap)", "Selesai (Arsip Belum Lengkap)", "Selesai (Adendum)").Find(&projects).Error
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to fetch projects: "+err.Error())
 		return

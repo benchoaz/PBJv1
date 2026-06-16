@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 
 const PPKContext = createContext();
@@ -13,7 +13,23 @@ export function PPKProvider({ children }) {
   // -- State declarations from ProcurementPreparation --
   const [docSettings, setDocSettings] = useState(() => {
     const saved = localStorage.getItem('pbj_doc_settings');
-    const defaultSettings = { showKop: true, marginTop: 40, marginLeft: 40, marginBottom: 30, marginRight: 20, formatNomorSurat: '027/{nomor}/DKUPP/2026' };
+    const defaultSettings = {
+      showKop: true,
+      logoType: 'pemda',
+      namaPemda: currentUser?.perangkatDaerah || 'PEMERINTAH KABUPATEN PROBOLINGGO',
+      namaInstansi: currentUser?.department ? currentUser.department.toUpperCase() : 'PENGADAAN BARANG/JASA',
+      alamatLengkap: 'Jl. Jenderal Ahmad Yani No. 23 Probolinggo – Probolinggo - 67219. Laman: https://probolinggokab.go.id',
+      paperSize: 'A4',
+      marginTop: 20,
+      marginBottom: 25,
+      marginLeft: 30,
+      marginRight: 20,
+      fontFamily: 'Arial',
+      fontSize: '12pt',
+      lineHeight: '1.15',
+      formatNomorSurat: '027/{nomor}/DKUPP/2026',
+      customLogo: null
+    };
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed.marginTop === 15 && parsed.marginLeft === 25 && parsed.marginBottom === 20 && parsed.marginRight === 20) {
@@ -21,14 +37,36 @@ export function PPKProvider({ children }) {
         localStorage.setItem('pbj_doc_settings', JSON.stringify(parsed));
       }
       parsed.showKop = true;
-      return { ...defaultSettings, ...parsed };
+      
+      // Fallback for empty strings (so that we don't render blank text if user saved empty strings)
+      const finalSettings = { ...defaultSettings, ...parsed };
+      if (!finalSettings.namaPemda?.trim()) finalSettings.namaPemda = defaultSettings.namaPemda;
+      if (!finalSettings.namaInstansi?.trim()) finalSettings.namaInstansi = defaultSettings.namaInstansi;
+      if (!finalSettings.alamatLengkap?.trim()) finalSettings.alamatLengkap = defaultSettings.alamatLengkap;
+      
+      return finalSettings;
     }
     return defaultSettings;
   });
 
   const [step, setStep] = useState(() => parseInt(localStorage.getItem('pbj_step') || '1'));
   const [dpaName, setDpaName] = useState(() => localStorage.getItem('pbj_dpa_name') || null);
-  const [satkerId, setSatkerId] = useState(() => localStorage.getItem('pbj_satker_id') || currentUser?.idSatker || '67081');
+  
+  // Use same fallback logic as TemplateSuratManager
+  const getEffectiveSatkerId = (u) => u?.idSatker || (u?.department ? u.department.replace(/\s+/g, '_').toLowerCase() : '67081');
+  const [satkerId, setSatkerId] = useState(() => localStorage.getItem('pbj_satker_id') || getEffectiveSatkerId(currentUser));
+
+  // Auto-update satkerId when currentUser becomes available
+  useEffect(() => {
+    if (currentUser) {
+      const effId = getEffectiveSatkerId(currentUser);
+      if (effId !== satkerId) {
+        setSatkerId(effId);
+        localStorage.setItem('pbj_satker_id', effId);
+      }
+    }
+  }, [currentUser]);
+
   const [scrapedData, setScrapedData] = useState(() => { const s = localStorage.getItem('pbj_scraped_data'); return s ? JSON.parse(s) : []; });
   const [selectedPack, setSelectedPack] = useState(() => { const s = localStorage.getItem('pbj_selected_pack'); return s ? JSON.parse(s) : null; });
   const [detailModalPack, setDetailModalPack] = useState(null);
@@ -39,28 +77,29 @@ export function PPKProvider({ children }) {
   const [techSpecs, setTechSpecs] = useState(() => localStorage.getItem('pbj_tech_specs') || '');
   const [dppSpecs, setDppSpecs] = useState(() => { const s = localStorage.getItem('pbj_dpp_specs'); return s ? JSON.parse(s) : { waktu: '1 (Satu) hari kerja', tempat: '', spesifikasiLayanan: '', justifikasiMerek: '', metodePemilihan: 'Negosiasi Harga' }; });
   const [packageMetadata, setPackageMetadata] = useState(() => { const s = localStorage.getItem('pbj_package_metadata'); return s ? JSON.parse(s) : { lokasi_pekerjaan: '', waktu_penyelesaian: '14 (empat belas) hari kalender', program: '', kegiatan: '', sub_kegiatan: '', nomor_dpp: '' }; });
-  const [selectedTplId, setSelectedTplId] = useState(() => {
-    const s = localStorage.getItem('pbj_selected_pack');
-    if (s) {
-      const pack = JSON.parse(s);
-      const packId = pack.id || pack.noSirup;
-      return localStorage.getItem(`pbj_selected_template_${packId}`) || '';
-    }
-    return '';
-  });
-  const [selectedNdTplId, setSelectedNdTplId] = useState(() => {
-    const s = localStorage.getItem('pbj_selected_pack');
-    if (s) {
-      const pack = JSON.parse(s);
-      const packId = pack.id || pack.noSirup;
-      return localStorage.getItem(`pbj_selected_nd_template_${packId}`) || '';
-    }
-    return '';
-  });
+  const [selectedTplId, setSelectedTplId] = useState(() => localStorage.getItem('pbj_selected_tpl_id') || '');
+  const [selectedNdTplId, setSelectedNdTplId] = useState(() => localStorage.getItem('pbj_selected_nd_tpl_id') || '');
   const [matchedDpaTypes, setMatchedDpaTypes] = useState(() => { const s = localStorage.getItem('pbj_matched_dpa_types'); return s ? JSON.parse(s) : []; });
   const [dpaAccounts, setDpaAccounts] = useState(() => { const s = localStorage.getItem('pbj_dpa_accounts'); return s ? JSON.parse(s) : []; });
   const [dpaRincian, setDpaRincian] = useState(() => { const s = localStorage.getItem('pbj_dpa_rincian'); return s ? JSON.parse(s) : {}; });
-  const [sirupPackages, setSirupPackages] = useState(() => { const s = localStorage.getItem('pbj_sirup_packages'); return s ? JSON.parse(s) : []; });
+  const [sirupPackagesState, setSirupPackagesState] = useState(() => { 
+    try {
+      const s = localStorage.getItem('pbj_sirup_packages'); 
+      return s ? JSON.parse(s) : []; 
+    } catch(e) { return []; }
+  });
+
+  const sirupPackages = sirupPackagesState;
+  const setSirupPackages = (newVal) => {
+    let resolvedVal = typeof newVal === 'function' ? newVal(sirupPackagesState) : newVal;
+    window.__sirupLog = window.__sirupLog || [];
+    window.__sirupLog.push({
+      time: new Date().toISOString(),
+      len: resolvedVal?.length,
+      trace: new Error().stack
+    });
+    setSirupPackagesState(newVal);
+  };
   const [namaAcara, setNamaAcara] = useState(() => localStorage.getItem('pbj_nama_acara') || '');
   const [tanggalSurat, setTanggalSurat] = useState(() => localStorage.getItem('pbj_tanggal_surat') || new Date().toISOString().split('T')[0]);
   const [comparisons, setComparisons] = useState(() => { const s = localStorage.getItem('pbj_comparisons'); return s ? JSON.parse(s) : {}; });
@@ -75,6 +114,38 @@ export function PPKProvider({ children }) {
   const [aiError, setAiError] = useState('');
   const [activeDocPreview, setActiveDocPreview] = useState(null);
 
+  // Sync settings from backend for cross-device persistence
+  useEffect(() => {
+    if (!satkerId) return;
+    const fetchBackendSettings = async () => {
+      try {
+        const resDoc = await fetch(`/api/settings/doc_settings_satker_${satkerId}`);
+        if (resDoc.ok) {
+          const data = await resDoc.json();
+          if (data && data.value) {
+            const parsed = JSON.parse(data.value);
+            setDocSettings(prev => ({ ...prev, ...parsed }));
+            localStorage.setItem('pbj_doc_settings', data.value);
+          }
+        }
+        
+        const resTpl = await fetch(`/api/settings/templates_satker_${satkerId}`);
+        if (resTpl.ok) {
+          const data = await resTpl.json();
+          if (data && data.value) {
+            const parsed = JSON.parse(data.value);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              localStorage.setItem('pbj_templates', data.value);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to sync settings from backend', e);
+      }
+    };
+    fetchBackendSettings();
+  }, [satkerId]);
+
   // Load state and Project tracking
   const [currentProjectId, setCurrentProjectId] = useState(() => localStorage.getItem('pbj_current_project_id') || null);
   const [status, setStatus] = useState(() => localStorage.getItem('pbj_status') || 'Draft');
@@ -88,16 +159,9 @@ export function PPKProvider({ children }) {
   useEffect(() => { localStorage.setItem('pbj_doc_settings', JSON.stringify(docSettings)); }, [docSettings]);
   useEffect(() => { localStorage.setItem('pbj_scraped_data', JSON.stringify(scrapedData)); }, [scrapedData]);
   useEffect(() => { if (selectedPack) localStorage.setItem('pbj_selected_pack', JSON.stringify(selectedPack)); else localStorage.removeItem('pbj_selected_pack'); }, [selectedPack]);
-  useEffect(() => {
-    if (selectedPack) {
-      const packId = selectedPack.id || selectedPack.noSirup;
-      const savedNd = localStorage.getItem(`pbj_selected_nd_template_${packId}`) || '';
-      const savedDpp = localStorage.getItem(`pbj_selected_template_${packId}`) || '';
-      setSelectedNdTplId(savedNd);
-      setSelectedTplId(savedDpp);
-    }
-  }, [selectedPack]);
   useEffect(() => { localStorage.setItem('pbj_hps_exempt_selected', isHpsExemptSelected.toString()); }, [isHpsExemptSelected]);
+  useEffect(() => { localStorage.setItem('pbj_selected_tpl_id', selectedTplId); }, [selectedTplId]);
+  useEffect(() => { localStorage.setItem('pbj_selected_nd_tpl_id', selectedNdTplId); }, [selectedNdTplId]);
   useEffect(() => { localStorage.setItem('pbj_hps_prices', JSON.stringify(hpsPrices)); }, [hpsPrices]);
   useEffect(() => { localStorage.setItem('pbj_hps_value', hpsValue); }, [hpsValue]);
   useEffect(() => { localStorage.setItem('pbj_tech_specs', techSpecs); }, [techSpecs]);
@@ -200,7 +264,7 @@ export function PPKProvider({ children }) {
     ];
   };
 
-  const silentReset = () => {
+  const silentReset = useCallback(() => {
     localStorage.removeItem('pbj_dpa_name');
     localStorage.removeItem('pbj_scraped_data');
     localStorage.removeItem('pbj_matched_dpa_types');
@@ -243,7 +307,7 @@ export function PPKProvider({ children }) {
     setNamaAcara('');
     setCurrentProjectId(null);
     setStatus('Draft');
-  };
+  }, []);
 
   const resetAll = () => {
     if (!confirm('Anda yakin ingin mereset semua data? Proses ini tidak dapat dibatalkan.')) return;
@@ -290,12 +354,26 @@ export function PPKProvider({ children }) {
         setDpaRincian({ [key]: rincian });
       }
 
-      if (parsed.docSettings) setDocSettings(parsed.docSettings);
+      // CRITICAL FIX: We only merge `parsed.docSettings` if the project is LOCKED.
+      // For Drafts, we want the "Template Surat" menu (which saves to localStorage) to act as a GLOBAL source of truth.
+      // But for Locked documents, we MUST show the exact snapshot (including signatures and Kop Surat at the time).
       
       if (project.status && project.status !== 'Draft') {
         setStep(5);
+        if (parsed.docSettings) {
+          setDocSettings(parsed.docSettings);
+        }
       } else if (parsed.step) {
         setStep(parsed.step);
+      } else {
+        // Fallback for old projects without parsed.step
+        if (parsed.items || (parsed.dpaRincian && Object.keys(parsed.dpaRincian).length > 0)) {
+          setStep(4); // Or 3 if no template data, but 4 is safe to reveal
+        } else if (parsed.selectedPack) {
+          setStep(3);
+        } else {
+          setStep(2);
+        }
       }
       
       if (parsed.surveyData) {
@@ -317,7 +395,59 @@ export function PPKProvider({ children }) {
       if (parsed.dppSpecs) setDppSpecs(parsed.dppSpecs);
       
       if (parsed.packageMetadata) {
-        setPackageMetadata(parsed.packageMetadata);
+        let md = parsed.packageMetadata;
+        
+        // Auto-fix/migrate old combined strings
+        let nomor_program = md.nomor_program || '';
+        let program = md.program || parsed.program || '';
+        if (!nomor_program && program.includes(' - ')) {
+           const p = program.split(' - ');
+           nomor_program = p[0].trim();
+           program = p.slice(1).join(' - ').trim();
+        }
+
+        let nomor_kegiatan = md.nomor_kegiatan || '';
+        let kegiatan = md.kegiatan || parsed.kegiatan || '';
+        if (!nomor_kegiatan && kegiatan.includes(' - ')) {
+           const k = kegiatan.split(' - ');
+           nomor_kegiatan = k[0].trim();
+           kegiatan = k.slice(1).join(' - ').trim();
+        }
+
+        let nomor_sub_kegiatan = md.nomor_sub_kegiatan || '';
+        let sub_kegiatan = md.sub_kegiatan || parsed.sub_kegiatan || '';
+        let sumber_dana = md.sumber_dana || '';
+        
+        if (!sumber_dana && sub_kegiatan.toLowerCase().includes('sumber pendanaan')) {
+           const sdParts = sub_kegiatan.split(/Sumber Pendanaan\s*:?\s*/i);
+           if (sdParts.length > 1) {
+               sumber_dana = sdParts[1].trim();
+               sub_kegiatan = sdParts[0].trim();
+           }
+        }
+
+        if (!nomor_sub_kegiatan && sub_kegiatan.includes(' - ')) {
+           const numMatch = sub_kegiatan.match(/^([\d\.]+)\s*-\s*(.*)/);
+           if (numMatch) {
+               nomor_sub_kegiatan = numMatch[1].trim();
+               sub_kegiatan = numMatch[2].trim();
+           }
+        }
+
+        setPackageMetadata({
+          ...md,
+          lokasi_pekerjaan: md.lokasi_pekerjaan || parsed.location || '',
+          waktu_penyelesaian: md.waktu_penyelesaian || parsed.duration || '14 (empat belas) hari kalender',
+          program: program,
+          kegiatan: kegiatan,
+          sub_kegiatan: sub_kegiatan,
+          nomor_program: nomor_program,
+          nomor_kegiatan: nomor_kegiatan,
+          nomor_sub_kegiatan: nomor_sub_kegiatan,
+          sumber_dana: sumber_dana,
+          nomor_dpp: md.nomor_dpp || parsed.nomor_dpp || '',
+          nomor_nd: md.nomor_nd || parsed.nomor_nd || ''
+        });
       } else {
         setPackageMetadata({
           lokasi_pekerjaan: parsed.location || '',
@@ -325,7 +455,10 @@ export function PPKProvider({ children }) {
           program: parsed.program || '',
           kegiatan: parsed.kegiatan || '',
           sub_kegiatan: parsed.sub_kegiatan || '',
-          nomor_dpp: parsed.nomor_dpp || ''
+          nomor_sub_kegiatan: '',
+          sumber_dana: '',
+          nomor_dpp: parsed.nomor_dpp || '',
+          nomor_nd: parsed.nomor_nd || ''
         });
       }
 

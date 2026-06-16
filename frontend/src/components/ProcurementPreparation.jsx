@@ -17,6 +17,7 @@ function ProcurementPreparationContent() {
     scrapedData,
     dpaAccounts,
     resetAll,
+    silentReset,
     status = 'Draft',
     currentProjectId,
     loadProjectData
@@ -29,46 +30,57 @@ function ProcurementPreparationContent() {
   useEffect(() => {
     // ALWAYS fetch from DB when navigating here with a paketId
     // We use a ref to prevent infinite loops caused by loadProjectData changing
-    if (paketId && fetchedIdRef.current !== paketId) {
-      fetchedIdRef.current = paketId;
-      fetch(`/api/projects/${paketId}`)
-        .then(res => {
-          if (!res.ok) throw new Error('Paket tidak ditemukan');
-          return res.json();
-        })
-        .then(data => {
-          loadProjectData(data);
-        })
-        .catch(err => {
-          console.error(err);
-          alert('Gagal memuat paket: ' + err.message);
-        });
+    if (paketId) {
+      if (fetchedIdRef.current !== paketId) {
+        fetchedIdRef.current = paketId;
+        fetch(`/api/projects/${paketId}`)
+          .then(res => {
+            if (!res.ok) throw new Error('Paket tidak ditemukan');
+            return res.json();
+          })
+          .then(data => {
+            loadProjectData(data);
+          })
+          .catch(err => {
+            console.error(err);
+            alert('Gagal memuat paket: ' + err.message);
+          });
+      }
+    } else {
+      // Clear fetching ref and reset context storage so it doesn't carry over a locked project
+      fetchedIdRef.current = null;
+      silentReset();
     }
-  }, [paketId, loadProjectData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paketId]);
 
   useEffect(() => {
     if (!user) {
       navigate('/login');
     } else if (user.role.toUpperCase() !== 'PPK' && user.role.toUpperCase() !== 'ADMIN') {
-      navigate('/pp/panel');
+      if (user.role.toUpperCase() === 'PP' && paketId) {
+        // Allow PP to view existing packages in read-only mode
+      } else {
+        navigate('/pp/panel');
+      }
     }
-  }, [user, navigate]);
+  }, [user, navigate, paketId]);
 
   return (
-    <div id="pbk-persiapan-root" className={`animate-fade-in pb-12 ${status === 'Terkirim ke PP' ? 'pointer-events-none' : ''}`}>
+    <div id="pbk-persiapan-root" className="animate-fade-in pb-12">
       {/* LOCK ALERT OVERLAY FOR READ-ONLY MODE */}
-      {status === 'Terkirim ke PP' && (
-        <div className="bg-amber-50 border-l-4 border-amber-500 p-6 mb-8 rounded-r-xl shadow-sm pointer-events-auto relative z-10">
+      {status !== 'Draft' && (
+        <div className="bg-amber-50 border-l-4 border-amber-500 p-6 mb-8 rounded-r-xl shadow-sm pointer-events-auto relative z-10 animate-fade-in">
           <div className="flex">
             <div className="flex-shrink-0">
               <span className="text-2xl">🔒</span>
             </div>
             <div className="ml-4">
               <h3 className="text-lg font-bold text-amber-800">
-                Dokumen Terkunci (Terkirim ke PP)
+                Dokumen Terkunci (Status: {status})
               </h3>
               <p className="text-amber-700 mt-1">
-                Paket pengadaan ini telah berhasil dikirim ke Pejabat Pengadaan (PP). Sistem secara otomatis <b>menggembok</b> seluruh isian agar tidak terjadi perubahan data secara sepihak. Anda masih bisa melihat rincian dan mengunduh PDF / Arsip.
+                Paket pengadaan ini sudah diproses ke tahap lanjut. Sistem secara otomatis <b>menggembok</b> seluruh isian agar tidak terjadi perubahan data secara sepihak. Anda masih bisa melihat rincian, mengunduh PDF, atau melakukan tanda tangan digital (jika diperlukan).
               </p>
             </div>
           </div>
@@ -90,11 +102,13 @@ function ProcurementPreparationContent() {
         )}
       </div>
 
-      <Step1PilihPaket />
-      {step >= 2 && <Step2UploadDPA />}
-      {step >= 3 && <Step3RincianHPS />}
-      {step >= 4 && <Step4TemplateSurat />}
-      {step >= 5 && <Step5Review />}
+      <div className={status !== 'Draft' ? 'pointer-events-none opacity-90' : ''}>
+        <Step1PilihPaket />
+        {step >= 2 && <Step2UploadDPA />}
+        {step >= 3 && <Step3RincianHPS />}
+        {step >= 4 && <Step4TemplateSurat />}
+        {step >= 5 && <Step5Review />}
+      </div>
     </div>
   );
 }

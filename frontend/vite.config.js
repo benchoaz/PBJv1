@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+    allowedHosts: ['propbj.web.id'],
     proxy: {
       '/api/survey': {
         target: 'http://localhost:3001',

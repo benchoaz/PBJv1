@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   BAHP_TEMPLATE_TYPES,
   KOMPARASI_KRITERIA,
@@ -11,7 +11,8 @@ import {
 
 /**
  * BahpDocument — Dokumen BAHP resmi yang dapat dicetak.
- * Setiap jenis pengadaan menghasilkan dokumen yang secara substansial berbeda.
+ * Mendukung "Panel Edit Manual" — PP dapat mengkoreksi teks tertentu
+ * melalui panel form sederhana. Override tersimpan per paketId di localStorage.
  */
 export default function BahpDocument({
   templateId = 'atk',
@@ -24,7 +25,29 @@ export default function BahpDocument({
   refinedBahpConclusion,
   getPackageItems,
   getDynamicTotalPagu,
+  activeAddendum,
 }) {
+  const paketId    = submittedPack?.id || submittedPack?.packId || 'default';
+  const STORE_KEY  = `pbj_bahp_override_${paketId}`;
+
+  const [editPanelOpen, setEditPanelOpen] = useState(false);
+  const [overrides, setOverrides] = useState(() => {
+    try { const s = localStorage.getItem(STORE_KEY); return s ? JSON.parse(s) : {}; }
+    catch { return {}; }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORE_KEY, JSON.stringify(overrides));
+  }, [overrides, STORE_KEY]);
+
+  const setOv = useCallback((key, val) =>
+    setOverrides(prev => ({ ...prev, [key]: val })), []);
+
+  const resetOv = useCallback((key) =>
+    setOverrides(prev => { const n = { ...prev }; delete n[key]; return n; }), []);
+
+  const hasOverride = Object.keys(overrides).length > 0;
+
   // ── Metadata dokumen ──────────────────────────────────────────────────────
   const instansi   = docSettings.namaInstansi    || submittedPack?.senderDepartment || 'Kecamatan Besuk';
   const ukpbj      = docSettings.namaUKPBJ       || 'Unit Kerja Pengadaan Barang/Jasa (UKPBJ)';
@@ -68,7 +91,6 @@ export default function BahpDocument({
   const tenagaAhliList    = getStoredJson('pbj_tenaga_ahli_list', []);
   const biayaPersonil     = parseFloat(localStorage.getItem('pbj_biaya_personil') || '0');
   const biayaNonPersonil  = parseFloat(localStorage.getItem('pbj_biaya_non_personil') || '0');
-  const satkerPesertaList = getStoredJson('pbj_satker_peserta_list', []);
   const koordinatLokasi   = localStorage.getItem('pbj_koordinat_lokasi') || '';
   const personilK3        = localStorage.getItem('pbj_personil_k3') || '';
   const metodeKerja       = localStorage.getItem('pbj_metode_kerja') || '';
@@ -91,11 +113,123 @@ export default function BahpDocument({
     konstruksi:            [{ key: 'sbu', label: 'SBU' }, { key: 'jadwal', label: 'Waktu (HK)' }, { key: 'k3', label: 'K3/SMKK' }],
     konsultasi_non:        [{ key: 'tenaga_ahli', label: 'Tenaga Ahli' }, { key: 'jangka_waktu', label: 'Jangka Waktu (Bln)' }, { key: 'output', label: 'Output' }],
     konsultasi_konstruksi: [{ key: 'sbu', label: 'SBU Konsultansi' }, { key: 'tenaga_ahli', label: 'Tenaga Ahli' }, { key: 'spta', label: 'SPTA' }],
-    konsolidasi:           [{ key: 'status_pdn', label: 'Status PDN' }, { key: 'volume_total', label: 'Volume Total' }, { key: 'jml_satker', label: 'Jml Satker' }],
+    konsolidasi:           [{ key: 'status_pdn', label: 'Status PDN' }],
   };
   const extraCols = extraColDefs[templateId] || [];
 
+  // ── Computed values for panel default values ────────────────────────────
+  const defaultPembuka = refinedBahpIntro
+    || `Pada hari ini, ${tglLong}, bertempat di ${instansi}, Pejabat Pengadaan pada Satuan Kerja ${instansi} telah melaksanakan proses penelusuran katalog elektronik, komparasi harga dan kualitas, serta negosiasi teknis kepada penyedia melalui sistem e-Purchasing Katalog Elektronik LKPP untuk pengadaan ${tpl.jenisPengadaan} — ${tpl.label} — sebagaimana tercantum di bawah ini.`;
+  const defaultDasarHukum = dasarHukum.map((d, i) => `${i+1}. ${d}`).join('\n');
+  const defaultKlausul  = klausul?.isi || '';
+  const defaultPenutup  = refinedBahpConclusion || penutup;
+
   return (
+    <>
+    {/* ─── Panel Edit Manual (print:hidden) ─────────────────────────────── */}
+    <div className="print:hidden">
+      {/* Toggle button */}
+      <div className="flex items-center justify-between mb-2">
+        <button
+          onClick={() => setEditPanelOpen(o => !o)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-sm border transition-all ${
+            editPanelOpen
+              ? 'bg-amber-500 text-white border-amber-600'
+              : 'bg-white text-slate-700 border-slate-200 hover:border-amber-400 hover:text-amber-700'
+          }`}
+        >
+          <span>{editPanelOpen ? '🔒 Tutup Panel Edit' : '✏️ Edit Manual Teks BAHP'}</span>
+          {hasOverride && !editPanelOpen && (
+            <span className="bg-amber-100 text-amber-800 border border-amber-200 rounded-full px-2 py-0.5 text-[9px] font-black">
+              {Object.keys(overrides).length} diubah
+            </span>
+          )}
+        </button>
+        {hasOverride && (
+          <button
+            onClick={() => { if(window.confirm('Reset semua koreksi manual ke teks otomatis?')) setOverrides({}); }}
+            className="text-[10px] font-bold text-rose-600 hover:underline"
+          >↺ Reset Semua</button>
+        )}
+      </div>
+
+      {/* Panel form */}
+      {editPanelOpen && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-4 shadow-sm">
+          <div className="flex items-center gap-2 border-b border-amber-200 pb-2">
+            <span className="text-sm font-black text-amber-900">✏️ Panel Edit Manual BAHP</span>
+            <span className="text-[9px] text-amber-700 font-medium">Kosongkan kolom untuk kembali ke teks otomatis. Perubahan tersimpan otomatis per paket.</span>
+          </div>
+
+          {/* Pembuka */}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider">Paragraf Pembuka</label>
+              {overrides.pembuka && <button onClick={() => resetOv('pembuka')} className="text-[9px] text-rose-600 hover:underline font-bold">↺ Reset</button>}
+            </div>
+            <textarea
+              value={overrides.pembuka ?? defaultPembuka}
+              onChange={e => setOv('pembuka', e.target.value)}
+              rows={4}
+              className="w-full text-xs border border-amber-200 rounded-lg p-2.5 focus:outline-none focus:border-amber-400 bg-white resize-y leading-relaxed"
+              placeholder={defaultPembuka}
+            />
+          </div>
+
+          {/* Dasar Hukum */}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider">Dasar Hukum (satu baris = satu poin)</label>
+              {overrides.dasar_hukum && <button onClick={() => resetOv('dasar_hukum')} className="text-[9px] text-rose-600 hover:underline font-bold">↺ Reset</button>}
+            </div>
+            <textarea
+              value={overrides.dasar_hukum ?? defaultDasarHukum}
+              onChange={e => setOv('dasar_hukum', e.target.value)}
+              rows={6}
+              className="w-full text-xs border border-amber-200 rounded-lg p-2.5 focus:outline-none focus:border-amber-400 bg-white resize-y leading-relaxed font-mono"
+              placeholder={defaultDasarHukum}
+            />
+          </div>
+
+          {/* Klausul Khusus */}
+          {klausul && (
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider">Klausul Khusus — {klausul.judul}</label>
+                {overrides.klausul && <button onClick={() => resetOv('klausul')} className="text-[9px] text-rose-600 hover:underline font-bold">↺ Reset</button>}
+              </div>
+              <textarea
+                value={overrides.klausul ?? defaultKlausul}
+                onChange={e => setOv('klausul', e.target.value)}
+                rows={5}
+                className="w-full text-xs border border-amber-200 rounded-lg p-2.5 focus:outline-none focus:border-amber-400 bg-white resize-y leading-relaxed"
+                placeholder={defaultKlausul}
+              />
+            </div>
+          )}
+
+          {/* Penutup/Kesimpulan */}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider">Paragraf Kesimpulan & Penetapan (Seksi E)</label>
+              {overrides.penutup && <button onClick={() => resetOv('penutup')} className="text-[9px] text-rose-600 hover:underline font-bold">↺ Reset</button>}
+            </div>
+            <textarea
+              value={overrides.penutup ?? defaultPenutup}
+              onChange={e => setOv('penutup', e.target.value)}
+              rows={4}
+              className="w-full text-xs border border-amber-200 rounded-lg p-2.5 focus:outline-none focus:border-amber-400 bg-white resize-y leading-relaxed"
+              placeholder={defaultPenutup}
+            />
+          </div>
+
+          <div className="text-[9px] text-amber-700 border-t border-amber-200 pt-2">
+            💡 Perubahan otomatis tersimpan ke browser. Saat cetak, teks yang sudah diedit akan digunakan. Tabel data, komparasi, dan tanda tangan tidak dapat diedit di sini.
+          </div>
+        </div>
+      )}
+    </div>
+
     <div 
       className="bg-white text-black mx-auto print:shadow-none print:border-none print:w-full transition-all duration-300"
       style={{
@@ -194,19 +328,20 @@ export default function BahpDocument({
       {/* ╔══════════════════════════════════════════════╗
           ║ PEMBUKA                                      ║
           ╚══════════════════════════════════════════════╝ */}
-      <div className="text-justify mb-3 ">
-        {refinedBahpIntro ? (
-          <span className="whitespace-pre-wrap">{refinedBahpIntro}</span>
-        ) : (
-          <>
-            Pada hari ini, <strong>{tglLong}</strong>, bertempat di {instansi},
-            Pejabat Pengadaan pada Satuan Kerja <strong>{instansi}</strong> telah melaksanakan
-            proses penelusuran katalog elektronik, komparasi harga dan kualitas, serta negosiasi
-            teknis kepada penyedia melalui sistem e-Purchasing Katalog Elektronik LKPP untuk
-            pengadaan <strong>{tpl.jenisPengadaan}</strong> — <em>{tpl.label}</em> —
-            sebagaimana tercantum di bawah ini.
-          </>
-        )}
+      <div className="text-justify mb-3">
+        {overrides.pembuka
+          ? <><span className="print:hidden text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mr-1">📝 Manual</span><span className="whitespace-pre-wrap">{overrides.pembuka}</span></>
+          : refinedBahpIntro
+            ? <span className="whitespace-pre-wrap">{refinedBahpIntro}</span>
+            : <>
+                Pada hari ini, <strong>{tglLong}</strong>, bertempat di {instansi},
+                Pejabat Pengadaan pada Satuan Kerja <strong>{instansi}</strong> telah melaksanakan
+                proses penelusuran katalog elektronik, komparasi harga dan kualitas, serta negosiasi
+                teknis kepada penyedia melalui sistem e-Purchasing Katalog Elektronik LKPP untuk
+                pengadaan <strong>{tpl.jenisPengadaan}</strong> — <em>{tpl.label}</em> —
+                sebagaimana tercantum di bawah ini.
+              </>
+        }
       </div>
 
       {/* ── Identitas Paket ── */}
@@ -235,9 +370,19 @@ export default function BahpDocument({
           ║ DASAR HUKUM                                  ║
           ╚══════════════════════════════════════════════╝ */}
       <SectionTitle>Dasar Hukum</SectionTitle>
-      <ol className="list-decimal list-inside text-[0.95em] space-y-0.5 mb-4 ml-3">
-        {dasarHukum.map((d, i) => <li key={i} className="leading-relaxed">{d}</li>)}
-      </ol>
+      {overrides.dasar_hukum
+        ? <div className="text-[0.95em] mb-4 ml-3">
+            <span className="print:hidden text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mr-1">📝 Manual</span>
+            <ol className="list-decimal list-inside space-y-0.5 whitespace-pre-line">
+              {overrides.dasar_hukum.split('\n').filter(l => l.trim()).map((line, i) => (
+                <li key={i} className="leading-relaxed">{line.replace(/^\d+\.\s*/, '')}</li>
+              ))}
+            </ol>
+          </div>
+        : <ol className="list-decimal list-inside text-[0.95em] space-y-0.5 mb-4 ml-3">
+            {dasarHukum.map((d, i) => <li key={i} className="leading-relaxed">{d}</li>)}
+          </ol>
+      }
 
       {/* ╔══════════════════════════════════════════════╗
           ║ SEKSI A — RINCIAN PENETAPAN PRODUK/JASA      ║
@@ -245,62 +390,147 @@ export default function BahpDocument({
       <SectionTitle letter="A">
         Hasil Rincian Penetapan {tpl.jenisPengadaan} melalui e-Purchasing
       </SectionTitle>
-      <table className="w-full border-collapse mb-4">
-        <thead>
-          <tr>
-            <td className={`${TH} w-5`}>No</td>
-            <td className={TH}>Nama {tpl.jenisPengadaan}</td>
-            <td className={`${TH} w-10`}>Vol</td>
-            <td className={TH}>Penyedia</td>
-            <td className={`${TH} text-right`}>Harga DPA</td>
-            <td className={`${TH} text-right`}>Harga Tayang</td>
-            <td className={`${TH} text-right`}>Harga Negosiasi</td>
-            {extraCols.map(c => <td key={c.key} className={`${TH}`}>{c.label}</td>)}
-            <td className={`${TH} text-right`}>Total</td>
-            <td className={`${TH} w-14`}>Status</td>
-          </tr>
-        </thead>
-        <tbody>
-          {activeItems.length === 0 ? (
-            <tr><td colSpan={9 + extraCols.length} className={`${TD} text-center italic text-black`}>
-              Belum ada item yang diproses
-            </td></tr>
-          ) : activeItems.map((item, idx) => {
-            const nego    = negotiatedItems[item.no] || {};
-            const dpaPrice = parseFloat(item.paguDpa ?? item.price ?? 0);
-            const tayang  = parseFloat(nego.tayang  ?? item.tayang ?? item.price ?? 0);
-            const negoVal = parseFloat(nego.price   ?? 0);
-            const vendor  = nego.vendor || item.vendor || item.dppVendor || '-';
-            const total   = negoVal * (item.qty || 1);
-            const status  = nego.itemStatus || 'Tersedia';
-            return (
-              <tr key={item.no} className={idx % 2 === 0 ? 'bg-white' : ''}>
-                <td className={`${TD} text-center`}>{idx + 1}</td>
-                <td className={TD}>{item.name}</td>
-                <td className={`${TD} text-center`}>{item.qty} {item.unit}</td>
-                <td className={TD}>{vendor}</td>
-                <td className={`${TD} text-right font-mono`}>Rp {dpaPrice.toLocaleString('id-ID')}</td>
-                <td className={`${TD} text-right font-mono`}>Rp {tayang.toLocaleString('id-ID')}</td>
-                <td className={`${TD} text-right font-mono font-bold`}>Rp {negoVal.toLocaleString('id-ID')}</td>
-                {extraCols.map(c => (
-                  <td key={c.key} className={`${TD} text-center`}>
-                    {nego?.[c.key] || resolveCritVal(c.key, { vendor, harga_tayang: tayang, harga_nego: negoVal, extra: nego }, true)}
-                  </td>
-                ))}
-                <td className={`${TD} text-right font-mono font-bold`}>Rp {total.toLocaleString('id-ID')}</td>
-                <td className={`${TD} text-center`}>{status}</td>
+      <SectionTitle letter="A">
+        {activeAddendum 
+          ? 'Hasil Rincian Komparasi Adendum Surat Pesanan / Kontrak'
+          : `Hasil Rincian Penetapan ${tpl.jenisPengadaan} melalui e-Purchasing`
+        }
+      </SectionTitle>
+      {activeAddendum ? (() => {
+        let adItems = [];
+        try { adItems = JSON.parse(activeAddendum.items_json || '[]'); } catch(e) {}
+        let totalInitial = 0;
+        let totalFinal = 0;
+        return (
+          <table className="w-full border-collapse mb-4">
+            <thead>
+              <tr className="bg-gray-100 text-center font-bold">
+                <td className={`${TH} w-5`} rowSpan={2}>No</td>
+                <td className={TH} rowSpan={2}>Komoditas</td>
+                <td className={TH} rowSpan={2}>Status</td>
+                <td className={TH} colSpan={3}>Kondisi BAHP Awal</td>
+                <td className={TH} colSpan={3}>Kondisi Adendum Akhir</td>
+                <td className={TH} rowSpan={2}>Selisih Biaya</td>
               </tr>
-            );
-          })}
-          {activeItems.length > 0 && (
-            <tr className="bg-gray-50 font-bold ">
-              <td colSpan={7 + extraCols.length} className={`${TD} text-right`}>TOTAL NILAI NEGOSIASI</td>
-              <td className={`${TD} text-right font-mono`}>Rp {grandTotal.toLocaleString('id-ID')}</td>
-              <td className={TD}></td>
+              <tr className="bg-gray-50 text-center font-bold">
+                <td className={TH}>Vol</td>
+                <td className={TH}>Harga Satuan</td>
+                <td className={TH}>Total</td>
+                <td className={TH}>Vol</td>
+                <td className={TH}>Harga Satuan</td>
+                <td className={TH}>Total</td>
+              </tr>
+            </thead>
+            <tbody>
+              {adItems.map((item, idx) => {
+                const initQty = item.initial_qty || item.qty || 0;
+                const initPrice = item.negotiated_price || 0; 
+                const initTotal = initQty * initPrice;
+                
+                const finalQty = item.is_deleted ? 0 : (item.qty_confirmed || 0);
+                const finalPrice = item.negotiated_price || 0;
+                const finalTotal = finalQty * finalPrice;
+                
+                const selisih = finalTotal - initTotal;
+                
+                totalInitial += initTotal;
+                totalFinal += finalTotal;
+                
+                let itemStatus = 'Tetap';
+                if (item.is_deleted) itemStatus = 'Dihapus';
+                else if (item.is_new) itemStatus = 'Substitusi';
+                else if (finalQty !== initQty) itemStatus = 'Berubah';
+                
+                return (
+                  <tr key={idx}>
+                    <td className={`${TD} text-center`}>{idx + 1}</td>
+                    <td className={TD}>{item.item_name}</td>
+                    <td className={`${TD} text-center font-semibold`}>{itemStatus}</td>
+                    <td className={`${TD} text-center font-mono`}>{initQty}</td>
+                    <td className={`${TD} text-right font-mono`}>Rp {initPrice.toLocaleString('id-ID')}</td>
+                    <td className={`${TD} text-right font-mono`}>Rp {initTotal.toLocaleString('id-ID')}</td>
+                    <td className={`${TD} text-center font-mono`}>{finalQty}</td>
+                    <td className={`${TD} text-right font-mono`}>Rp {finalPrice.toLocaleString('id-ID')}</td>
+                    <td className={`${TD} text-right font-mono font-bold`}>Rp {finalTotal.toLocaleString('id-ID')}</td>
+                    <td className={`${TD} text-right font-mono font-bold ${selisih < 0 ? 'text-rose-600' : selisih > 0 ? 'text-emerald-600' : ''}`}>
+                      {selisih === 0 ? 'Rp 0' : `${selisih < 0 ? '-' : '+'}Rp ${Math.abs(selisih).toLocaleString('id-ID')}`}
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr className="bg-gray-100 font-bold">
+                <td colSpan={3} className={`${TD} text-right`}>TOTAL</td>
+                <td className={`${TD} text-center`}>-</td>
+                <td className={TD}></td>
+                <td className={`${TD} text-right font-mono`}>Rp {totalInitial.toLocaleString('id-ID')}</td>
+                <td className={`${TD} text-center`}>-</td>
+                <td className={TD}></td>
+                <td className={`${TD} text-right font-mono`}>Rp {totalFinal.toLocaleString('id-ID')}</td>
+                <td className={`${TD} text-right font-mono ${totalFinal - totalInitial < 0 ? 'text-rose-600' : totalFinal - totalInitial > 0 ? 'text-emerald-600' : ''}`}>
+                  {(totalFinal - totalInitial) === 0 ? 'Rp 0' : `${(totalFinal - totalInitial) < 0 ? '-' : '+'}Rp ${Math.abs(totalFinal - totalInitial).toLocaleString('id-ID')}`}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        );
+      })() : (
+        <table className="w-full border-collapse mb-4">
+          <thead>
+            <tr>
+              <td className={`${TH} w-5`}>No</td>
+              <td className={TH}>Nama {tpl.jenisPengadaan}</td>
+              <td className={`${TH} w-10`}>Vol</td>
+              <td className={TH}>Penyedia</td>
+              <td className={`${TH} text-right`}>Harga DPA</td>
+              <td className={`${TH} text-right`}>Harga Tayang</td>
+              <td className={`${TH} text-right`}>Harga Negosiasi</td>
+              {extraCols.map(c => <td key={c.key} className={`${TH}`}>{c.label}</td>)}
+              <td className={`${TH} text-right`}>Total</td>
+              <td className={`${TH} w-14`}>Status</td>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {activeItems.length === 0 ? (
+              <tr><td colSpan={9 + extraCols.length} className={`${TD} text-center italic text-black`}>
+                Belum ada item yang diproses
+              </td></tr>
+            ) : activeItems.map((item, idx) => {
+              const nego    = negotiatedItems[item.no] || {};
+              const dpaPrice = parseFloat(item.paguDpa ?? item.price ?? 0);
+              const tayang  = parseFloat(nego.tayang  ?? item.tayang ?? item.price ?? 0);
+              const negoVal = parseFloat(nego.price   ?? 0);
+              const vendor  = nego.vendor || item.vendor || item.dppVendor || '-';
+              const total   = negoVal * (item.qty || 1);
+              const status  = nego.itemStatus || 'Tersedia';
+              return (
+                <tr key={item.no} className={idx % 2 === 0 ? 'bg-white' : ''}>
+                  <td className={`${TD} text-center`}>{idx + 1}</td>
+                  <td className={TD}>{item.name}</td>
+                  <td className={`${TD} text-center`}>{item.qty} {item.unit}</td>
+                  <td className={TD}>{vendor}</td>
+                  <td className={`${TD} text-right font-mono`}>Rp {dpaPrice.toLocaleString('id-ID')}</td>
+                  <td className={`${TD} text-right font-mono`}>Rp {tayang.toLocaleString('id-ID')}</td>
+                  <td className={`${TD} text-right font-mono font-bold`}>Rp {negoVal.toLocaleString('id-ID')}</td>
+                  {extraCols.map(c => (
+                    <td key={c.key} className={`${TD} text-center`}>
+                      {nego?.[c.key] || resolveCritVal(c.key, { vendor, harga_tayang: tayang, harga_nego: negoVal, extra: nego }, true)}
+                    </td>
+                  ))}
+                  <td className={`${TD} text-right font-mono font-bold`}>Rp {total.toLocaleString('id-ID')}</td>
+                  <td className={`${TD} text-center`}>{status}</td>
+                </tr>
+              );
+            })}
+            {activeItems.length > 0 && (
+              <tr className="bg-gray-50 font-bold ">
+                <td colSpan={7 + extraCols.length} className={`${TD} text-right`}>TOTAL NILAI NEGOSIASI</td>
+                <td className={`${TD} text-right font-mono`}>Rp {grandTotal.toLocaleString('id-ID')}</td>
+                <td className={TD}></td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
 
       {/* ╔══════════════════════════════════════════════╗
           ║ KLAUSUL KHUSUS (berbeda tiap jenis)          ║
@@ -309,7 +539,10 @@ export default function BahpDocument({
         <>
           <SectionTitle letter="B">{klausul.judul}</SectionTitle>
           <p className=" text-[0.95em] text-justify leading-relaxed whitespace-pre-line mb-4">
-            {klausul.isi}
+            {overrides.klausul
+              ? <><span className="print:hidden text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mr-1">📝 Manual</span>{overrides.klausul}</>
+              : klausul.isi
+            }
           </p>
         </>
       )}
@@ -457,38 +690,13 @@ export default function BahpDocument({
         </div>
       )}
 
-      {/* Pengadaan Terkonsolidasi */}
+      {/* Pengadaan Terkonsolidasi: Penunjukan Penyedia */}
       {templateId === 'konsolidasi' && (
-        <div className="mb-5">
-          <SectionTitle>Daftar Satuan Kerja Peserta Konsolidasi</SectionTitle>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                <td className={`${TH} w-8`}>No</td>
-                <td className={TH}>Nama Satker / SKPD</td>
-                <td className={`${TH} text-right`}>Pagu Anggaran</td>
-                <td className={`${TH} w-24`}>Volume Kebutuhan</td>
-                <td className={TH}>Alamat Pengiriman</td>
-              </tr>
-            </thead>
-            <tbody>
-              {satkerPesertaList.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className={`${TD} text-center italic`}>Tidak ada rincian satker peserta yang diinputkan</td>
-                </tr>
-              ) : (
-                satkerPesertaList.map((satker, sIdx) => (
-                  <tr key={sIdx}>
-                    <td className={`${TD} text-center`}>{sIdx + 1}</td>
-                    <td className={TD}>{satker.namaSatker || '-'}</td>
-                    <td className={`${TD} text-right font-mono`}>Rp {(parseFloat(satker.pagu) || 0).toLocaleString('id-ID')}</td>
-                    <td className={`${TD} text-center`}>{satker.volume || '-'}</td>
-                    <td className={TD}>{satker.alamat || '-'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="mb-5 border border-black rounded p-3 bg-white">
+          <div className="font-bold mb-2 uppercase text-black">Catatan Prosedur Konsolidasi</div>
+          <p className="text-[0.95em] text-justify leading-relaxed">
+            Pelaksanaan e-Purchasing ini merupakan tindak lanjut atas Pengadaan Terkonsolidasi yang penyedianya telah ditetapkan melalui Kontrak Payung. Pejabat Pembuat Komitmen (PPK) pada masing-masing Satuan Kerja melaksanakan tahapan pemesanan secara langsung kepada penyedia katalog elektronik terpilih sesuai ketentuan yang berlaku.
+          </p>
         </div>
       )}
 
@@ -589,7 +797,10 @@ export default function BahpDocument({
           ╚══════════════════════════════════════════════╝ */}
       <SectionTitle letter="E">Kesimpulan dan Penetapan Penyedia</SectionTitle>
       <p className=" text-[0.95em] text-justify leading-relaxed whitespace-pre-line mb-3">
-        {refinedBahpConclusion || penutup}
+        {overrides.penutup
+          ? <><span className="print:hidden text-[8px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mr-1">📝 Manual</span>{overrides.penutup}</>
+          : (refinedBahpConclusion || penutup)
+        }
       </p>
       <p className=" text-[0.95em] text-justify leading-relaxed mb-6">
         Demikian Berita Acara Hasil Pemilihan (BAHP) e-Purchasing ini dibuat dengan sebenarnya,
@@ -834,6 +1045,7 @@ export default function BahpDocument({
         </div>
       </div>
     </div>
+  </>
   );
 }
 

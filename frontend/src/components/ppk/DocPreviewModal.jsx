@@ -2,6 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { Settings, Printer, FileDown } from 'lucide-react';
 import { usePPK } from './PPKContext';
+import { DEFAULT_TEMPLATES } from '../../utils/defaultTemplates';
 
 
 const getDynamicProductLink = (vendorName, keyword) => {
@@ -53,10 +54,16 @@ const parseSmartColons = (text) => {
       output[output.length - 1] += `<tr><td style="width: 1%; white-space: nowrap; padding-right: 15px; vertical-align: top; border: none; padding-top: 2px;">${match[1]}</td><td style="width: 1%; padding-right: 8px; vertical-align: top; border: none; padding-top: 2px;">:</td><td style="vertical-align: top; border: none; padding-top: 2px;">${match[2]}</td></tr>`;
     } else {
       if (inTable) {
-        inTable = false;
-        output[output.length - 1] += '</tbody></table>';
+        if (line.trim() === '' || line.includes('<') || line.includes('>')) {
+          inTable = false;
+          output[output.length - 1] += '</tbody></table>';
+          output.push(line);
+        } else {
+          output[output.length - 1] = output[output.length - 1].replace(/<\/td><\/tr>$/, `<br/>${line}</td></tr>`);
+        }
+      } else {
+        output.push(line);
       }
-      output.push(line);
     }
   }
   if (inTable) output[output.length - 1] += '</tbody></table>';
@@ -726,8 +733,13 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  <div className="space-y-4 relative">
  {(() => {
  const templatesStr = localStorage.getItem('pbj_templates');
- let templates = [];
- try { if (templatesStr) templates = JSON.parse(templatesStr); } catch (e) {}
+ let templates = DEFAULT_TEMPLATES;
+ try { 
+   if (templatesStr) {
+     const parsed = JSON.parse(templatesStr);
+     if (parsed && parsed.length > 0) templates = parsed;
+   }
+ } catch (e) {}
  
  const ndTemplate = templates.find(t => t.id === selectedNdTplId) || templates.find(t => t.id === 'TPL-001');
  
@@ -834,8 +846,13 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
 
  {(() => {
  const templatesStr = localStorage.getItem('pbj_templates');
- let templates = [];
- try { if (templatesStr) templates = JSON.parse(templatesStr); } catch (e) {}
+ let templates = DEFAULT_TEMPLATES;
+ try { 
+   if (templatesStr) {
+     const parsed = JSON.parse(templatesStr);
+     if (parsed && parsed.length > 0) templates = parsed;
+   }
+ } catch (e) {}
 
   // Prioritaskan template ID yang dikirim oleh PPK dari selectedPack
   const pStyleTpl = selectedPack?.dppTemplateId || selectedPack?.dppSpecs?.templateId || '';
@@ -850,7 +867,15 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
     else if (cat === 'Konsolidasi') tplId = 'TPL-006E';
   }
 
-  const template = templates.find(t => t.id === selectedTplId) || templates.find(t => t.id === tplId);
+  let template = templates.find(t => t.id === selectedTplId) || templates.find(t => t.id === tplId);
+  
+  if (!template || !template.content.includes('{{komponen_dinamis_dpp}}')) {
+    const fallbackId = selectedTplId || tplId || 'TPL-006B';
+    const defaultFallback = DEFAULT_TEMPLATES.find(t => t.id === fallbackId);
+    if (defaultFallback && defaultFallback.content.includes('{{komponen_dinamis_dpp}}')) {
+      template = defaultFallback;
+    }
+  }
  
  if (template && template.content.includes('{{komponen_dinamis_dpp}}')) {
  // Template parsing logic
@@ -1021,9 +1046,83 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
       BAB III. DOKUMEN PENGUMPULAN REFERENSI HARGA
     </div>
     <p className="mb-2 indent-8">
-      Sebagai metode pengadaan e-purchasing, dokumen Referensi Harga ini digunakan untuk membuktikan harga yang disepakati wajar. Estimasi perbandingan harga (Harga DPA vs Harga Tayang e-Katalog) adalah sebagai berikut:
+      Sebagai metode pengadaan e-purchasing, dokumen Referensi Harga ini digunakan untuk membuktikan harga yang wajar.
     </p>
+
+    <div className="pl-4 space-y-2 mb-4">
+      <div className="font-bold">A. Daftar Penyedia Potensial e-Katalog</div>
+      {surveyData ? (() => {
+        const foundProducts = surveyData.products ? surveyData.products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN') : [];
+        if (foundProducts.length === 0) {
+          return <p className="italic text-slate-600 my-1 pb-1 ">* Seluruh item barang tidak ditemukan di e-Katalog LKPP. Referensi e-Katalog tidak terlampir.</p>
+        }
+        return (
+          <table className="w-full border-collapse border border-slate-900 mb-2">
+            <thead>
+              <tr className="bg-slate-100 font-bold text-center">
+                <td className="border border-slate-900 p-1 w-8">No</td>
+                <td className="border border-slate-900 p-1">Nama Barang</td>
+                <td className="border border-slate-900 p-1">Penyedia Katalog</td>
+                <td className="border border-slate-900 p-1 text-right">Harga Katalog (Rp)</td>
+              </tr>
+            </thead>
+            <tbody>
+              {foundProducts.flatMap((p, pIdx) => {
+                const rows = [];
+                const totalRows = 1 + (p.comparators && p.comparators.length > 0 ? p.comparators.length : 0);
+                
+                // Target penyedia (Pertama)
+                rows.push(
+                  <tr key={`win-${pIdx}`}>
+                    <td className="border border-slate-900 p-1 text-center" rowSpan={totalRows}>{pIdx + 1}</td>
+                    <td className="border border-slate-900 p-1 text-sm" rowSpan={totalRows}>
+                      <a href={p.link} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 break-all">{p.name}</a>
+                    </td>
+                    <td className="border border-slate-900 p-1 text-xs text-slate-800">
+                      {p.vendor}
+                    </td>
+                    <td className="border border-slate-900 p-1 text-right text-xs text-slate-800">
+                      {(p.price || 0).toLocaleString('id-ID')}
+                    </td>
+                  </tr>
+                );
+                
+                // Penyedia potensial lainnya (Alternatif)
+                if (p.comparators && p.comparators.length > 0) {
+                  p.comparators.forEach((comp, cIdx) => {
+                    rows.push(
+                      <tr key={`comp-${pIdx}-${cIdx}`}>
+                        <td className="border border-slate-900 p-1 text-xs text-slate-800">
+                          {comp.vendor}
+                        </td>
+                        <td className="border border-slate-900 p-1 text-right text-xs text-slate-800">
+                          {(comp.price || 0).toLocaleString('id-ID')}
+                        </td>
+                      </tr>
+                    );
+                  });
+                }
+                return rows;
+              })}
+            </tbody>
+          </table>
+        );
+      })() : <p className="italic text-slate-600 my-1 pb-1 ">* Belum ada survei yang dilakukan.</p>}
+    </div>
+
+    <div className="pl-4 space-y-2 mb-4">
+      <div className="font-bold">B. Estimasi Perbandingan Harga</div>
+      <p className="mb-2 indent-8">
+        Berdasarkan daftar di atas, perbandingan harga (Harga DPA vs Harga Tayang e-Katalog) adalah sebagai berikut:
+      </p>
+
     
+    {(() => {
+      const items = getPackageItems(selectedPack).filter(item => (item.qty === '' ? 0 : (item.qty || 0)) > 0);
+      const hasComp1 = autoComparator && items.some((item, idx) => comparisons && comparisons['ITEM-' + idx]);
+      const hasComp2 = autoComparator && items.some((item, idx) => comparisons && comparisons['ITEM-' + idx + '-2']);
+      
+      return (
     <table className="w-full border-collapse border border-slate-900 mb-2">
       <thead>
         {autoComparator ? (
@@ -1031,9 +1130,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
             <td className="border border-slate-900 p-1 w-8">No</td>
             <td className="border border-slate-900 p-1">Uraian Barang</td>
             <td className="border border-slate-900 p-1 w-24 text-right">Harga DPA</td>
-            <td className="border border-slate-900 p-1 w-32 bg-emerald-50">Produk Potensial (e-Katalog)</td>
-            <td className="border border-slate-900 p-1 w-32 bg-amber-50">Produk Pembanding</td>
-            <td className="border border-slate-900 p-1 w-24 text-right">Selisih Harga</td>
+            <td className="border border-slate-900 p-1 w-64">Daftar Penyedia Potensial</td>
             <td className="border border-slate-900 p-1">Alasan Pemilihan</td>
           </tr>
         ) : (
@@ -1047,14 +1144,13 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
         )}
       </thead>
       <tbody>
-        {getPackageItems(selectedPack).filter(item => (item.qty === '' ? 0 : (item.qty || 0)) > 0).map((item, idx) => {
+        {items.map((item, idx) => {
           const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
           const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
           const displayName = surveyProduct?.name || item.name;
           const hargaTayang = surveyProduct?.price ? surveyProduct.price : 0;
           const compKey = 'ITEM-' + idx;
           const comp = comparisons && comparisons[compKey];
-          const selisih = comp?.price ? comp.price - hargaTayang : null;
 
           if (autoComparator) {
             return (
@@ -1062,26 +1158,26 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
                 <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
                 <td className="border border-slate-900 p-1 text-sm">{displayName}</td>
                 <td className="border border-slate-900 p-1 text-right text-sm">Rp {(item.price || 0).toLocaleString('id-ID')}</td>
-                <td className="border border-slate-900 p-1 bg-emerald-50/30">
-                  <div className="font-bold text-[10px]">{surveyProduct?.vendor || '-'}</div>
-                  <div className="font-mono text-xs">Rp {hargaTayang.toLocaleString('id-ID')}</div>
+                <td className="border border-slate-900 p-1">
+                  <div className="mb-2">
+                    <div className="text-[10px] text-slate-800">{surveyProduct?.vendor || '-'}</div>
+                    <div className="text-[11px] text-slate-700">Rp {hargaTayang.toLocaleString('id-ID')}</div>
+                  </div>
+                  {surveyProduct?.comparators && surveyProduct.comparators.length > 0 && (
+                    <div className="pt-2 border-t border-slate-300 space-y-2">
+                      {surveyProduct.comparators.map((c, cIdx) => (
+                        <div key={cIdx}>
+                          <div className="text-[10px] text-slate-800">{c.vendor}</div>
+                          <div className="text-[11px] text-slate-700">Rp {(c.price || 0).toLocaleString('id-ID')}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </td>
-                <td className="border border-slate-900 p-1 bg-amber-50/30">
-                  {comp ? (
-                    <>
-                      <div className="font-bold text-[10px]">{comp.vendor}</div>
-                      <div className="font-mono text-xs">Rp {(comp.price || 0).toLocaleString('id-ID')}</div>
-                      <div className="text-[9px] text-slate-500">{comp.status || 'Luar Katalog'}</div>
-                    </>
-                  ) : <span className="text-slate-600 font-semibold text-[9px] italic">Tidak ada pembanding di wilayah yang sama</span>}
-                </td>
-                <td className="border border-slate-900 p-1 text-right font-mono text-emerald-700 text-[10px]">
-                  {selisih ? `Hemat Rp ${selisih.toLocaleString('id-ID')}` : '-'}
-                </td>
-                <td className="border border-slate-900 p-1 text-[9px]">
-                  {comp ? (comp.alasan || (hargaTayang < item.price 
-                    ? 'Harga e-Katalog lebih efisien dari pagu DPA' 
-                    : 'Sesuai pagu DPA, efisien')) : <span className="font-semibold text-emerald-800">Satu-satunya pelaku usaha potensial di wilayah kerja</span>}
+                <td className="border border-slate-900 p-1 text-[9px] align-top">
+                  {comp ? (comp.alasan || (hargaTayang <= (comp.price || item.price) 
+                    ? 'Rekomendasi Referensi 1 (Harga Termurah / Memenuhi Spesifikasi)' 
+                    : 'Rekomendasi Referensi 1 (Sesuai Pagu DPA)')) : <span className="font-semibold text-slate-800">Satu-satunya pelaku usaha potensial di wilayah kerja</span>}
                 </td>
               </tr>
             );
@@ -1112,6 +1208,9 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
         })}
       </tbody>
     </table>
+      );
+    })()}
+    </div>
     <p className="indent-8 mb-4"><em>Catatan Analisis: Seluruh harga yang tertera sudah termasuk pajak yang berlaku dan keuntungan wajar, serta biaya kirim/instalasi (apabila dipersyaratkan). Hasil tangkapan layar produk e-Katalog terlampir di akhir dokumen ini.</em></p>
 
     <div className="font-bold uppercase mt-8 mb-2 text-center">BAB IV. RENCANA METODE PEMILIHAN PENYEDIA E-PURCHASING</div>

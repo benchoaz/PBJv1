@@ -45,7 +45,8 @@ export default function Step1PilihPaket() {
     if (!satkerId) return;
     const loadFromDB = async () => {
       try {
-        const res = await fetch(`/api/sirup/saved?satker_id=${satkerId}&tahun=${new Date().getFullYear()}`);
+        const t = new Date().getTime();
+        const res = await fetch(`/api/sirup/saved?satker_id=${satkerId}&tahun=${new Date().getFullYear()}&_t=${t}`);
         if (!res.ok) return;
         const data = await res.json();
         if (data.success && data.packages?.length > 0) {
@@ -59,8 +60,11 @@ export default function Step1PilihPaket() {
             tahun: String(pkg.tahun_anggaran),
             _from_db: true,
           }));
+          window.__lastMappedLength = mapped.length; // global debug
           setSirupPackages(mapped);
           setSirupFromDB(true);
+        } else {
+          window.__lastMappedLength = "data.success is " + data.success + ", length is " + (data.packages?.length);
         }
       } catch (e) {
         console.error('Error loading SIRUP from DB:', e);
@@ -85,7 +89,8 @@ export default function Step1PilihPaket() {
     setIsFetchingSirup(true);
     setSirupFromDB(false);
     try {
-      const res = await fetch(`/api/sirup/satker/${idSatker}?tahun=${new Date().getFullYear()}`);
+      const t = new Date().getTime();
+      const res = await fetch(`/api/sirup/satker/${idSatker}?tahun=${new Date().getFullYear()}&_t=${t}`);
       const data = await res.json();
       const pkgs = data.packages || data.data || (Array.isArray(data) ? data : null);
       if (pkgs) {
@@ -155,7 +160,8 @@ export default function Step1PilihPaket() {
         
         // Reload dari DB untuk sinkronisasi penuh
         try {
-          const dbRes = await fetch(`/api/sirup/saved?satker_id=${satkerId}&tahun=${new Date().getFullYear()}`);
+          const t = new Date().getTime();
+          const dbRes = await fetch(`/api/sirup/saved?satker_id=${satkerId}&tahun=${new Date().getFullYear()}&_t=${t}`);
           if (dbRes.ok) {
             const dbData = await dbRes.json();
             if (dbData.success && dbData.packages?.length > 0) {
@@ -342,7 +348,7 @@ export default function Step1PilihPaket() {
                   (p.packName || '').toLowerCase().includes(sirupSearchQuery.toLowerCase()) ||
                   String(p.noSirup || '').includes(sirupSearchQuery.trim())
                 ).length} paket
-                {sirupFromDB && <span className="text-slate-300 font-normal">(Dari cache server)</span>}
+                {sirupFromDB && <span className="text-slate-300 font-normal">(DARI CACHE SERVER)</span>}
               </span>
               <span className="px-2 py-0.5 text-[9px] rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold">● Live</span>
             </div>

@@ -1,8 +1,48 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePPK } from './PPKContext';
-import { Settings, Printer, Download, ClipboardList } from 'lucide-react';
+import { Settings, Printer, Download, ClipboardList, Wand2 } from 'lucide-react';
+import { DEFAULT_TEMPLATES } from '../TemplateSuratManager';
 
+function terbilang(angka) {
+  if (!angka) return "Nol";
+  const huruf = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
+  let n = Math.floor(Math.abs(angka));
+  if (n < 12) return huruf[n];
+  if (n < 20) return terbilang(n - 10) + " Belas";
+  if (n < 100) {
+    const puluh = terbilang(Math.floor(n / 10)) + " Puluh";
+    const sisa = terbilang(n % 10);
+    return (puluh + " " + sisa).trim();
+  }
+  if (n < 200) {
+    return ("Seratus " + terbilang(n - 100)).trim();
+  }
+  if (n < 1000) {
+    const ratus = terbilang(Math.floor(n / 100)) + " Ratus";
+    const sisa = terbilang(n % 100);
+    return (ratus + " " + sisa).trim();
+  }
+  if (n < 2000) {
+    return ("Seribu " + terbilang(n - 1000)).trim();
+  }
+  if (n < 1000000) {
+    const ribu = terbilang(Math.floor(n / 1000)) + " Ribu";
+    const sisa = terbilang(n % 1000);
+    return (ribu + " " + sisa).trim();
+  }
+  if (n < 1000000000) {
+    const juta = terbilang(Math.floor(n / 1000000)) + " Juta";
+    const sisa = terbilang(n % 1000000);
+    return (juta + " " + sisa).trim();
+  }
+  if (n < 1000000000000) {
+    const milyar = terbilang(Math.floor(n / 1000000000)) + " Milyar";
+    const sisa = terbilang(n % 1000000000);
+    return (milyar + " " + sisa).trim();
+  }
+  return "Angka terlalu besar";
+}
 
 export default function Step4TemplateSurat() {
   const { 
@@ -13,13 +53,50 @@ export default function Step4TemplateSurat() {
     step, setStep,
     aiError, setAiError,
     hpsValue, isHpsExemptSelected,
-    surveyData, hpsPrices, getPackageItems
+    surveyData, hpsPrices, getPackageItems,
+    selectedTplId, setSelectedTplId, autoComparator,
+    comparisons
   } = usePPK();
 
   const [activeDocPreview, setActiveDocPreview] = useState(null);
-  const getPacketCategory = () => 'ATK';
+  const [isEnhancingDPP, setIsEnhancingDPP] = useState({});
 
-  const getActiveSurveyData = () => null;
+  const enhanceDPPTextWithAI = async (field, currentText) => {
+    if (!currentText || !currentText.trim()) return;
+    setIsEnhancingDPP(prev => ({ ...prev, [field]: true }));
+    try {
+      const response = await fetch('/api/ai/enhance-justification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: currentText })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDppSpecs(prev => ({ ...prev, [field]: data.result }));
+      } else {
+        alert('Gagal memproses teks dengan AI.');
+      }
+    } catch (err) {
+      console.error('Enhance error:', err);
+      alert('Terjadi kesalahan saat memproses AI.');
+    } finally {
+      setIsEnhancingDPP(prev => ({ ...prev, [field]: false }));
+    }
+  };
+  
+  const getPacketCategory = (packName) => {
+    const name = (packName || '').toLowerCase();
+    if (name.includes('prasmanan') || name.includes('katering')) return 'Mamin-Prasmanan';
+    if (name.includes('nasi kotak') || name.includes('nasi bungkus')) return 'Mamin-Bungkus';
+    if (name.includes('snack') || name.includes('kue')) return 'Mamin-Snack';
+    if (name.includes('mamin') || name.includes('makanan')) return 'Mamin-Bungkus';
+    if (name.includes('modal') || name.includes('kendaraan') || name.includes('mesin') || name.includes('elektronik') || name.includes('peralatan')) return 'Modal';
+    if (name.includes('konsolidasi')) return 'Konsolidasi';
+    if (name.includes('jasa')) return 'Jasa';
+    return 'ATK';
+  };
+
+  const getActiveSurveyData = () => surveyData;
   const parseSmartColons = (t) => t;
 
   const handleExportWord = async () => {
@@ -323,49 +400,111 @@ export default function Step4TemplateSurat() {
                       <input type="text" value={packageMetadata.waktu_penyelesaian} onChange={(e) => setPackageMetadata({...packageMetadata, waktu_penyelesaian: e.target.value})} placeholder="Contoh: 14 (empat belas) hari kalender" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Program</label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nomor Program</label>
+                      <input type="text" value={packageMetadata.nomor_program || ''} onChange={(e) => setPackageMetadata({...packageMetadata, nomor_program: e.target.value})} placeholder="Contoh: 7.01..." className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nama Program</label>
                       <input type="text" value={packageMetadata.program} onChange={(e) => setPackageMetadata({...packageMetadata, program: e.target.value})} placeholder="Nama Program" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Kegiatan</label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nomor Kegiatan</label>
+                      <input type="text" value={packageMetadata.nomor_kegiatan || ''} onChange={(e) => setPackageMetadata({...packageMetadata, nomor_kegiatan: e.target.value})} placeholder="Contoh: 7.01.03..." className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nama Kegiatan</label>
                       <input type="text" value={packageMetadata.kegiatan} onChange={(e) => setPackageMetadata({...packageMetadata, kegiatan: e.target.value})} placeholder="Nama Kegiatan" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Sub Kegiatan</label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nomor Sub Kegiatan</label>
+                      <input type="text" value={packageMetadata.nomor_sub_kegiatan || ''} onChange={(e) => setPackageMetadata({...packageMetadata, nomor_sub_kegiatan: e.target.value})} placeholder="Contoh: 7.01.03..." className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nama Sub Kegiatan</label>
                       <input type="text" value={packageMetadata.sub_kegiatan} onChange={(e) => setPackageMetadata({...packageMetadata, sub_kegiatan: e.target.value})} placeholder="Nama Sub Kegiatan" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
                     </div>
                     <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Sumber Dana</label>
+                      <input type="text" value={packageMetadata.sumber_dana || ''} onChange={(e) => setPackageMetadata({...packageMetadata, sumber_dana: e.target.value})} placeholder="Sumber Dana" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nomor DPP (Manual)</label>
-                      <input type="text" value={packageMetadata.nomor_dpp} onChange={(e) => setPackageMetadata({...packageMetadata, nomor_dpp: e.target.value})} placeholder="Opsional (Kosongi jika otomatis)" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                      <input type="text" value={packageMetadata.nomor_dpp || ''} onChange={(e) => setPackageMetadata({...packageMetadata, nomor_dpp: e.target.value})} placeholder="Opsional (Kosongi jika otomatis)" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal DPP</label>
+                      <input type="date" value={packageMetadata.tanggal_dpp || ''} onChange={(e) => setPackageMetadata({...packageMetadata, tanggal_dpp: e.target.value})} className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nomor Nota Dinas (Manual)</label>
+                      <input type="text" value={packageMetadata.nomor_nd || ''} onChange={(e) => setPackageMetadata({...packageMetadata, nomor_nd: e.target.value})} placeholder="Opsional (Kosongi jika otomatis)" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Nota Dinas</label>
+                      <input type="date" value={packageMetadata.tanggal_nd || ''} onChange={(e) => setPackageMetadata({...packageMetadata, tanggal_nd: e.target.value})} className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
                     </div>
                   </div>
 
-                  {/* Badge Indikator Jenis DPP */}
+                  {/* Pemilihan Template DPP */}
                   <div className="mb-6 p-4 border rounded-xl bg-blue-50 border-blue-200">
-                    <div className="font-bold text-blue-900 text-sm mb-1 flex items-center gap-2">
+                    <div className="font-bold text-blue-900 text-sm mb-3 flex items-center gap-2">
                       <ClipboardList className="w-5 h-5 text-blue-700" />
-                      <span>Template DPP: </span>
-                      {
-                        getPacketCategory(selectedPack?.packName || '') === 'Mamin-Prasmanan' ? 'Mamin — Prasmanan/Katering' :
-                        getPacketCategory(selectedPack?.packName || '') === 'Mamin-Bungkus' ? 'Mamin — Nasi Kotak / Bungkus' :
-                        getPacketCategory(selectedPack?.packName || '') === 'Mamin-Snack' ? 'Mamin — Snack' :
-                        getPacketCategory(selectedPack?.packName || '') === 'Modal' ? 'Belanja Modal' :
-                        getPacketCategory(selectedPack?.packName || '') === 'Konsolidasi' ? 'Konsolidasi' :
-                        getPacketCategory(selectedPack?.packName || '') === 'Jasa' ? 'Jasa' : 'ATK / Standar'
-                      }
+                      <span>Pilih Template Dokumen Persiapan Pengadaan (DPP)</span>
                     </div>
-                    <div className="text-xs text-blue-800 leading-relaxed">
-                      {getPacketCategory(selectedPack?.packName || '') === 'Mamin-Prasmanan' && "Pasal kunci: I.e (Peralatan saji & Personil Layanan), VII (Wajib SLHS). Status: Jasa Katering."}
-                      {getPacketCategory(selectedPack?.packName || '') === 'Mamin-Bungkus' && "Pasal kunci: I.e (Higienis, kemasan individual, 1 jam sebelum), VII (Wajib SLHS)."}
-                      {getPacketCategory(selectedPack?.packName || '') === 'Mamin-Snack' && "Pasal kunci: I.e (Kemasan tertutup, masa kadaluarsa), VII (Wajib SLHS)."}
-                      {getPacketCategory(selectedPack?.packName || '') === 'Modal' && "Pasal kunci: I.b (Merek & Service Center), VII (Surat Dukungan Pabrikan)."}
-                      {getPacketCategory(selectedPack?.packName || '') === 'Konsolidasi' && "Pasal kunci: VI (Direct Purchasing ke Penyedia Konsolidasi). Status: Bebas HPS."}
-                      {getPacketCategory(selectedPack?.packName || '') === 'Jasa' && "Pasal kunci: standar untuk Jasa lainnya."}
-                      {getPacketCategory(selectedPack?.packName || '') === 'ATK' && "Pasal kunci: standar pengadaan ATK."}
+                    
+                    <select
+                      value={selectedTplId || ''}
+                      onChange={(e) => setSelectedTplId(e.target.value)}
+                      className="w-full bg-white text-xs px-3 py-2.5 border border-blue-300 rounded-lg focus:border-indigo-500 outline-none transition-colors"
+                    >
+                      <option value="">-- Pilih Manual atau Biarkan Otomatis --</option>
+                      {(() => {
+                          try {
+                            const tStr = localStorage.getItem('pbj_templates');
+                            let tpls = tStr ? JSON.parse(tStr) : [];
+                            if (!tpls || tpls.length === 0) {
+                              tpls = DEFAULT_TEMPLATES.filter(t => t.category === 'Tahap Persiapan');
+                            }
+                            return tpls.map(t => (
+                              <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
+                            ));
+                          } catch(e) { return null; }
+                      })()}
+                    </select>
+
+                  </div>
+
+                  {/* Pengaturan Khusus Kerangka Surat DPP (AI Assisted) */}
+                  <div className="mb-6 p-4 border rounded-xl bg-indigo-50/50 border-indigo-200">
+                    <div className="font-bold text-indigo-900 text-sm mb-4 flex items-center gap-2">
+                      <Wand2 className="w-5 h-5 text-indigo-600" />
+                      <span>Pengaturan Spesifik DPP & Refinement AI</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Spesifikasi Layanan Tambahan</label>
+                          <button onClick={() => enhanceDPPTextWithAI('spesifikasiLayanan', dppSpecs.spesifikasiLayanan)} disabled={isEnhancingDPP['spesifikasiLayanan']} className="text-[9px] font-bold bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200 transition-colors flex items-center gap-1 disabled:opacity-50">
+                            {isEnhancingDPP['spesifikasiLayanan'] ? '✨ Merapikan...' : '✨ Rapikan Bahasa (AI)'}
+                          </button>
+                        </div>
+                        <textarea value={dppSpecs.spesifikasiLayanan || ''} onChange={(e) => setDppSpecs({...dppSpecs, spesifikasiLayanan: e.target.value})} placeholder="Contoh: Barang harus diantar beserta teknisi..." className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none min-h-[60px] resize-y"></textarea>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Justifikasi Pemilihan Merek</label>
+                          <button onClick={() => enhanceDPPTextWithAI('justifikasiMerek', dppSpecs.justifikasiMerek)} disabled={isEnhancingDPP['justifikasiMerek']} className="text-[9px] font-bold bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200 transition-colors flex items-center gap-1 disabled:opacity-50">
+                            {isEnhancingDPP['justifikasiMerek'] ? '✨ Merapikan...' : '✨ Rapikan Bahasa (AI)'}
+                          </button>
+                        </div>
+                        <textarea value={dppSpecs.justifikasiMerek || ''} onChange={(e) => setDppSpecs({...dppSpecs, justifikasiMerek: e.target.value})} placeholder="Contoh: Merek ini sudah teruji kompatibilitasnya..." className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none min-h-[60px] resize-y"></textarea>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-4">
+                  <div className="flex flex-wrap gap-4 pointer-events-auto">
                     {!isHpsExemptSelected && (
                       <button
                         onClick={() => setActiveDocPreview('hps')}
@@ -387,9 +526,19 @@ export default function Step4TemplateSurat() {
                       Lihat Dokumen DPP PPK
                     </button>
                   </div>
+                  
+                  {/* Action Buttons Step 4 */}
+                  <div className="flex justify-end mt-8 border-t border-slate-200 pt-6 print:hidden">
+                    <button
+                      onClick={() => setStep(5)}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2"
+                    >
+                      Lanjut ke TTE & Pengiriman &rarr;
+                    </button>
+                  </div>
                   </div>
               )}
-                  
+
       {/* DOCUMENT PREVIEW MODAL (A4 PAPER SIMULATION & HIGH-FIDELITY PRINT-READY VIEW) */}
       {activeDocPreview && selectedPack && createPortal(
         <div id="print-modal-parent" style={{ backgroundColor: 'rgba(15, 23, 42, 0.95)' }} className="fixed inset-0 backdrop-blur-md z-50 flex flex-col items-center overflow-y-auto p-4 animate-fade-in print:p-0 print:bg-white">
@@ -675,7 +824,8 @@ export default function Step4TemplateSurat() {
  
  // Add centered title for default Nota Dinas
  if (ndTemplate.id === 'TPL-001' && !content.includes('NOTA DINAS')) {
-    content = `<div class="text-center mb-6"><div class="font-bold text-lg underline leading-none mb-1">NOTA DINAS</div><div class="leading-none">Nomor : {{nomor_nd}}</div></div>\n` + content;
+    const dynamicNd = packageMetadata.nomor_nd || '{{nomor_nd}}';
+    content = `<div class="text-center mb-6"><div class="font-bold text-lg underline leading-none mb-1">NOTA DINAS</div><div class="leading-none">Nomor : ${dynamicNd}</div></div>\n` + content;
  }
  
  // Force remove legacy signature block from cached templates to prevent duplication
@@ -694,9 +844,9 @@ export default function Step4TemplateSurat() {
  '{{nama_satker}}': currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
  '{{nama_satker_kapital}}': (currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
  '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : defaultAlamat,
- '{{nama_pekerjaan}}': selectedPack.packName || '',
+ '{{nama_pekerjaan}}': (selectedPack.packName || '').replace(/\n/g, ' '),
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
- '{{sumber_dana}}': `${selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date().getFullYear()}`,
+ '{{sumber_dana}}': `${packageMetadata.sumber_dana || selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date().getFullYear()}`,
  '{{nama_ppk}}': currentUser?.name || '',
  '{{nip_ppk}}': currentUser?.nip || '',
  '{{nomor_surat}}': nomorBase.replace('{nomor}', '045.2'),
@@ -771,12 +921,11 @@ export default function Step4TemplateSurat() {
  let content = template.content;
  
  // Center the DPP title and Nomor
- content = content.replace(/^DOKUMEN PERSIAPAN PENGADAAN \(DPP\)\nNomor : \{\{nomor_dpp\}\}/, '<div class="text-center mb-6"><div class="font-bold text-lg underline leading-none mb-1">DOKUMEN PERSIAPAN PENGADAAN (DPP)</div><div class="leading-none">Nomor : {{nomor_dpp}}</div></div>');
-
+ content = content.replace(/DOKUMEN PERSIAPAN PENGADAAN \(DPP\)\s*Nomor : \{\{nomor_dpp\}\}/i, '<div class="text-center mb-6"><div class="font-bold text-lg underline leading-none mb-1">DOKUMEN PERSIAPAN PENGADAAN (DPP)</div><div class="leading-none mb-2">Nomor : {{nomor_dpp}}</div></div>');
+ 
  const currentDocSettingsStr = localStorage.getItem('pbj_doc_settings');
  const docSettingsFallback = currentDocSettingsStr ? JSON.parse(currentDocSettingsStr) : null;
  const nomorBase = docSettingsFallback ? (docSettingsFallback.formatNomorSurat || '027/{nomor}/BPBJ/2026') : '027/{nomor}/BPBJ/2026';
- 
  const isBesuk = currentUser?.department?.toLowerCase().includes('besuk');
  const defaultAlamat = isBesuk ? 'Jl. Raya Besuk Nomor 37 Besuk Probolinggo - 67283' : (docSettingsFallback?.alamatLengkap || 'Komplek Perkantoran Pemerintah Daerah');
  const defaultTempat = isBesuk ? 'Besuk' : (currentUser?.department || 'Probolinggo');
@@ -786,9 +935,9 @@ export default function Step4TemplateSurat() {
  '{{nama_satker}}': currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)',
  '{{nama_satker_kapital}}': (currentUser?.department || 'Bagian Pengadaan Barang dan Jasa (BPBJ)').toUpperCase(),
  '{{alamat_satker}}': docSettingsFallback ? docSettingsFallback.alamatLengkap : defaultAlamat,
- '{{nama_pekerjaan}}': selectedPack.packName || '',
+ '{{nama_pekerjaan}}': (selectedPack.packName || '').replace(/\n/g, ' '),
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
- '{{sumber_dana}}': `${selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date().getFullYear()}`,
+ '{{sumber_dana}}': `${packageMetadata.sumber_dana || selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date().getFullYear()}`,
  '{{nama_ppk}}': currentUser?.name || '',
  '{{nip_ppk}}': currentUser?.nip || '',
  '{{nomor_surat}}': nomorBase.replace('{nomor}', '045.2'),
@@ -838,389 +987,255 @@ export default function Step4TemplateSurat() {
 
  return (
  <>
- <div style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', textAlign: 'justify', fontSize: '12pt', fontFamily: 'Arial, sans-serif' }} dangerouslySetInnerHTML={{ __html: parseSmartColons(parts[0]) }} />
+ <div style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', textAlign: 'justify', fontSize: '12pt', fontFamily: 'Arial, sans-serif' }} dangerouslySetInnerHTML={{ __html: parseSmartColons(parts[0].trimEnd()) }} />
  
- {/* The Dynamic Components Section */}
- <div className="py-4">
+  {/* The Dynamic Components Section */}
+  <div className="py-4 text-justify text-[12pt] font-['Arial',sans-serif] leading-relaxed">
+    {/* BAB I */}
+    
+    <table className="w-full mb-4 mt-2 border-none">
+      <tbody>
+        <tr><td className="w-[30%] align-top border-none p-1">Nama Paket</td><td className="w-4 align-top border-none p-1">:</td><td className="align-top border-none p-1">{replacements['{{nama_pekerjaan}}']}</td></tr>
+        <tr><td className="w-[30%] align-top border-none p-1">Instansi/Satuan Kerja</td><td className="w-4 align-top border-none p-1">:</td><td className="align-top border-none p-1">{replacements['{{nama_satker}}']}</td></tr>
+        <tr><td className="w-[30%] align-top border-none p-1">Tahun Anggaran</td><td className="w-4 align-top border-none p-1">:</td><td className="align-top border-none p-1">{replacements['{{tahun_anggaran}}']}</td></tr>
+        <tr><td className="w-[30%] align-top border-none p-1">Pagu Anggaran</td><td className="w-4 align-top border-none p-1">:</td><td className="align-top border-none p-1">{replacements['{{nilai_pagu}}']}</td></tr>
+        <tr><td className="w-[30%] align-top border-none p-1">ID RUP</td><td className="w-4 align-top border-none p-1">:</td><td className="align-top border-none p-1">{replacements['{{kode_rup}}']}</td></tr>
+        
+      </tbody>
+    </table>
 
- <div className="pl-4 space-y-2 ">
- <div className="font-bold">a. Spesifikasi Jenis, Jumlah, dan Mutu Barang</div>
- <table className="w-full border-collapse border border-slate-900 mb-2">
- <thead>
- <tr className="bg-slate-100 font-bold text-center">
- <td className="border border-slate-900 p-1">No</td>
- <td className="border border-slate-900 p-1">Identitas/Jenis Barang</td>
- <td className="border border-slate-900 p-1">Spesifikasi Mutu</td>
- <td className="border border-slate-900 p-1">Kuantitas</td>
- <td className="border border-slate-900 p-1">Satuan</td>
- </tr>
- </thead>
- <tbody>
- {getPackageItems(selectedPack).filter(item => (item.qty === '' ? 0 : (item.qty || 0)) > 0).map((item, idx) => {
- return (
- <tr key={item.no}>
- <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
- <td className="border border-slate-900 p-1">{item.name}</td>
- <td className="border border-slate-900 p-1">{item.spesifikasi || 'Sesuai Kebutuhan DPA'}</td>
- <td className="border border-slate-900 p-1 text-center">{item.qty}</td>
- <td className="border border-slate-900 p-1 text-center">{item.unit}</td>
- </tr>
- );
- })}
- </tbody>
- </table>
+    {/* BAB II */}
+    <div className="font-bold uppercase mt-8 mb-2 text-center">BAB I. PRIORITAS PENGGUNAAN PRODUK DALAM NEGERI (PDN) & UMK</div>
+    <p className="indent-8 mb-2">Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah, PPK mengutamakan penyedia dengan kualifikasi usaha kecil/koperasi serta produk dalam negeri berdasarkan tingkatan prioritas berikut:</p>
+    <ol className="list-decimal pl-12 mb-6">
+      <li>Produk Dalam Negeri (PDN) dengan nilai TKDN &ge; 25%.</li>
+      <li>PDN dengan nilai TKDN &lt; 25%.</li>
+      <li>Produk berlabel PDN namun belum memiliki nilai TKDN.</li>
+      <li>Produk Impor (jika tidak ada pilihan lokal dan disertai justifikasi).</li>
+    </ol>
 
- <div className="font-bold mt-2">b. Justifikasi Teknis Dalam Penggunaan Merek</div>
- <p className="text-justify">
- {dppSpecs.merek || (getPacketCategory(selectedPack?.packName || '') === 'Modal'
- ? 'Mengingat spesifikasi yang dibutuhkan berteknologi tinggi dan memerlukan jaminan purna jual, maka ditetapkan standar merek pabrikan yang memiliki Service Center resmi di sekitar lokasi dinas.'
- : getPacketCategory(selectedPack?.packName || '') === 'Konsolidasi'
- ? 'Pengadaan merujuk pada penetapan merek dan spesifikasi hasil konsolidasi terpusat Katalog Sektoral sesuai Keputusan UKPBJ.'
- : 'Tidak mensyaratkan merek tertentu dan mengutamakan persaingan sehat sesuai spesifikasi teknis yang dibutuhkan.')}
- </p>
+    <div className="font-bold uppercase mt-8 mb-2 text-center">BAB II. SPESIFIKASI TEKNIS E-PURCHASING</div>
+    
+    <div className="font-bold mt-5 mb-1">A. Identitas Barang & Spesifikasi Mutu</div>
+    <table className="w-full border-collapse border border-slate-900 mb-2">
+      <thead>
+        <tr className="bg-slate-100 font-bold text-center">
+          <td className="border border-slate-900 p-1 w-8">No</td>
+          <td className="border border-slate-900 p-1">Identitas / Nama Barang & Spesifikasi Mutu</td>
+          <td className="border border-slate-900 p-1 w-16">Kuantitas</td>
+          <td className="border border-slate-900 p-1 w-16">Satuan</td>
+        </tr>
+      </thead>
+      <tbody>
+        {getPackageItems(selectedPack).filter(item => (item.qty === '' ? 0 : (item.qty || 0)) > 0).map((item, idx) => {
+          return (
+            <tr key={item.no}>
+              <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
+              <td className="border border-slate-900 p-1">
+                <strong>{item.name}</strong>
+                {item.spesifikasi && (
+                  <div style={{ marginTop: '4px', fontSize: '11px', color: '#334155' }}>
+                    Spesifikasi: {item.spesifikasi}
+                  </div>
+                )}
+              </td>
+              <td className="border border-slate-900 p-1 text-center">{item.qty}</td>
+              <td className="border border-slate-900 p-1 text-center">{item.unit}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
 
- <div className="font-bold mt-2">c. Spesifikasi Waktu</div>
- <p className="text-justify">Waktu pelaksanaan pengadaan maksimal selama {dppSpecs.waktu || '14 (Empat Belas) hari kalender'} sejak penerbitan SP.</p>
+    <div className="font-bold mt-4">B. Spesifikasi Waktu dan Layanan</div>
+    <p className="indent-8 mb-2">Waktu pelaksanaan pengadaan maksimal selama <strong>{dppSpecs.waktu || packageMetadata.waktu_penyelesaian || '14 (Empat Belas) hari kalender'}</strong>. Lokasi tujuan akhir pengiriman berada di: <strong>{dppSpecs.tempat || packageMetadata.lokasi_pekerjaan || currentUser?.department || 'Kabupaten Probolinggo'}</strong>.</p>
+    {dppSpecs.spesifikasiLayanan && (
+      <div className="whitespace-pre-wrap text-justify mb-4 leading-relaxed indent-8">
+        {dppSpecs.spesifikasiLayanan}
+      </div>
+    )}
 
- <div className="font-bold mt-2">d. Spesifikasi Tempat</div>
- <p className="text-justify">Alamat tujuan akhir: {dppSpecs.tempat || (currentUser?.department?.includes('Bago') ? 'Jl. Raya Bago No. 176, Besuk' : 'Komp. Perkantoran Pemerintah Kabupaten Probolinggo')}</p>
-
- <div className="font-bold mt-2">e. Spesifikasi Tingkat Layanan</div>
- <ul className="list-disc pl-4 space-y-1">
- {dppSpecs.layanan ? (
-   dppSpecs.layanan.split('\n').map((line, i) => line.trim() ? <li key={i}>{line}</li> : null)
- ) : (getPacketCategory(selectedPack?.packName || '') === 'Mamin-Prasmanan' ? (
- <>
- <li>Menyediakan peralatan saji/prasmanan, personil pelayanan (pramusaji), dan menjaga kebersihan area.</li>
- <li>Makanan dalam kondisi higienis dan siap saji selambat-lambatnya 1 Jam sebelum jadwal pelaksanaan kegiatan.</li>
- </>
- ) : (
- <>
- <li>Produk/barang harus dalam kondisi baru dan baik.</li>
- <li>Barang diantarkan langsung ke alamat tujuan akhir.</li>
- </>
- ))}
- {(getPacketCategory(selectedPack?.packName || '') === 'Mamin-Bungkus' || getPacketCategory(selectedPack?.packName || '') === 'Mamin-Snack') && (
- <li>Kondisi makanan/minuman higienis, bersih, terbungkus rapi/kemasan tertutup, dan dikirimkan 1 Jam sebelum jadwal pelaksanaan kegiatan.</li>
- )}
- {getPacketCategory(selectedPack?.packName || '') === 'Modal' && <li>Dilengkapi jaminan garansi resmi distributor/pabrikan minimal 1 tahun.</li>}
- <li>Penyedia wajib mengganti barang yang rusak/tidak sesuai spesifikasi selambat-lambatnya 1x24 jam.</li>
- </ul>
- </div>
-
- <div className="font-bold uppercase mt-4">II. Prioritas Penggunaan Produk Dalam Negeri</div>
- <p className="text-justify">
- Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah, PPK memprioritaskan pemilihan produk dalam negeri pada Katalog Elektronik yang memiliki label Produk Dalam Negeri (PDN) atau memiliki sertifikat TKDN.
- </p>
-
- <div className="font-bold uppercase mt-4">III. Prioritas Penggunaan Produk dari Usaha Kecil</div>
- <p className="text-justify">
- Mengingat pagu paket pengadaan ini bernilai di bawah Rp15.000.000.000,00 maka pengadaan diprioritaskan kepada Penyedia dengan Kualifikasi Usaha Kecil atau Koperasi di wilayah lokal.
- </p>
-
- <div className="font-bold uppercase mt-4">IV. Pengumpulan Referensi Harga</div>
- <p className="text-justify">
- PPK telah mempersiapkan referensi harga sebagai dasar pelaksanaan negosiasi yang diambil dari Katalog Elektronik, Harga Pasar setempat, dan/atau Standar Harga Satuan.
- </p>
-
- <div className="pl-4 space-y-2 ">
- <div className="font-bold">a. Informasi Katalog Elektronik Inaproc</div>
- {getActiveSurveyData() ? (() => {
- const foundProducts = getActiveSurveyData().products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN');
- if (foundProducts.length === 0) {
- return <p className="italic text-slate-600 my-1 pb-1 ">* Seluruh item barang tidak ditemukan di e-Katalog LKPP. Referensi e-Katalog tidak terlampir.</p>
- }
- return (
- <table className="w-full border-collapse border border-slate-900 mb-2 ">
- <thead>
- <tr className="bg-slate-100 font-bold text-center">
- <td className="border border-slate-900 p-1 w-8">No</td>
- <td className="border border-slate-900 p-1">Nama Barang</td>
- <td className="border border-slate-900 p-1">Penyedia Katalog</td>
- <td className="border border-slate-900 p-1 text-right">Harga Katalog (Rp)</td>
- </tr>
- </thead>
- <tbody>
- {foundProducts.map((p, idx) => (
- <tr key={p.id}>
- <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
- <td className="border border-slate-900 p-1 text-blue-700 underline">
- <a href={p.link} target="_blank" rel="noopener noreferrer" className="hover:text-blue-900">{p.name}</a>
- </td>
- <td className="border border-slate-900 p-1">{p.vendor}</td>
- <td className="border border-slate-900 p-1 text-right">
-   {(p.price || 0).toLocaleString('id-ID')}
- </td>
- </tr>
- ))}
- </tbody>
- </table>
- );
- })() : (
- <p className="italic text-slate-500">Silakan lakukan Survei Pasar Otomatis pada panel PPK untuk memunculkan data e-Katalog.</p>
- )}
-
- <div className="font-bold mt-2">b. Informasi Harga Pasar / Standar Harga Satuan (Estimasi)</div>
- {isHpsExemptSelected ? (
- <p className="text-justify mb-2 indent-8">
- Sesuai dengan ketentuan pada <strong>Pasal 26 Peraturan Presiden Nomor 16 Tahun 2018 tentang Pengadaan Barang/Jasa Pemerintah sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021</strong>, penyusunan Harga Perkiraan Sendiri (HPS) dikecualikan untuk pengadaan barang/jasa dengan nilai Pagu Anggaran paling banyak Rp10.000.000,00 (sepuluh juta rupiah), E-Purchasing, dan/atau Tender pekerjaan terintegrasi. Sehubungan dengan hal tersebut, pengadaan ini menggunakan harga pasar atau harga satuan acuan belanja sebagai dasar pelaksanaan proses pengadaan tanpa menetapkan dokumen HPS tersendiri. Adapun rincian estimasi harga acuan adalah sebagai berikut:
- </p>
- ) : (
- <p className="text-justify mb-2">Berdasarkan hasil kalkulasi Harga Perkiraan Sendiri (HPS) bernilai total <b>Rp&nbsp;{parseInt(hpsValue || 0).toLocaleString('id-ID')}</b>, dengan rincian per item sebagai berikut:</p>
- )}
- <table className="w-full border-collapse border border-slate-900 mb-2 ">
- <thead>
- <tr className="bg-slate-100 font-bold text-center">
- <td className="border border-slate-900 p-1 w-8">No</td>
- <td className="border border-slate-900 p-1">Uraian Barang</td>
- <td className="border border-slate-900 p-1 w-32 text-right">{isHpsExemptSelected ? 'Harga Satuan Acuan (Rp)' : 'Harga HPS/SHS (Rp)'}</td>
- </tr>
- </thead>
- <tbody>
- {getPackageItems(selectedPack).filter(item => (item.qty === '' ? 0 : (item.qty || 0)) > 0).map((item, idx) => {
- const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
- // ✅ FIX: Use updated name from surveyData if available (e.g. user changed keyword)
- const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
- const displayName = surveyProduct?.name || item.name;
- return (
- <tr key={item.no}>
- <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
- <td className="border border-slate-900 p-1">{displayName}</td>
- <td className="border border-slate-900 p-1 text-right">
-   {unitHpsPrice.toLocaleString('id-ID')}
- </td>
- </tr>
- )
- })}
- </tbody>
- </table>
- </div>
-
- {getActiveSurveyData() && (
- <div className="pl-4 space-y-2 mt-4 page-break-inside-avoid">
- <div className="font-bold">c. Justifikasi Pemilihan dan Produk Pembanding</div>
- {(() => {
- const products = getActiveSurveyData().products;
- const productsWithData = products.filter(p => 
- (justifications[p.id] && justifications[p.id].trim()) || 
- (comparisons[p.id] && comparisons[p.id].name)
- );
-
- if (productsWithData.length === 0) {
- return <p className="italic text-slate-600 my-1 pb-1 ">* Tidak ada justifikasi spesifik atau produk pembanding yang dicatat.</p>;
- }
-
- // Group by justification text
- const groups = {};
- productsWithData.forEach(p => {
- const justText = (justifications[p.id] || '').trim();
- if (!groups[justText]) {
- groups[justText] = { items: [], comparisons: [] };
- }
- groups[justText].items.push(p.name);
- if (comparisons[p.id] && comparisons[p.id].name) {
- groups[justText].comparisons.push({ pName: p.name, mainPrice: p.price, comp: comparisons[p.id] });
- }
- });
-
- return (
- <div className="space-y-6 mt-2">
- {Object.keys(groups).map((justText, idx) => {
- const group = groups[justText];
- const isGlobal = group.items.length > 3 || group.items.length === products.length;
- 
- return (
- <div key={`group-${idx}`} className="mb-4 p-4 border border-slate-300 rounded-lg bg-slate-50 shadow-sm page-break-inside-avoid">
- <div className="flex items-center gap-2 mb-3 border-b border-slate-200 pb-2">
- <span className="bg-indigo-600 text-white font-bold px-2 py-0.5 rounded uppercase tracking-wider">
- {isGlobal ? 'Klausul Tingkat Paket' : 'Klausul Spesifik'}
- </span>
- <span className=" font-semibold text-slate-700">
- Berlaku untuk {group.items.length} item barang
- </span>
- </div>
- 
- <div className="mb-3 text-slate-600 italic leading-relaxed">
- {group.items.join(', ')}
- </div>
- 
- {(() => {
-    const isMamin = getPacketCategory(selectedPack?.packName || '').startsWith('Mamin');
-    return (
+    {dppSpecs.justifikasiMerek && (
       <>
-        <div className="mb-4">
-          <div className="font-bold text-slate-800 mb-1">
-            {isMamin ? 'Catatan Pertimbangan Pemilihan:' : 'Pertimbangan Pemilihan Penyedia:'}
-          </div>
-          <div className={`text-justify pl-3 border-l-4 ${justText ? 'border-indigo-400' : 'border-slate-400'} mt-2 text-[11pt] text-slate-700`}>
-            {isMamin ? (
-              <>
-                <p className="mb-2">Mengingat karakteristik pengadaan Makan Minum (Mamin) yang bersifat habis pakai dan memiliki risiko penurunan kualitas (basi) jika menempuh waktu perjalanan yang lama, maka Pejabat Pembuat Komitmen (PPK) menetapkan Kriteria Pembanding Utama secara terbatas, yaitu:</p>
-                <ul className="list-disc pl-4 space-y-1">
-                  <li><strong>Kesesuaian Harga:</strong> Membandingkan nilai ekonomis porsi yang selaras dengan pagu anggaran.</li>
-                  <li><strong>Kedekatan Jarak Geografis:</strong> Memilih penyedia dengan radius terdekat (satu kecamatan/wilayah kerja) untuk memastikan ketepatan waktu distribusi saat jam konsumsi acara dan menjamin makanan diterima dalam kondisi segar (higienis).</li>
-                </ul>
-                <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded text-slate-700">
-                  <strong className="text-amber-800 block mb-1">💡 Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK):</strong>
-                  <ul className="list-decimal pl-4 space-y-1.5 text-xs text-justify">
-                    <li><strong>Metode Rotasi Kerja/Order (Penyedia Ganda):</strong> Mengingat terdapat lebih dari satu penyedia Mamin dalam wilayah kecamatan yang sama, PP/PPK disarankan menerapkan sistem rotasi kerja secara bergiliran pada paket belanja berikutnya untuk mencegah monopoli usaha dan mendukung pemerataan ekonomi UMKK lokal.</li>
-                    <li><strong>Penyesuaian Spesifikasi Menu (Menu Matching):</strong> Memilih penyedia yang menu dan kapasitas produksinya paling sesuai dengan jenis acara dinas.</li>
-                    <li><strong>Penentuan Jarak Berdasarkan Lokasi Pengiriman Riil:</strong> Apabila tempat acara/pengiriman ditujukan ke lokasi lain di luar kantor instansi/kecamatan, pemilihan penyedia harus memprioritaskan katering terdekat dari <em>titik pengiriman riil tersebut</em> demi efisiensi biaya ongkir dan meminimalkan risiko makanan basi di perjalanan.</li>
-                  </ul>
-                </div>
-              </>
-            ) : justText ? (
-              <>
-                Berdasarkan hasil survei pasar e-Katalog, Pejabat Pembuat Komitmen (PPK) menetapkan pemilihan penyedia dengan pertimbangan spesifikasi kinerja, waktu, dan/atau layanan pendukung sebagai berikut:<br/>
-                <div className="mt-2 font-medium italic text-slate-800">"{justText}"</div>
-              </>
-            ) : (
-              <>
-                Berdasarkan hasil perbandingan katalog elektronik pada tabel referensi, Pejabat Pembuat Komitmen (PPK) menetapkan pemilihan penyedia didasarkan pada prinsip <span className="italic">Best Value for Money</span>. Pemilihan tidak semata-mata mempertimbangkan harga termurah, melainkan mempertimbangkan keunggulan spesifikasi teknis, ketersediaan stok, kecepatan pengiriman, serta garansi/layanan purna jual yang lebih dapat diandalkan untuk menunjang urgensi operasional pemerintah daerah.
-              </>
-            )}
-          </div>
-        </div>
-
-        {group.comparisons.length > 0 && (
-          <div className="mt-4">
-            <div className="font-bold text-slate-800 mb-2">Tabel Komparasi Produk:</div>
-            {group.comparisons.map((c, i) => (
-              <div key={i} className="mb-6">
-                <table className="w-full border-collapse border border-slate-300 text-[10pt]">
-                  <thead>
-                    <tr className="bg-slate-200 text-slate-800">
-                      <th className="border border-slate-300 p-1.5 text-left font-bold w-[25%]">Komponen Evaluasi</th>
-                      <th className="border border-slate-300 p-1.5 text-left font-bold w-[25%]">{isMamin ? 'Penyedia A (Pilihan)' : 'Produk Utama (Pilihan)'}</th>
-                      <th className="border border-slate-300 p-1.5 text-left font-bold w-[25%]">{isMamin ? 'Penyedia B (Pembanding 1)' : 'Produk Pembanding 1'}</th>
-                      <th className="border border-slate-300 p-1.5 text-left font-bold w-[25%]">{isMamin ? 'Penyedia C (Pembanding 2)' : 'Produk Pembanding 2'}</th>
-                    </tr>
-                  </thead>
-                  <tbody contentEditable="true" suppressContentEditableWarning={true}>
-                    {isMamin ? (
-                      <>
-                        <tr>
-                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Nama Paket Mamin</td>
-                          <td className="border border-slate-300 p-1.5">{c.pName}</td>
-                          <td className="border border-slate-300 p-1.5">{c.comp.name || '-'}</td>
-                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
-                        </tr>
-                        <tr>
-                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Harga per Porsi</td>
-                          <td className="border border-slate-300 p-1.5 font-bold">Rp {(c.mainPrice || 0).toLocaleString('id-ID')}</td>
-                          <td className="border border-slate-300 p-1.5 font-bold">Rp {parseInt(c.comp.price || 0).toLocaleString('id-ID')}</td>
-                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
-                        </tr>
-                        <tr>
-                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Lokasi Dapur/Toko</td>
-                          <td className="border border-slate-300 p-1.5">Kecamatan ... (1 Wilayah)</td>
-                          <td className="border border-slate-300 p-1.5">{c.comp.lokasi || 'Kecamatan ... (Beda Wilayah)'}</td>
-                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
-                        </tr>
-                        <tr>
-                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Jarak & Estimasi Waktu</td>
-                          <td className="border border-slate-300 p-1.5">2 KM / 10 Menit</td>
-                          <td className="border border-slate-300 p-1.5">{c.comp.jarak || '15 KM / 45 Menit'}</td>
-                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
-                        </tr>
-                        <tr>
-                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Status TKDN</td>
-                          <td className="border border-slate-300 p-1.5">PDN (Skala UMK)</td>
-                          <td className="border border-slate-300 p-1.5">{c.comp.tkdn || 'PDN (Skala UMK)'}</td>
-                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
-                        </tr>
-                        <tr>
-                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Rekomendasi Akhir</td>
-                          <td className="border border-slate-300 p-1.5 font-bold text-emerald-700">DIPILIH</td>
-                          <td className="border border-slate-300 p-1.5 font-bold text-rose-600">Tidak Dipilih</td>
-                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
-                        </tr>
-                      </>
-                    ) : (
-                      <>
-                        <tr>
-                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Merek & Tipe</td>
-                          <td className="border border-slate-300 p-1.5">{c.pName}</td>
-                          <td className="border border-slate-300 p-1.5">{c.comp.name || '-'}</td>
-                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
-                        </tr>
-                        <tr>
-                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Link E-Katalog</td>
-                          <td className="border border-slate-300 p-1.5 text-blue-600">Terlampir</td>
-                          <td className="border border-slate-300 p-1.5 text-blue-600">Terlampir</td>
-                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
-                        </tr>
-                        <tr>
-                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Spesifikasi Fisik</td>
-                          <td className="border border-slate-300 p-1.5">Sesuai KAK</td>
-                          <td className="border border-slate-300 p-1.5">{c.comp.spesifikasi || 'Sesuai KAK'}</td>
-                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
-                        </tr>
-                        <tr>
-                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Nilai TKDN (%)</td>
-                          <td className="border border-slate-300 p-1.5"></td>
-                          <td className="border border-slate-300 p-1.5">{c.comp.tkdn || ''}</td>
-                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
-                        </tr>
-                        <tr>
-                          <td className="border border-slate-300 p-1.5 font-bold bg-slate-50">Harga (Inc. Ongkir & PPN)</td>
-                          <td className="border border-slate-300 p-1.5 font-bold">Rp {(c.mainPrice || 0).toLocaleString('id-ID')}</td>
-                          <td className="border border-slate-300 p-1.5 font-bold">Rp {parseInt(c.comp.price || 0).toLocaleString('id-ID')}</td>
-                          <td className="border border-slate-300 p-1.5 text-slate-400 italic">-</td>
-                        </tr>
-                      </>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            ))}
-            
-            {isMamin && (
-              <div className="mt-2 text-[10pt] text-justify mb-4" contentEditable="true" suppressContentEditableWarning={true}>
-                <div className="font-bold underline mb-1">JUSTIFIKASI TEKNIS PEMILIHAN PRODUK MAMIN</div>
-                <p className="mb-2">Berdasarkan hasil telaah produk sejenis pada Etalase Katalog Elektronik Lokal, harga satuan porsi antara penyedia adalah sama/sebanding. Namun, Pejabat Pembuat Komitmen (PPK) menetapkan untuk memilih penyedia terpilih dengan pertimbangan teknis utama sebagai berikut:</p>
-                <ul className="list-decimal pl-5 space-y-1">
-                  <li><strong>Faktor Kedekatan Jarak dan Ketepatan Waktu:</strong> Penyedia berdomisili di Kecamatan yang sama dengan lokasi pelaksanaan acara/kantor (jarak &plusmn; 2 KM). Hal ini memastikan makanan dapat dikirim tepat waktu sesuai jadwal konsumsi peserta tanpa risiko keterlambatan akibat kemacetan jalan lintas kecamatan.</li>
-                  <li><strong>Kualitas dan Higienitas Makanan:</strong> Jarak pengiriman yang pendek (&le; 10 menit) meminimalisir risiko penurunan kualitas makanan (basi/rusak) selama perjalanan, sehingga makanan diterima dalam kondisi segar dan hangat.</li>
-                  <li><strong>Pemberdayaan Ekonomi Lokal:</strong> Memprioritaskan pelaku usaha mikro/kecil yang berada di lingkungan terdekat tempat kegiatan sesuai asas efektivitas pengadaan.</li>
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
+        <div className="font-bold mt-4">C. Justifikasi Teknis Merek</div>
+        <p className="indent-8 mb-4 leading-relaxed whitespace-pre-wrap">{dppSpecs.justifikasiMerek}</p>
       </>
-    );
-  })()}
- </div>
- );
- })}
- </div>
- );
- })()}
- </div>
- )}
+    )}
 
- <div className="font-bold uppercase mt-4">V. Rancangan Kontrak (Surat Pesanan)</div>
- <p className="text-justify">Draft/Rancangan Kontrak menggunakan bentuk Surat Pesanan (SP) E-Purchasing yang berlaku standar pada sistem Inaproc LKPP.</p>
+    <div className="font-bold uppercase mt-8 mb-2 text-center page-break-before-avoid">
+      BAB III. DOKUMEN PENGUMPULAN REFERENSI HARGA
+    </div>
+    <p className="mb-2 indent-8">
+      Sebagai metode pengadaan e-purchasing, dokumen Referensi Harga ini digunakan untuk membuktikan harga yang disepakati wajar.
+    </p>
 
- <div className="font-bold uppercase mt-4">VI. Rencana Metode Pemilihan Penyedia</div>
- <p className="text-justify">
- {getPacketCategory(selectedPack?.packName || '') === 'Konsolidasi'
- ? 'Pengadaan dilakukan secara langsung (Direct Purchasing) kepada Penyedia Konsolidasi Sektoral yang telah ditetapkan UKPBJ.'
- : 'E-Purchasing dengan metode Negosiasi Harga terhadap harga dan/atau layanan pendukung sesuai ketentuan Katalog Elektronik.'}
- </p>
+    <div className="pl-4 space-y-2 mb-4">
+      <div className="font-bold">a. Daftar Penyedia Potensial e-Katalog</div>
+      {getActiveSurveyData() ? (() => {
+        const foundProducts = getActiveSurveyData().products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN');
+        if (foundProducts.length === 0) {
+          return <p className="italic text-slate-600 my-1 pb-1 ">* Seluruh item barang tidak ditemukan di e-Katalog LKPP. Referensi e-Katalog tidak terlampir.</p>
+        }
+        return (
+          <table className="w-full border-collapse border border-slate-900 mb-2">
+            <thead>
+              <tr className="bg-slate-100 font-bold text-center">
+                <td className="border border-slate-900 p-1 w-8">No</td>
+                <td className="border border-slate-900 p-1">Nama Barang</td>
+                <td className="border border-slate-900 p-1">Penyedia Katalog</td>
+                <td className="border border-slate-900 p-1 text-right">Harga Katalog (Rp)</td>
+              </tr>
+            </thead>
+            <tbody>
+              {foundProducts.flatMap((p, pIdx) => {
+                const rows = [];
+                const totalRows = 1 + (p.comparators && p.comparators.length > 0 ? p.comparators.length : 0);
+                // Target penyedia (Pemenang survei)
+                // Target penyedia (Pertama)
+                rows.push(
+                  <tr key={`win-${pIdx}`}>
+                    <td className="border border-slate-900 p-1 text-center" rowSpan={totalRows}>{pIdx + 1}</td>
+                    <td className="border border-slate-900 p-1 text-sm" rowSpan={totalRows}>
+                      <a href={p.link} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 break-all">{p.name}</a>
+                    </td>
+                    <td className="border border-slate-900 p-1 text-xs text-slate-800">
+                      {p.vendor}
+                    </td>
+                    <td className="border border-slate-900 p-1 text-right text-xs text-slate-800">
+                      {(p.price || 0).toLocaleString('id-ID')}
+                    </td>
+                  </tr>
+                );
+                
+                // Penyedia potensial lainnya (Alternatif)
+                if (p.comparators && p.comparators.length > 0) {
+                  p.comparators.forEach((comp, cIdx) => {
+                    rows.push(
+                      <tr key={`comp-${pIdx}-${cIdx}`}>
+                        <td className="border border-slate-900 p-1 text-xs text-slate-800">
+                          {comp.vendor}
+                        </td>
+                        <td className="border border-slate-900 p-1 text-right text-xs text-slate-800">
+                          {(comp.price || 0).toLocaleString('id-ID')}
+                        </td>
+                      </tr>
+                    );
+                  });
+                }
+                return rows;
+              })}
+            </tbody>
+          </table>
+        );
+      })() : <p className="italic text-slate-600 my-1 pb-1 ">* Belum ada survei yang dilakukan.</p>}
+    </div>
 
- <div className="font-bold uppercase mt-4">VII. Persyaratan Kualifikasi</div>
- <p className=" font-bold mt-1">Penyedia Badan Usaha / Perorangan:</p>
- <ul className="list-disc pl-8 space-y-1 ">
- <li>Memiliki identitas / NIB dan izin usaha sesuai KBLI yang relevan.</li>
- <li>Memiliki status valid wajib pajak / NPWP.</li>
- {getPacketCategory(selectedPack?.packName || '') === 'Modal' && <li>Memiliki Surat Dukungan Pabrikan atau Distributor Resmi.</li>}
- {getPacketCategory(selectedPack?.packName || '').startsWith('Mamin') && <li>Memiliki Sertifikat Laik Higiene Sanitasi (SLHS) dari Dinas Kesehatan setempat.</li>}
- <li>Memiliki alamat usaha yang jelas dan kapasitas manajerial yang memadai.</li>
- </ul>
+    <div className="pl-4 space-y-2 mb-4">
+      <div className="font-bold">b. Estimasi Perbandingan Harga</div>
+      <p className="mb-2 indent-8">
+        Berdasarkan daftar di atas, perbandingan harga (Harga DPA vs Harga Tayang e-Katalog) adalah sebagai berikut:
+      </p>
+    
+    <table className="w-full border-collapse border border-slate-900 mb-2">
+      <thead>
+        {autoComparator ? (
+          <tr className="bg-slate-100 font-bold text-center">
+            <td className="border border-slate-900 p-1 w-8">No</td>
+            <td className="border border-slate-900 p-1">Uraian Barang</td>
+            <td className="border border-slate-900 p-1 w-24 text-right">Harga DPA</td>
+            <td className="border border-slate-900 p-1 w-64">Daftar Penyedia Potensial</td>
+            <td className="border border-slate-900 p-1">Alasan Pemilihan</td>
+          </tr>
+        ) : (
+          <tr className="bg-slate-100 font-bold text-center">
+            <td className="border border-slate-900 p-1 w-8">No</td>
+            <td className="border border-slate-900 p-1">Uraian Barang</td>
+            <td className="border border-slate-900 p-1 w-24 text-right">Harga DPA</td>
+            <td className="border border-slate-900 p-1 w-24 text-right">Harga Tayang e-Katalog</td>
+            <td className="border border-slate-900 p-1">Penyedia & Tautan e-Katalog</td>
+          </tr>
+        )}
+      </thead>
+      <tbody>
+        {getPackageItems(selectedPack).filter(item => (item.qty === '' ? 0 : (item.qty || 0)) > 0).map((item, idx) => {
+          const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
+          const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
+          const displayName = surveyProduct?.name || item.name;
+          const hargaTayang = surveyProduct?.price ? surveyProduct.price : 0;
+          const compKey = 'ITEM-' + idx;
+          const comp = comparisons && comparisons[compKey];
+          const selisih = comp?.price ? comp.price - hargaTayang : null;
 
- </div>
+          if (autoComparator) {
+            return (
+              <tr key={item.no}>
+                <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
+                <td className="border border-slate-900 p-1 text-sm">{displayName}</td>
+                <td className="border border-slate-900 p-1 text-right text-sm">Rp {(item.price || 0).toLocaleString('id-ID')}</td>
+                <td className="border border-slate-900 p-1">
+                  <div className="mb-2">
+                    <div className="text-[10px] text-slate-800">{surveyProduct?.vendor || '-'}</div>
+                    <div className="text-[11px] text-slate-700">Rp {hargaTayang.toLocaleString('id-ID')}</div>
+                  </div>
+                  {surveyProduct?.comparators && surveyProduct.comparators.length > 0 && (
+                    <div className="pt-2 border-t border-slate-300 space-y-2">
+                      {surveyProduct.comparators.map((c, cIdx) => (
+                        <div key={cIdx}>
+                          <div className="text-[10px] text-slate-800">{c.vendor}</div>
+                          <div className="text-[11px] text-slate-700">Rp {(c.price || 0).toLocaleString('id-ID')}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </td>
+                <td className="border border-slate-900 p-1 text-[9px] align-top">
+                  {comp ? (comp.alasan || (hargaTayang < item.price 
+                    ? 'Harga e-Katalog lebih efisien dari pagu DPA' 
+                    : 'Sesuai pagu DPA, efisien')) : <span className="font-semibold text-emerald-800">Satu-satunya pelaku usaha potensial di wilayah kerja</span>}
+                </td>
+              </tr>
+            );
+          } else {
+            const brandText = surveyProduct ? (surveyProduct.vendor || 'Sesuai Katalog') : 'Sesuai Kebutuhan DPA';
+            const linkHref = surveyProduct && surveyProduct.link
+              ? surveyProduct.link
+              : (surveyProduct ? getDynamicProductLink(surveyProduct.vendor, surveyProduct.name) : '');
+            return (
+              <tr key={item.no}>
+                <td className="border border-slate-900 p-1 text-center">{idx + 1}</td>
+                <td className="border border-slate-900 p-1">{item.name}</td>
+                <td className="border border-slate-900 p-1 text-right">Rp {(item.price || 0).toLocaleString('id-ID')}</td>
+                <td className="border border-slate-900 p-1 text-right">Rp {(hargaTayang || 0).toLocaleString('id-ID')}</td>
+                <td className="border border-slate-900 p-1 text-sm">
+                  {surveyProduct && surveyProduct.success && surveyProduct.vendor !== 'TIDAK DITEMUKAN' ? (
+                    <>
+                      <strong>{brandText}</strong><br/>
+                      <a href={linkHref} target="_blank" className="text-blue-600 break-all text-[10px]">{linkHref}</a>
+                    </>
+                  ) : (
+                    <span className="text-slate-400 italic">Belum disurvei / tidak ditemukan</span>
+                  )}
+                </td>
+              </tr>
+            );
+          }
+        })}
+      </tbody>
+    </table>
+    </div>
+    <p className="indent-8 mb-4"><em>Catatan Analisis: Seluruh harga yang tertera sudah termasuk pajak yang berlaku dan keuntungan wajar, serta biaya kirim/instalasi (apabila dipersyaratkan). Hasil tangkapan layar produk e-Katalog terlampir di akhir dokumen ini.</em></p>
+
+    <div className="font-bold uppercase mt-8 mb-2 text-center">BAB IV. RENCANA METODE PEMILIHAN PENYEDIA E-PURCHASING</div>
+    <p className="indent-8 mb-4">
+      Metode pemilihan penyedia ditetapkan menggunakan: <strong>{dppSpecs.metodePemilihan || 'Negosiasi Harga'}</strong>.
+    </p>
+
+    <div className="font-bold uppercase mt-8 mb-2 text-center">BAB V. DRAFT RANCANGAN KONTRAK (SURAT PESANAN)</div>
+    <p className="indent-8 mb-4">
+      Rancangan kontrak menggunakan format standar <strong>Surat Pesanan (SP)</strong> yang diterbitkan langsung dan diunduh dari Sistem E-Purchasing (Katalog Elektronik LKPP). Segala ketentuan mengenai hak, kewajiban, tata cara pembayaran, sanksi, dan denda tunduk pada Syarat-Syarat Umum/Khusus Kontrak e-Purchasing.
+    </p>
+  </div>
+
  {/* Render the second part of the template (footer/signature) */}
  {parts[1] && (
  <div className="mt-8 pt-6 signature-section" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', textAlign: 'justify', fontFamily: 'Arial, sans-serif', pageBreakInside: 'avoid', breakInside: 'avoid' }} dangerouslySetInnerHTML={{ __html: parseSmartColons(parts[1]) }} />

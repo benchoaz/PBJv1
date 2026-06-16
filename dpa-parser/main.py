@@ -182,7 +182,7 @@ def clean_uraian(text: str) -> str:
     if not lines:
         return "Belanja"
         
-    text = lines[0]
+    text = " ".join(lines)
     text = re.sub(r'\[.*?\]|\(.*?\)', '', text)
     text = re.sub(r'Sumber Dana\s*:.*', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\b\d{1,3}(?:\.\d{3})+(?:,\d{2})?\b', '', text)
@@ -895,6 +895,112 @@ Kembalikan HANYA respons berupa JSON objek murni tanpa penjelasan pembuka/penutu
         print(f"⚠️ AI Validator error: {str(e)}")
         return True, f"Validasi sukses (AI validator fallback: {str(e)})."
 
+def run_table_extraction_pipeline(doc: fitz.Document, ai_provider: str = "", api_key: str = "", esc_provider: str = "", esc_key: str = "") -> List[RekeningDPA]:
+    rekenings = []
+    current_rek = None
+    group_major = ""
+    group_minor = ""
+    
+    for page in doc:
+        tables = page.find_tables()
+        for tab in tables:
+            extracted = tab.extract()
+            for row in extracted:
+                clean_row = [c.replace("\n", " ").strip() if c is not None else "" for c in row]
+                if not any(clean_row): continue
+                
+                # Cek baris untuk kode rekening
+                kode_match = re.search(r'\b5\.[12]\.\d{2}\.\d{2}\.\d{3}\.\d{5}\b', clean_row[0] + " " + clean_row[1])
+                if kode_match:
+                    if current_rek and current_rek.pagu > 0:
+                        rekenings.append(current_rek)
+                        
+                    kode = kode_match.group(0)
+                    uraian = clean_row[1] if clean_row[1] else clean_row[0]
+                    pagu_str = clean_row[-1].replace('Rp', '').replace('.', '').replace(',00', '').strip()
+                    pagu = int(pagu_str) if pagu_str.isdigit() else 0
+                    
+                    sirup_info = REKENING_SIRUP_MAP.get(kode, {})
+                    kategori = sirup_info.get("kategori")
+                    
+                    current_rek = RekeningDPA(
+                        kode_rekening=kode,
+                        uraian=clean_uraian(uraian),
+                        pagu=pagu,
+                        confidence=95,
+                        rincian=[],
+                        is_valid=True,
+                        validation_reason="Tabel DPA diekstrak dengan presisi tinggi menggunakan fitz.find_tables.",
+                        kategori_sirup=kategori,
+                        raw_text_block="[Tabel DPA Native]"
+                    )
+                    group_major = ""
+                    group_minor = ""
+                    continue
+                    
+                if current_rek:
+                    # Ambil rincian dari sel tabel
+                    vol_text = clean_row[2] if len(clean_row) > 2 else ""
+                    
+                    # Deteksi baris pengelompokan (Activity / Sub-activity)
+                    if len(clean_row) > 1 and not vol_text:
+                        # Cek pengelompokan besar [ # ]
+                        if re.match(r'^\[\s*#\s*\]', clean_row[1]):
+                            raw_major = re.sub(r'^\[\s*#\s*\]\s*', '', clean_row[1]).strip()
+                            # Buang bagian "Sumber Dana: ..." agar tidak terlalu panjang
+                            group_major = re.sub(r'(?i)sumber dana:.*', '', raw_major).strip()
+                            group_minor = "" # Reset minor
+                        # Cek pengelompokan kecil [ - ]
+                        elif re.match(r'^\[\s*\-\s*\]', clean_row[1]):
+                            group_minor = re.sub(r'^\[\s*\-\s*\]\s*', '', clean_row[1]).strip()
+                        elif not current_rek.rincian and clean_row[1] and len(clean_row[1]) > 2:
+                            if clean_row[1].lower() not in current_rek.uraian.lower():
+                                current_rek.uraian += " " + clean_row[1]
+                    
+                    if vol_text and re.search(r'\d+', vol_text):
+                        vol_match = re.findall(r'\d+[\.,]?\d*', vol_text)
+                        vol = 1.0
+                        if len(vol_match) == 2 and 'x' in vol_text.lower():
+                            v1 = float(vol_match[0].replace(',', '.'))
+                            v2 = float(vol_match[1].replace(',', '.'))
+                            vol = v1 * v2
+                        elif len(vol_match) > 0:
+                            vol = float(vol_match[0].replace(',', '.'))
+                            
+                        nama_asli = clean_row[1]
+                        
+                        # Gabungkan nama asli dengan konteks kelompok penggunaannya
+                        combined_group = ""
+                        if group_major and group_minor:
+                            combined_group = f"[{group_major} - {group_minor}]"
+                        elif group_major:
+                            combined_group = f"[{group_major}]"
+                        elif group_minor:
+                            combined_group = f"[{group_minor}]"
+                            
+                        nama_final = f"{combined_group} {nama_asli}".strip() if combined_group else nama_asli
+                            
+                        satuan = clean_row[3] if len(clean_row) > 3 else "Buah"
+                        harga_str = clean_row[4].replace('Rp', '').replace('.', '').replace(',00', '').strip() if len(clean_row) > 4 else "0"
+                        total_str = clean_row[-1].replace('Rp', '').replace('.', '').replace(',00', '').strip() if len(clean_row) > 5 else "0"
+                        
+                        harga_sat = int(harga_str) if harga_str.isdigit() else 0
+                        harga_tot = int(total_str) if total_str.isdigit() else 0
+                        
+                        if harga_tot > 0:
+                            current_rek.rincian.append(RincianItem(
+                                no=len(current_rek.rincian) + 1,
+                                nama=nama_final[:200],
+                                volume=vol,
+                                satuan=normalize_satuan(satuan),
+                                harga_satuan=harga_sat,
+                                harga_total=harga_tot
+                            ))
+
+    if current_rek and current_rek.pagu > 0:
+        rekenings.append(current_rek)
+        
+    return rekenings
 
 # ── Pipeline Ekstraksi Utama ─────────────────────────────────────────────────
 def run_extraction_pipeline(doc: fitz.Document, full_ocr_text: str, use_ocr: bool, ai_provider: str = "", api_key: str = "", esc_provider: str = "", esc_key: str = "") -> List[RekeningDPA]:
@@ -1190,14 +1296,14 @@ def parse_excel(excel_bytes: bytes) -> Tuple[str, float]:
 
 # ── Audit Log ────────────────────────────────────────────────────────────────
 def write_log(pages: int, count: int, engine: str, status: str, pdf_bytes: bytes):
-    os.makedirs('logs', exist_ok=True)
+    os.makedirs('/tmp/pbj_logs', exist_ok=True)
     entry = {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "file_hash": hashlib.sha256(pdf_bytes).hexdigest()[:16],
         "pages": pages, "rekening_count": count,
         "ocr_engine": engine, "status": status
     }
-    with open('logs/extraction_audit.jsonl', 'a') as f:
+    with open('/tmp/pbj_logs/extraction_audit.jsonl', 'a') as f:
         f.write(json.dumps(entry) + '\n')
 
 
@@ -1214,7 +1320,7 @@ def extract_global_metadata(text: str) -> dict:
     if not text:
         return meta
         
-    with open('logs/debug_extract_text.txt', 'w') as f:
+    with open('/tmp/pbj_logs/debug_extract_text.txt', 'w') as f:
         f.write(text)
         
     lines = [l.strip() for l in text.split('\n') if l.strip()]
@@ -1349,9 +1455,9 @@ def health():
     paddle_ver = "installed"
     docs_today, sum_conf = 0, 0.0
     today = time.strftime("%Y-%m-%d", time.gmtime())
-    if os.path.exists('logs/extraction_audit.jsonl'):
+    if os.path.exists('/tmp/pbj_logs/extraction_audit.jsonl'):
         try:
-            with open('logs/extraction_audit.jsonl') as f:
+            with open('/tmp/pbj_logs/extraction_audit.jsonl') as f:
                 for line in f:
                     e = json.loads(line.strip())
                     if e.get('timestamp', '').startswith(today):
@@ -1372,14 +1478,14 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
         raise HTTPException(400, 'Beraks kosong.')
 
     import os
-    os.makedirs('logs', exist_ok=True)
+    os.makedirs('/tmp/pbj_logs', exist_ok=True)
 
     # Save bytes for local debugging and inspection
     try:
         ext = 'xlsx' if (filename.endswith('.xlsx') or filename.endswith('.xls')) else 'png' if (filename.endswith('.png') or filename.endswith('.jpg') or filename.endswith('.jpeg')) else 'pdf'
-        with open(f'logs/debug_uploaded_dpa.{ext}', 'wb') as f:
+        with open(f'/tmp/pbj_logs/debug_uploaded_dpa.{ext}', 'wb') as f:
             f.write(file_bytes)
-        print(f"💾 Saved uploaded file for debugging to logs/debug_uploaded_dpa.{ext}")
+        print(f"💾 Saved uploaded file for debugging to /tmp/pbj_logs/debug_uploaded_dpa.{ext}")
     except Exception as e:
         print(f"⚠️ Failed to save debug file: {str(e)}")
 
@@ -1441,7 +1547,7 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
                 ocr_text, ocr_conf = ocr_pdf(file_bytes)
                 rekening = run_extraction_pipeline(None, ocr_text, use_ocr=True, ai_provider=x_ai_provider, api_key=x_ai_key, esc_provider=x_ai_escalation_provider, esc_key=x_ai_escalation_key)
                 write_log(total_pages, len(rekening), 'paddleocr', 'ok', file_bytes)
-                with open('logs/debug_ocr_text.txt', 'w') as f:
+                with open('/tmp/pbj_logs/debug_ocr_text.txt', 'w') as f:
                     f.write(ocr_text)
                 meta = extract_global_metadata(ocr_text)
                 return ParseResult(
@@ -1455,8 +1561,17 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
                     pesan=f'Berhasil OCR scan PDF dengan AI Refinement ({x_ai_provider or "none"}). {len(rekening)} rekening ditemukan.'
                 )
 
-            # Native PDF
-            rekening = run_extraction_pipeline(doc, '', use_ocr=False, ai_provider=x_ai_provider, api_key=x_ai_key, esc_provider=x_ai_escalation_provider, esc_key=x_ai_escalation_key)
+            # Native PDF (Cobain Table Extraction terlebih dahulu)
+            rekening = run_table_extraction_pipeline(doc, ai_provider=x_ai_provider, api_key=x_ai_key, esc_provider=x_ai_escalation_provider, esc_key=x_ai_escalation_key)
+            
+            # Jika table extraction gagal mengekstrak barang sama sekali, fallback ke text extraction
+            if rekening and sum(len(r.rincian) for r in rekening) == 0:
+                rekening = []
+
+            if not rekening:
+                # Fallback ke teks ekstraksi biasa jika tidak ada tabel terdeteksi
+                rekening = run_extraction_pipeline(doc, '', use_ocr=False, ai_provider=x_ai_provider, api_key=x_ai_key, esc_provider=x_ai_escalation_provider, esc_key=x_ai_escalation_key)
+                
             avg_conf = sum(r.confidence for r in rekening) / len(rekening) if rekening else 0
 
             # Fallback ke OCR jika confidence rendah atau tidak ada rekening
@@ -1480,7 +1595,7 @@ async def parse_dpa(file: UploadFile = File(...), x_ai_provider: Optional[str] =
 
             native_text = "\n".join(page.get_text() for page in doc)
             
-            with open('logs/debug_native_text.txt', 'w') as f:
+            with open('/tmp/pbj_logs/debug_native_text.txt', 'w') as f:
                 f.write(native_text)
                 
             meta = extract_global_metadata(native_text)
@@ -1515,11 +1630,11 @@ class ParseJobResponse(BaseModel):
 def background_parse_rak(job_id: str, file_bytes: bytes, filename: str, x_ai_provider: str, x_ai_key: str, x_ai_escalation_provider: str, x_ai_escalation_key: str):
     try:
         import os
-        os.makedirs('logs', exist_ok=True)
+        os.makedirs('/tmp/pbj_logs', exist_ok=True)
         
         filename_lower = filename.lower()
         ext = 'xlsx' if (filename_lower.endswith('.xlsx') or filename_lower.endswith('.xls')) else 'pdf'
-        with open(f'logs/debug_uploaded_rak.{ext}', 'wb') as f:
+        with open(f'/tmp/pbj_logs/debug_uploaded_rak.{ext}', 'wb') as f:
             f.write(file_bytes)
 
         text_to_parse = ""

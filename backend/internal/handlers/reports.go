@@ -45,7 +45,7 @@ func (h *ReportHandler) GetAbsorptionReport(w http.ResponseWriter, r *http.Reque
 
 	// 1. Fetch finished projects
 	var projects []models.Project
-	query := h.DB.Where("status = ? OR status = ?", "Selesai", "Selesai (Arsip Lengkap)")
+	query := h.DB.Where("status = ? OR status = ? OR status = ? OR status = ? OR status = ?", "Selesai", "Selesai (Arsip Lengkap)", "Selesai (Arsip Belum Lengkap)", "Selesai (Adendum)", "Verifikasi Adendum oleh PP")
 
 	// Enforce Satker access constraints
 	if userRole != "" && strings.ToLower(userRole) != "admin" {

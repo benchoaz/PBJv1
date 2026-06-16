@@ -36,6 +36,8 @@ export default function Step5Review() {
   } = usePPK();
 
   const [isSigned, setIsSigned] = useState(false);
+  const anggaranTersedia = selectedPack?.pagu || 0;
+  const isOverBudget = !isHpsExemptSelected && anggaranTersedia > 0 && parseInt(hpsValue || 0) > anggaranTersedia;
 
   return (
     <>
@@ -130,7 +132,8 @@ export default function Step5Review() {
                     sentDate: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
                     dppSpecs: dppSpecs,
                     selectedTplId: selectedTplId,
-                    selectedNdTplId: selectedNdTplId
+                    selectedNdTplId: selectedNdTplId,
+                    packageMetadata: packageMetadata
                   }
                   
 

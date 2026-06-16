@@ -543,18 +543,26 @@ export default function ProcurementPanel() {
           console.error('Failed to serialize PP evaluation:', e);
         }
 
+        const isComplete = inaprocDocs.sp && inaprocDocs.invoice && inaprocDocs.transfer && inaprocDocs.pnbp && inaprocDocs.bast;
+        const targetStatus = isComplete ? 'Selesai (Arsip Lengkap)' : 'Selesai (Arsip Belum Lengkap)';
+
         const res = await fetch(`/api/projects/${targetId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            status: 'Selesai (Arsip Lengkap)',
+            status: targetStatus,
             ...(updatedDescription ? { description: updatedDescription } : {})
           })
         });
         if (!res.ok) throw new Error('Gagal memperbarui status paket di server');
       }
       
-      await dialog.success('Luar Biasa! Pekerjaan selesai! Dokumen arsip lengkap Inaproc telah diunggah dan dikembalikan ke PPK untuk keperluan audit BPK.');
+      const isComplete = inaprocDocs.sp && inaprocDocs.invoice && inaprocDocs.transfer && inaprocDocs.pnbp && inaprocDocs.bast;
+      if (isComplete) {
+        await dialog.success('Luar Biasa! Pekerjaan selesai! Dokumen arsip lengkap Inaproc telah diunggah dan dikembalikan ke PPK untuk keperluan audit BPK.');
+      } else {
+        await dialog.warning('Pekerjaan selesai! Namun karena dokumen arsip belum lengkap (ada salah satu yang belum terunggah), status diatur menjadi "Selesai (Arsip Belum Lengkap)".');
+      }
       
       // Clear local states
       localStorage.removeItem('pbj_submitted_package');
@@ -1592,67 +1600,14 @@ export default function ProcurementPanel() {
                     </button>
                   )}
                   <button 
-                    onClick={() => setShowDppModal(true)}
+                    onClick={() => window.open(`/ppk/persiapan?paketId=${submittedPack.id}`, '_blank')}
                     className="text-[11px] text-slate-700 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-300 transition-all font-bold flex items-center gap-1.5"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                    Dokumen DPP PPK
+                    Dokumen DPP PPK (Asli)
                   </button>
                 </div>
               </div>
-              
-              {showDppModal && submittedPack && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                  <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative animate-scale-up">
-                    <div className="sticky top-0 bg-white border-b border-slate-200 p-4 flex justify-between items-center z-10 rounded-t-xl">
-                      <h3 className="font-bold text-slate-800">Pratinjau Dokumen Persiapan Pengadaan (DPP)</h3>
-                      <button onClick={() => setShowDppModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors">✕</button>
-                    </div>
-                    <div className="p-8 pb-16 bg-white font-serif text-slate-800 leading-relaxed text-[12pt]" style={{fontFamily: "'Times New Roman', Times, serif"}}>
-                      <h4 className="text-center font-bold mb-6 text-lg uppercase">Dokumen Persiapan Pengadaan (DPP)</h4>
-                      
-                      <div className="mb-4">
-                        <table className="w-full">
-                          <tbody>
-                            <tr><td className="w-48 py-1">Nama Paket Pekerjaan</td><td className="w-4 py-1">:</td><td>{submittedPack.packName}</td></tr>
-                            <tr><td className="py-1">Nilai HPS</td><td className="py-1">:</td><td>Rp {(parseFloat(submittedPack.hpsValue)||0).toLocaleString('id-ID')}</td></tr>
-                          </tbody>
-                        </table>
-                      </div>
-                      
-                      <h5 className="font-bold mt-6 mb-2">BAB I. SPESIFIKASI TEKNIS PEKERJAAN (KAK)</h5>
-                      
-                      <h6 className="font-bold mt-4 mb-1">A. Latar Belakang Pekerjaan</h6>
-                      <div className="text-justify whitespace-pre-wrap pl-4">{submittedPack.dppSpecs?.latarBelakang || submittedPack.techSpecs || '-'}</div>
-                      
-                      <h6 className="font-bold mt-4 mb-1">B. Maksud dan Tujuan</h6>
-                      <div className="text-justify whitespace-pre-wrap pl-4">{submittedPack.dppSpecs?.maksudTujuan || '-'}</div>
-                      
-                      <h6 className="font-bold mt-4 mb-2">C. Spesifikasi Jenis, Jumlah, and Mutu Barang</h6>
-                      <table className="w-full border-collapse border border-slate-800 text-sm mt-2">
-                        <thead>
-                          <tr>
-                            <th className="border border-slate-800 p-2 text-center w-12">No</th>
-                            <th className="border border-slate-800 p-2 text-center">Nama Barang (Katalog)</th>
-                            <th className="border border-slate-800 p-2 text-center w-24">Jumlah</th>
-                            <th className="border border-slate-800 p-2 text-center">Spesifikasi Mutu</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Array.isArray(submittedPack.items) ? submittedPack.items.map((item, idx) => (
-                            <tr key={idx}>
-                              <td className="border border-slate-800 p-2 text-center">{idx + 1}</td>
-                              <td className="border border-slate-800 p-2">{item.name}</td>
-                              <td className="border border-slate-800 p-2 text-center font-bold">{item.qty} {item.unit || 'Paket'}</td>
-                              <td className="border border-slate-800 p-2 whitespace-pre-wrap">{submittedPack.dppSpecs?.itemSpecs?.[item.id] || item.spesifikasi || '-'}</td>
-                            </tr>
-                          )) : <tr><td colSpan="4" className="border border-slate-800 p-2 text-center">Data barang tidak tersedia</td></tr>}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
               
               <div className="flex flex-col items-end gap-3 w-full border-t border-slate-100 pt-5 mt-2">
                 <div className="flex justify-between w-full md:w-80 items-center bg-slate-50 p-3 rounded-lg border border-slate-100">

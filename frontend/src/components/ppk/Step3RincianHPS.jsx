@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usePPK } from './PPKContext';
+import { DEFAULT_TEMPLATES } from '../../utils/defaultTemplates';
 import { Save, Search, RefreshCw, Camera, Sparkles, CheckCircle2, XCircle, AlertTriangle, Loader2, Check, FileText, ClipboardList, Edit3, Store, Globe, LayoutGrid } from 'lucide-react';
-import DocPreviewModal from './DocPreviewModal';
 import { dialog } from '../../utils/dialog';
 
 const getDynamicProductLink = (vendorName, keyword) => {
@@ -78,6 +78,7 @@ export default function Step3RincianHPS() {
   } = usePPK();
   const [isAiEditorOpen, setIsAiEditorOpen] = useState(true);
   const [aiLoadingField, setAiLoadingField] = useState(null);
+  const [globalMaxProviders, setGlobalMaxProviders] = useState(3);
   
   const handleAiAssist = (field) => {
     setAiLoadingField(field);
@@ -135,6 +136,8 @@ export default function Step3RincianHPS() {
       }
     };
     fetchRAK();
+    const interval = setInterval(fetchRAK, 5000);
+    return () => clearInterval(interval);
   }, [currentUser, satkerId]);
 
   useEffect(() => {
@@ -194,11 +197,15 @@ export default function Step3RincianHPS() {
     const cleanStr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const cleanTargetLoc = cleanStr(targetLoc);
     
+    let targetIsZone1 = false;
+    let targetIsZone2 = false;
+
     // Determine Target Location Label
     let targetLocLabel = targetLoc || 'Kab. Probolinggo';
     if (targetLoc) {
       if (userSubdistrict && cleanTargetLoc.includes(cleanStr(userSubdistrict))) {
         targetLocLabel = `${targetLoc} (Zona 1: Kec. Sama)`;
+        targetIsZone1 = true;
       } else {
         const DAFTAR_KECAMATAN = [
           "Bantaran", "Banyuanyar", "Besuk", "Dringu", "Gading", "Gending", "Kotaanyar", 
@@ -209,6 +216,7 @@ export default function Step3RincianHPS() {
         const isKec = DAFTAR_KECAMATAN.some(kec => cleanTargetLoc.includes(cleanStr(kec)));
         if (isKec) {
           targetLocLabel = `${targetLoc} (Zona 2: Luar Kecamatan)`;
+          targetIsZone2 = true;
         }
       }
     }
@@ -216,23 +224,27 @@ export default function Step3RincianHPS() {
     const tPrice = parseFloat(targetPrice) || 0;
     const cPrice = parseFloat(compPrice) || 0;
     const diff = cPrice - tPrice;
+    const diffText = diff > 0 ? `dengan selisih penghematan Rp ${formatPrice(diff)} per unit` : '';
+
+    // If there is NO comparator or comparator price is 0
+    if (!compVendor || cPrice === 0) {
+      if (targetIsZone1 || targetIsZone2) {
+        return `Pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) didasarkan pada kesesuaian harga tayang e-Katalog. Dari aspek logistik, penyedia berlokasi di ${targetLocLabel} yang mengefisienkan waktu pengiriman Mamin agar tetap segar saat dikerjakan. Hal ini juga selaras dengan aspek pemerataan penyedia lokal dalam SE Bupati Probolinggo.`;
+      }
+      return `Pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) didasarkan pada kesesuaian harga tayang e-Katalog. Dari sisi lokasi, penyedia berlokasi di ${targetLocLabel} yang memudahkan koordinasi logistik serah terima barang.`;
+    }
 
     if (diff > 0) {
-      // Pembanding lebih mahal -> Justifikasi berbasis Harga (Penghematan)
-      const diffText = `dengan selisih penghematan Rp ${formatPrice(diff)} per unit`;
-      if (isMamin) {
-        return `Pemilihan ${targetVendor || 'Penyedia Terpilih'} (Rp ${formatPrice(tPrice)}) didasarkan pada harga tayang e-Katalog yang lebih efisien dibandingkan penyedia pembanding ${compVendor || 'Penyedia Pembanding'} (Rp ${formatPrice(cPrice)}) ${diffText}. Selain itu, dari aspek logistik, penyedia berlokasi di ${targetLocLabel} yang mengefisienkan waktu pengiriman Mamin agar tetap segar saat dikerjakan. Pemilihan ini juga selaras dengan aspek pemerataan penyedia lokal dalam SE Bupati Probolinggo.`;
-      } else {
-        return `Pemilihan ${targetVendor || 'Penyedia Terpilih'} (Rp ${formatPrice(tPrice)}) dilakukan karena menawarkan harga tayang e-Katalog yang lebih kompetitif dibandingkan penyedia pembanding ${compVendor || 'Penyedia Pembanding'} (Rp ${formatPrice(cPrice)}) ${diffText}. Dari sisi lokasi, penyedia terpilih berlokasi di ${targetLocLabel} yang memudahkan koordinasi logistik serah terima barang.`;
+      if (targetIsZone1 || targetIsZone2) {
+        return `Pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) didasarkan pada harga tayang e-Katalog yang lebih efisien dibandingkan penyedia lainnya ${compVendor} (Rp ${formatPrice(cPrice)}) ${diffText}. Selain itu, dari aspek logistik, penyedia berlokasi di ${targetLocLabel} yang mengefisienkan waktu pengiriman Mamin agar tetap segar saat dikerjakan. Hal ini juga selaras dengan aspek pemerataan penyedia lokal dalam SE Bupati Probolinggo.`;
       }
+      return `Pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) diberikan karena menawarkan harga tayang e-Katalog yang lebih kompetitif dibandingkan penyedia lainnya ${compVendor} (Rp ${formatPrice(cPrice)}) ${diffText}. Dari sisi lokasi, penyedia berlokasi di ${targetLocLabel} yang memudahkan koordinasi logistik serah terima barang.`;
     } else {
-      // Pembanding lebih murah atau sama -> Justifikasi berbasis Jarak/Logistik/Teknis
-      const conditionText = diff < 0 ? 'menawarkan harga lebih rendah' : 'menawarkan harga yang sama';
-      if (isMamin) {
-        return `Meskipun penyedia pembanding ${compVendor || 'Penyedia Pembanding'} ${conditionText} (Rp ${formatPrice(cPrice)}), pemilihan ${targetVendor || 'Penyedia Terpilih'} (Rp ${formatPrice(tPrice)}) tetap diprioritaskan berdasarkan efisiensi jarak dan waktu logistik. Penyedia terpilih berlokasi di ${targetLocLabel} yang memastikan Mamin tiba lebih cepat dan terjamin kesegarannya. Hal ini juga selaras dengan aspek pemerataan penyedia lokal dalam SE Bupati Probolinggo.`;
-      } else {
-        return `Meskipun penyedia pembanding ${compVendor || 'Penyedia Pembanding'} ${conditionText} (Rp ${formatPrice(cPrice)}), pemilihan ${targetVendor || 'Penyedia Terpilih'} (Rp ${formatPrice(tPrice)}) tetap dilakukan dengan pertimbangan efisiensi jarak pengiriman dan jaminan ketersediaan barang. Penyedia terpilih berlokasi di ${targetLocLabel} yang mempermudah koordinasi serta percepatan serah terima logistik.`;
+      const conditionText = tPrice === cPrice ? 'setara' : 'lebih efisien';
+      if (targetIsZone1 || targetIsZone2) {
+        return `Meskipun penyedia lainnya ${compVendor} ${conditionText} (Rp ${formatPrice(cPrice)}), pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) diprioritaskan berdasarkan efisiensi jarak dan waktu logistik. Penyedia berlokasi di ${targetLocLabel} yang memastikan Mamin tiba lebih cepat dan terjamin kesegarannya. Hal ini selaras dengan aspek pemerataan penyedia lokal dalam SE Bupati Probolinggo.`;
       }
+      return `Meskipun penyedia lainnya ${compVendor} ${conditionText} (Rp ${formatPrice(cPrice)}), pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) diberikan dengan pertimbangan efisiensi jarak pengiriman dan jaminan ketersediaan barang. Penyedia berlokasi di ${targetLocLabel} yang mempermudah koordinasi serta percepatan serah terima logistik.`;
     }
   };
 
@@ -317,12 +329,16 @@ export default function Step3RincianHPS() {
   useEffect(() => {
     let templateName = '';
     try {
+      let templates = DEFAULT_TEMPLATES;
       const templatesStr = localStorage.getItem('pbj_templates');
       if (templatesStr) {
-        const templates = JSON.parse(templatesStr);
-        const tpl = templates.find(t => t.id === selectedTplId);
-        if (tpl) templateName = tpl.name || '';
+        try { 
+          const parsed = JSON.parse(templatesStr); 
+          if (parsed && parsed.length > 0) templates = parsed;
+        } catch (e) {}
       }
+      const tpl = templates.find(t => t.id === selectedTplId);
+      if (tpl) templateName = tpl.name || '';
     } catch(e) {}
     
     let defMerek = "";
@@ -336,7 +352,7 @@ export default function Step3RincianHPS() {
     } else if (templateName.includes('Konsolidasi')) {
       defMerek = "Pemilihan merek/produk telah ditetapkan berdasarkan hasil Konsolidasi Pengadaan oleh Bagian Pengadaan Barang dan Jasa Sekretariat Daerah yang memiliki spesifikasi teknis dan Standar Satuan Harga yang seragam.";
       defMetode = "Dilakukan melalui metode Direct Purchasing (Pembelian Langsung) pada e-Katalog Elektronik khusus etalase Produk Konsolidasi sesuai Surat Edaran PBJ tentang pelaksanaan pengadaan barang/jasa hasil konsolidasi tanpa memandang batasan HPS.";
-      defSpek = "Penyedia yang dipilih merupakan penyedia pelaksana Katalog Konsolidasi terpilih. Pengiriman dilakukan sesuai permintaan parsial/sekaligus dan tidak diperkenankan ada tambahan ongkos kirim/biaya lainnya di luar yang tertera dalam kontrak.";
+      defSpek = "Kandidat penyedia yang direkomendasikan merupakan penyedia pelaksana Katalog Konsolidasi potensial. Pengiriman dilakukan sesuai permintaan parsial/sekaligus dan tidak diperkenankan ada tambahan ongkos kirim/biaya lainnya di luar yang tertera dalam e-Katalog.";
     } else if (templateName.includes('Makanan')) {
       defMerek = "Penyediaan jasa katering tidak mensyaratkan merek tertentu, melainkan berfokus pada kualitas cita rasa, higienitas penyajian, dan reputasi kebersihan penyedia lokal di sekitar lokasi kegiatan.";
       defMetode = "Metode E-Purchasing Katalog Elektronik Etalase Makanan dan Minuman, dengan mengedepankan pemberdayaan Pelaku Usaha Mikro dan Kecil (UMK) yang berdomisili di wilayah setempat.";
@@ -488,7 +504,11 @@ export default function Step3RincianHPS() {
     if (clean.includes('/')) {
       clean = clean.split('/')[0].trim();
     }
+    const hasKonsolidasi = /konsolidasi/i.test(clean);
     clean = clean.replace(/\(.*?\)/g, '');
+    if (hasKonsolidasi && !clean.toLowerCase().includes('konsolidasi')) {
+      clean += ' konsolidasi';
+    }
     return clean.replace(/\s+/g, ' ').trim();
   };
 
@@ -498,11 +518,20 @@ export default function Step3RincianHPS() {
     const kodeRekening = matchedAcc?.account;
     if (!kodeRekening) return selectedPack?.pagu || 0;
     
-    const rakAcc = rakAccounts.find(acc => acc.kode_rekening === kodeRekening);
+    const targetSub = (packageMetadata?.sub_kegiatan || '').trim().toLowerCase();
+    const rakAcc = rakAccounts.find(acc => {
+      if (acc.kode_rekening !== kodeRekening) return false;
+      const accSub = (acc.sub_kegiatan || '').toLowerCase();
+      return accSub.includes(targetSub) || targetSub.includes(accSub);
+    });
     if (!rakAcc) return selectedPack?.pagu || 0;
 
     const months = ['bulan_jan','bulan_feb','bulan_mar','bulan_apr','bulan_mei','bulan_jun','bulan_jul','bulan_ags','bulan_sep','bulan_okt','bulan_nov','bulan_des'];
-    return months.slice(0, currentMonth).reduce((sum, m) => sum + (rakAcc[m] || 0), 0);
+    
+    // Hitung akhir dari Triwulan saat ini (1-3 -> 3, 4-6 -> 6, 7-9 -> 9, 10-12 -> 12)
+    const currentTriwulanEndMonth = Math.ceil(currentMonth / 3) * 3;
+    
+    return months.slice(0, currentTriwulanEndMonth).reduce((sum, m) => sum + (rakAcc[m] || 0), 0);
   };
 
   const anggaranTersedia = getAnggaranTersedia();
@@ -540,10 +569,12 @@ export default function Step3RincianHPS() {
     const items = getPackageItems(selectedPack);
 
     const requestItems = items
-      .map((item, idx) => {
+      .filter((item) => {
         const qty = item.qty === '' ? 0 : (item.qty || 0);
-        if (qty <= 0) return null;
-        
+        return qty > 0;
+      })
+
+      .map((item, idx) => {
         let rawQuery = item.name;
         
         // Jika user sudah mengetik manual, gunakan itu
@@ -553,6 +584,10 @@ export default function Step3RincianHPS() {
         // Jika belum diketik manual dan mode AI aktif, bersihkan otomatis nama dari DPA
         else if (useAiMode) {
           rawQuery = autoCleanKeyword(item.name);
+        }
+
+        if (category === 'Konsolidasi' && !rawQuery.toLowerCase().includes('konsolidasi')) {
+          rawQuery += ' konsolidasi';
         }
   
         return {
@@ -595,7 +630,8 @@ export default function Step3RincianHPS() {
           locations: searchLocations.split(',').map(s => s.trim()).filter(Boolean),
           ignorePriceLimit: ignorePriceLimit,
           autoComparator: autoComparator,
-          proxy: userProxy
+          proxy: userProxy,
+          maxProviders: globalMaxProviders
         })
       });
 
@@ -668,31 +704,21 @@ export default function Step3RincianHPS() {
         
         // Auto-Comparator Capture
         if (autoComparator && res.comparators && res.comparators.length > 0) {
-          const comp = res.comparators[0];
-          newComparisons['ITEM-' + index] = {
-            vendor: comp.vendor,
-            name: comp.name,
-            price: comp.price,
-            status: comp.status,
-            link: comp.link,
-            alasan: comp.alasan,
-            isAuto: true
-          };
-          
-          if (res.comparators.length > 1) {
-            const comp2 = res.comparators[1];
-            newComparisons['ITEM-' + index + '-2'] = {
-              vendor: comp2.vendor,
-              name: comp2.name,
-              price: comp2.price,
-              status: comp2.status,
-              link: comp2.link,
-              alasan: comp2.alasan,
+          res.comparators.forEach((comp, cIdx) => {
+            const key = cIdx === 0 ? `ITEM-${index}` : `ITEM-${index}-${cIdx + 1}`;
+            newComparisons[key] = {
+              vendor: comp.vendor,
+              name: comp.name,
+              price: comp.price,
+              status: comp.status,
+              link: comp.link,
+              alasan: comp.alasan,
               isAuto: true
             };
-          }
+          });
 
           // Auto-fill justification
+          const comp = res.comparators[0];
           const isMamin = category.startsWith('Mamin');
           const targetLoc = res.location || res.location_name || res.address || '';
           const compLoc = comp.location || comp.location_name || comp.address || '';
@@ -737,7 +763,8 @@ export default function Step3RincianHPS() {
           img: r.img,
           searchImg: r.searchImg,
           success: r.success,
-          location: r.location || r.location_name || r.address || ''
+          location: r.location || r.location_name || r.address || '',
+          comparators: r.comparators || []
         })),
         timestamp: new Date().toLocaleString('id-ID')
       });
@@ -769,6 +796,12 @@ export default function Step3RincianHPS() {
     
     setLoadingProductIndex(productIndex);
 
+    const category = getPacketCategory(selectedPack?.packName || '');
+    let finalQuery = customQuery;
+    if (category === 'Konsolidasi' && !finalQuery.toLowerCase().includes('konsolidasi')) {
+      finalQuery += ' konsolidasi';
+    }
+
     const items = getPackageItems(selectedPack);
     const targetItem = items[productIndex];
     if (!targetItem) {
@@ -778,7 +811,7 @@ export default function Step3RincianHPS() {
 
     const requestItems = [{
       name: targetItem.name,
-      query: customQuery,
+      query: finalQuery,
       fallbackPrice: targetItem.price,
       explicitMinPrice: customMinPrices[productIndex] ? parseInt(customMinPrices[productIndex].toString().replace(/\D/g, ''), 10) : null,
       explicitMaxPrice: customMaxPrices[productIndex] ? parseInt(customMaxPrices[productIndex].toString().replace(/\D/g, ''), 10) : null,
@@ -858,7 +891,8 @@ export default function Step3RincianHPS() {
           img: singleRes.img,
           searchImg: singleRes.searchImg || singleRes.img,
           success: singleRes.success,
-          location: singleRes.location || singleRes.location_name || singleRes.address || ''
+          location: singleRes.location || singleRes.location_name || singleRes.address || '',
+          comparators: singleRes.comparators || []
         };
         if (prodIdx !== -1) {
           updatedProducts[prodIdx] = newProductObj;
@@ -882,33 +916,24 @@ export default function Step3RincianHPS() {
         }
 
         if (autoComparator && singleRes.comparators && singleRes.comparators.length > 0) {
-          const comp = singleRes.comparators[0];
           setComparisons(prev => {
             const newComps = { ...prev };
-            newComps['ITEM-' + productIndex] = {
-              vendor: comp.vendor,
-              name: comp.name,
-              price: comp.price,
-              status: comp.status,
-              link: comp.link,
-              alasan: comp.alasan,
-              isAuto: true
-            };
-            
-            if (singleRes.comparators.length > 1) {
-              const comp2 = singleRes.comparators[1];
-              newComps['ITEM-' + productIndex + '-2'] = {
-                vendor: comp2.vendor,
-                name: comp2.name,
-                price: comp2.price,
-                status: comp2.status,
-                link: comp2.link,
-                alasan: comp2.alasan,
+            singleRes.comparators.forEach((comp, cIdx) => {
+              const key = cIdx === 0 ? `ITEM-${productIndex}` : `ITEM-${productIndex}-${cIdx + 1}`;
+              newComps[key] = {
+                vendor: comp.vendor,
+                name: comp.name,
+                price: comp.price,
+                status: comp.status,
+                link: comp.link,
+                alasan: comp.alasan,
                 isAuto: true
               };
-            }
+            });
             return newComps;
           });
+          
+          const comp = singleRes.comparators[0];
 
           const isMamin = getPacketCategory(selectedPack?.packName || '').startsWith('Mamin');
           const targetLoc = singleRes.location || singleRes.location_name || singleRes.address || '';
@@ -1016,6 +1041,7 @@ export default function Step3RincianHPS() {
   const handleBatchCustomSearch = async () => {
     if (!selectedPack || !surveyData) return;
     
+    const category = getPacketCategory(selectedPack?.packName || '');
     const items = getPackageItems(selectedPack);
     const indicesToSearch = [];
     const requestItems = [];
@@ -1027,10 +1053,15 @@ export default function Step3RincianHPS() {
       const hasCustomTarget = customTargets[idx] && customTargets[idx].trim() !== '';
       
       if (qty > 0 && (hasCustomKeyword || hasCustomTarget)) {
+        let itemQuery = hasCustomKeyword ? customKeywords[idx].trim() : autoCleanKeyword(item.name);
+        if (category === 'Konsolidasi' && !itemQuery.toLowerCase().includes('konsolidasi')) {
+          itemQuery += ' konsolidasi';
+        }
+
         indicesToSearch.push(idx);
         requestItems.push({
           name: item.name,
-          query: hasCustomKeyword ? customKeywords[idx].trim() : autoCleanKeyword(item.name),
+          query: itemQuery,
           isCustomKeyword: hasCustomKeyword,
           fallbackPrice: item.price || item.paguDpa,
           explicitMinPrice: customMinPrices[idx] ? parseInt(customMinPrices[idx].toString().replace(/\D/g, ''), 10) : null,
@@ -1248,7 +1279,7 @@ export default function Step3RincianHPS() {
 
             {selectedPack && (
               <div className="mb-6 bg-slate-50 border border-slate-200 rounded-xl p-5 text-sm space-y-2">
-                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Paket Terpilih</div>
+                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Paket Potensial</div>
                 <div className="text-slate-900 font-semibold">{selectedPack?.packName}</div>
                 <div className="grid grid-cols-2 gap-3 mt-2 text-xs text-slate-500">
                   <div>Instansi: <span className="text-slate-700 font-medium">{selectedPack.klpd} ({selectedPack.satker})</span></div>
@@ -1395,12 +1426,12 @@ export default function Step3RincianHPS() {
                         <button 
                           onClick={() => setAutoComparator(!autoComparator)}
                           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${autoComparator ? 'bg-indigo-500' : 'bg-slate-300'}`}
-                          title="Jika aktif, otomatis mengisi produk pembanding dari alternatif yang lebih mahal."
+                          title="Jika aktif, otomatis mengisi penyedia potensial lainnya dari alternatif yang lebih mahal."
                         >
                           <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${autoComparator ? 'translate-x-5' : 'translate-x-1'}`} />
                         </button>
                         <span className="text-xs font-medium text-slate-700">
-                          Auto Pembanding
+                          Auto Alternatif
                         </span>
                       </div>
                     </div>
@@ -1431,6 +1462,17 @@ export default function Step3RincianHPS() {
                           className="flex-1 text-[11px] px-2 py-2 focus:outline-none bg-transparent"
                         />
                         <span className="text-[11px] text-slate-500 pr-3">%</span>
+                      </div>
+                      <div className="flex items-center border border-slate-300 rounded-lg focus-within:ring-2 focus-within:ring-emerald-500 bg-white mt-2">
+                        <span className="text-[11px] text-slate-500 pl-3">Maks. Penyedia per Barang</span>
+                        <input 
+                          type="number"
+                          min="1" max="5"
+                          value={globalMaxProviders}
+                          onChange={(e) => setGlobalMaxProviders(parseInt(e.target.value) || 3)}
+                          className="flex-1 text-[11px] px-2 py-2 focus:outline-none bg-transparent"
+                          title="Batasi jumlah penyedia yang dicari untuk tiap barang (1 Target + n Alternatif)"
+                        />
                       </div>
                     </div>
                   </div>
@@ -1722,6 +1764,18 @@ export default function Step3RincianHPS() {
                                       {surveyItem.isFallbackScreenshot && (
                                         <span className="text-[8px] font-bold text-amber-600 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 w-fit mt-0.5" title="Menggunakan screenshot hasil pencarian karena halaman detail error/diblokir">⚠️ Mode Pencarian</span>
                                       )}
+
+                                      {/* Tampilkan Penyedia Potensial Lainnya */}
+                                      {surveyItem.comparators && surveyItem.comparators.length > 0 && (
+                                        <div className="mt-1.5 flex flex-col gap-0.5 border-t border-slate-100 pt-1.5">
+                                          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Penyedia Potensial:</span>
+                                          {surveyItem.comparators.map((comp, cIdx) => (
+                                            <a key={cIdx} href={comp.link} target="_blank" rel="noopener noreferrer" className="text-[9px] text-blue-600 hover:text-blue-800 hover:underline truncate max-w-[150px] flex items-center gap-1" title={`${comp.vendor} - Rp ${(comp.price || 0).toLocaleString('id-ID')}`}>
+                                              <span className="text-slate-400">↳</span> {comp.vendor}
+                                            </a>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   ) : surveyItem ? (
                                     <div className="flex flex-col gap-1 max-w-[150px]">
@@ -1738,7 +1792,7 @@ export default function Step3RincianHPS() {
                                     <button 
                                       type="button" 
                                       onClick={() => setExpandedSurveyRows(prev => ({...prev, [idx]: !prev[idx]}))}
-                                      className="mt-1.5 text-[9px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
+                                      className="mt-1.5 text-[9px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-2 py-0.5 rounded flex items-center gap-1 transition-colors pointer-events-auto"
                                     >
                                       {isRowExpanded ? '🔼 Tutup Detail' : '🔽 Lihat Detail Survei'}
                                     </button>
@@ -2035,18 +2089,18 @@ export default function Step3RincianHPS() {
                                           {!isFailed && (
                                             <div className="bg-white p-3 rounded-xl border border-slate-200/60 shadow-sm">
                                               <h4 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1">
-                                                ⚖️ Produk Pembanding
+                                                ⚖️ Produk Alternatif 1
                                               </h4>
                                               <div className="space-y-2">
                                                 <input 
-                                                  type="text" placeholder="Nama Produk Pembanding" 
+                                                  type="text" placeholder="Nama Produk Alternatif 1" 
                                                   value={(comparisons[p.id] && comparisons[p.id].name) || ''}
                                                   onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), name: e.target.value}})}
                                                   className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px]"
                                                 />
                                                 <div className="flex gap-2">
                                                   <input 
-                                                    type="text" placeholder="Penyedia Pembanding" 
+                                                    type="text" placeholder="Penyedia Alternatif 1" 
                                                     value={(comparisons[p.id] && comparisons[p.id].vendor) || ''}
                                                     onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), vendor: e.target.value}})}
                                                     className="flex-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px]"
@@ -2061,7 +2115,49 @@ export default function Step3RincianHPS() {
                                                     <option value="E-Katalog">E-Katalog</option>
                                                   </select>
                                                 </div>
+                                                <input 
+                                                  type="number" placeholder="Harga Alternatif 1" 
+                                                  value={(comparisons[p.id] && comparisons[p.id].price) || ''}
+                                                  onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), price: parseInt(e.target.value) || 0}})}
+                                                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px]"
+                                                />
                                               </div>
+                                              
+                                              <h4 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mt-4 mb-2 flex items-center gap-1">
+                                                ⚖️ Produk Alternatif 2
+                                              </h4>
+                                              <div className="space-y-2">
+                                                <input 
+                                                  type="text" placeholder="Nama Produk Alternatif 2" 
+                                                  value={(comparisons[p.id+'-2'] && comparisons[p.id+'-2'].name) || ''}
+                                                  onChange={(e) => setComparisons({...comparisons, [`${p.id}-2`]: {...(comparisons[`${p.id}-2`]||{}), name: e.target.value}})}
+                                                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px]"
+                                                />
+                                                <div className="flex gap-2">
+                                                  <input 
+                                                    type="text" placeholder="Penyedia Alternatif 2" 
+                                                    value={(comparisons[p.id+'-2'] && comparisons[p.id+'-2'].vendor) || ''}
+                                                    onChange={(e) => setComparisons({...comparisons, [`${p.id}-2`]: {...(comparisons[`${p.id}-2`]||{}), vendor: e.target.value}})}
+                                                    className="flex-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px]"
+                                                  />
+                                                  <select 
+                                                    value={(comparisons[p.id+'-2'] && comparisons[p.id+'-2'].status) || 'Luar Katalog'}
+                                                    onChange={(e) => setComparisons({...comparisons, [`${p.id}-2`]: {...(comparisons[`${p.id}-2`]||{}), status: e.target.value}})}
+                                                    className="w-1/3 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px]"
+                                                  >
+                                                    <option value="Luar Katalog">Luar Katalog</option>
+                                                    <option value="Toko Daring">Toko Daring</option>
+                                                    <option value="E-Katalog">E-Katalog</option>
+                                                  </select>
+                                                </div>
+                                                <input 
+                                                  type="number" placeholder="Harga Alternatif 2" 
+                                                  value={(comparisons[p.id+'-2'] && comparisons[p.id+'-2'].price) || ''}
+                                                  onChange={(e) => setComparisons({...comparisons, [`${p.id}-2`]: {...(comparisons[`${p.id}-2`]||{}), price: parseInt(e.target.value) || 0}})}
+                                                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px]"
+                                                />
+                                              </div>
+                                              
                                               <div className="mt-3 pt-3 border-t border-slate-100">
                                                 <h5 className="text-[9px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Atribut Evaluasi Tambahan (Tampil di Cetak)</h5>
                                                 <div className="grid grid-cols-2 gap-2">
@@ -2345,7 +2441,7 @@ export default function Step3RincianHPS() {
                             </div>
                           )}
 
-                          {/* NEW: Spesifikasi Mutu & Justifikasi & Pembanding */}
+                          {/* NEW: Spesifikasi Mutu & Justifikasi & Alternatif */}
                           {!isFailed && (
                             <div className="mt-4 pt-3 border-t border-dashed border-slate-200 space-y-3">
                               <div>
@@ -2440,16 +2536,16 @@ export default function Step3RincianHPS() {
                                 </div>
                               </div>
                               <div>
-                                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">⚖️ Produk Pembanding</label>
+                                <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">⚖️ Produk Alternatif</label>
                                 <div className="space-y-1.5 p-2 bg-slate-50/80 rounded-lg border border-slate-200/60">
                                   <input 
-                                    type="text" placeholder="Nama Produk Pembanding" 
+                                    type="text" placeholder="Nama Produk Alternatif" 
                                     value={(comparisons[p.id] && comparisons[p.id].name) || ''}
                                     onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), name: e.target.value}})}
                                     className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-[9px]"
                                   />
                                   <input 
-                                    type="text" placeholder="Penyedia Pembanding" 
+                                    type="text" placeholder="Penyedia Alternatif" 
                                     value={(comparisons[p.id] && comparisons[p.id].vendor) || ''}
                                     onChange={(e) => setComparisons({...comparisons, [p.id]: {...(comparisons[p.id]||{}), vendor: e.target.value}})}
                                     className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-[9px]"
@@ -2644,440 +2740,21 @@ export default function Step3RincianHPS() {
                         <p className="mt-1 leading-relaxed text-[10px]">Dokumen akan ditandatangani secara elektronik (TTE) menggunakan integrasi API Otoritas Sertifikat Pemerintah BSSN.</p>
                       </div>
                     )}
-                  </div>
-                </div>
-              </div>
-
-
-              {/* Document Generation Action Center */}
-              {(hpsValue || isHpsExemptSelected) && (
-                <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 space-y-4">
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Informasi Surat &amp; Penetapan</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">Lengkapi informasi di bawah ini agar sesuai dengan paket yang dikerjakan sebelum dicetak.</p>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Lokasi Pekerjaan / Tujuan</label>
-                      <input type="text" value={packageMetadata.lokasi_pekerjaan} onChange={(e) => setPackageMetadata({...packageMetadata, lokasi_pekerjaan: e.target.value})} placeholder={`Contoh: Kantor ${currentUser?.department || 'Kecamatan'}`} className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Waktu Pelaksanaan</label>
-                      <input type="text" value={packageMetadata.waktu_penyelesaian} onChange={(e) => setPackageMetadata({...packageMetadata, waktu_penyelesaian: e.target.value})} placeholder="Contoh: 14 (empat belas) hari kalender" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Program</label>
-                      <input type="text" value={packageMetadata.program} onChange={(e) => setPackageMetadata({...packageMetadata, program: e.target.value})} placeholder="Nama Program" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Kegiatan</label>
-                      <input type="text" value={packageMetadata.kegiatan} onChange={(e) => setPackageMetadata({...packageMetadata, kegiatan: e.target.value})} placeholder="Nama Kegiatan" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Sub Kegiatan</label>
-                      <input type="text" value={packageMetadata.sub_kegiatan || ''} onChange={(e) => setPackageMetadata({...packageMetadata, sub_kegiatan: e.target.value})} placeholder="Nama Sub Kegiatan" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">MAK / Kode Rekening</label>
-                      <input type="text" value={packageMetadata.mak || ''} onChange={(e) => setPackageMetadata({...packageMetadata, mak: e.target.value})} placeholder="Misal: 5.1.02.01.01.0026" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tahun Anggaran</label>
-                      <input type="text" value={packageMetadata.tahun_anggaran || ''} onChange={(e) => setPackageMetadata({...packageMetadata, tahun_anggaran: e.target.value})} placeholder="Misal: 2026" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
-                    </div>
-                  </div>
-
-                  
-                    
-                    {/* Badge Indikator Jenis DPP & Editor KAK */}
-                    <div className="mb-6 p-4 border rounded-xl bg-blue-50 border-blue-200">
-                      <div className="font-bold text-blue-900 text-sm mb-4 flex items-center justify-between gap-2 border-b border-blue-200/50 pb-3">
-                        <div className="flex items-center gap-2">
-                          <ClipboardList className="w-5 h-5 text-blue-700" />
-                          <span>Template Dokumen & Klausul (Gabungan)</span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-                        <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Template Nota Dinas</label>
-                          <select
-                      value={selectedNdTplId}
-                      onChange={(e) => {
-                        setSelectedNdTplId(e.target.value);
-                        const packId = selectedPack.id || selectedPack.noSirup;
-                        localStorage.setItem(`pbj_selected_nd_template_${packId}`, e.target.value);
-                        setIsSigned(false); 
-                        if (step === 4) setStep(3);
-                      }}
-                      className="glass-input text-xs font-semibold bg-white text-slate-800 w-full p-2.5 border border-slate-200 rounded-xl shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
-                      disabled={isSigned}
-                    >
-                      {(() => {
-                        const templatesStr = localStorage.getItem('pbj_templates');
-                        let templates = [];
-                        try { if (templatesStr) templates = JSON.parse(templatesStr); } catch (ex) {}
-                        
-                        if (templates.length === 0) {
-                          return <option value="" disabled>Belum ada template tersimpan di sistem</option>;
-                        }
-
-                        const ndTemplates = templates.filter(t => 
-                          (t.name || '').toLowerCase().includes('nota dinas') || 
-                          (t.name || '').toLowerCase().includes('usulan pengadaan')
-                        );
-                        
-                        const otherTemplates = templates.filter(t => !ndTemplates.includes(t));
-
-                        return (
-                          <>
-                            <option value="">-- Pilih Template Nota Dinas --</option>
-                            {ndTemplates.length > 0 && (
-                              <optgroup label="Rekomendasi (Nota Dinas)">
-                                {ndTemplates.map(t => (
-                                  <option key={t.id} value={t.id}>{t.name}</option>
-                                ))}
-                              </optgroup>
-                            )}
-                            {otherTemplates.length > 0 && (
-                              <optgroup label="Template Lainnya (Manual)">
-                                {otherTemplates.map(t => (
-                                  <option key={t.id} value={t.id}>{t.name}</option>
-                                ))}
-                              </optgroup>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </select>
-                        </div>
-                        <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Template Dokumen Persiapan (DPP)</label>
-                          <select
-                      value={selectedTplId}
-                      onChange={(e) => {
-                        const newTplId = e.target.value;
-                        setSelectedTplId(newTplId);
-                        const packId = selectedPack.id || selectedPack.noSirup;
-                        localStorage.setItem(`pbj_selected_template_${packId}`, newTplId);
-                        
-                        // AUTO-FILL dppSpecs based on Template Category
-                        const isMamin = newTplId === 'TPL-006B';
-                        const isAtk = newTplId === 'TPL-006A';
-                        const isModal = newTplId === 'TPL-006C';
-                        const isPemeliharaan = newTplId === 'TPL-006F';
-                        const isKonstruksi = newTplId === 'TPL-006G';
-                        
-                        let autoLatarBelakang = dppSpecs?.latarBelakang || '';
-                        let autoMaksudTujuan = dppSpecs?.maksudTujuan || '';
-                        let autoWaktu = packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender';
-                        
-                        const satkerName = currentUser?.department || 'Pemerintah Kabupaten Probolinggo';
-                        if (isMamin) {
-                          autoLatarBelakang = `Dalam rangka mendukung pelaksanaan kegiatan operasional, rapat, dan/atau sosialisasi di lingkungan ${satkerName}, diperlukan penyediaan Makanan dan Minuman yang higienis dan memadai guna mendukung kelancaran pelaksanaan pada kegiatan ${packageMetadata.sub_kegiatan || selectedPack?.packName || 'tersebut'}.`;
-                          autoMaksudTujuan = `1. Memenuhi kebutuhan konsumsi peserta kegiatan secara tepat waktu dan higienis.\n2. Mendukung kelancaran dan kesuksesan pelaksanaan acara secara keseluruhan di lingkungan ${satkerName}.`;
-                          autoWaktu = '1 (Satu) hari kalender (atau sesuai jadwal pelaksanaan acara)';
-                        } else if (isAtk) {
-                          autoLatarBelakang = `Guna menunjang kelancaran administrasi dan operasional perkantoran sehari-hari di lingkungan ${satkerName}, sangat dibutuhkan ketersediaan Alat Tulis Kantor (ATK) dan/atau bahan habis pakai yang memadai, khususnya untuk menunjang kegiatan ${packageMetadata.sub_kegiatan || selectedPack?.packName || 'tersebut'}.`;
-                          autoMaksudTujuan = `1. Memenuhi kebutuhan dasar administrasi perkantoran di lingkungan ${satkerName}.\n2. Memastikan tidak ada kendala kelangkaan material logistik dalam memberikan pelayanan publik secara prima.`;
-                          autoWaktu = '14 (empat belas) hari kalender';
-                        } else if (isModal) {
-                          autoLatarBelakang = `Seiring dengan tuntutan kebutuhan modernisasi, digitalisasi, dan upaya peningkatan kinerja aparatur di lingkungan ${satkerName}, diperlukan dukungan penyediaan peralatan/aset/teknologi yang handal dan memadai untuk operasional kerja pada kegiatan ${packageMetadata.sub_kegiatan || selectedPack?.packName || 'tersebut'}.`;
-                          autoMaksudTujuan = `1. Meningkatkan efisiensi kerja dan kinerja pegawai melalui dukungan peralatan teknologi modern.\n2. Memenuhi standar kelayakan sarana dan prasarana minimal perangkat daerah pada ${satkerName}.`;
-                          autoWaktu = '30 (Tiga puluh) hari kalender';
-                        } else if (isPemeliharaan) {
-                          autoLatarBelakang = `Dalam rangka menjaga keandalan, keawetan, dan kinerja optimal dari aset/sarana/prasarana di lingkungan ${satkerName}, sangat diperlukan pelaksanaan pemeliharaan secara rutin dan berkala guna mendukung kelancaran operasional pada kegiatan ${packageMetadata.sub_kegiatan || selectedPack?.packName || 'tersebut'}.`;
-                          autoMaksudTujuan = `1. Memastikan seluruh sarana dan prasarana kantor selalu dalam kondisi siap pakai.\n2. Mencegah kerusakan fatal (breakdown) serta memperpanjang usia pakai aset milik ${satkerName}.`;
-                          autoWaktu = '365 (Tiga ratus enam puluh lima) hari kalender';
-                        } else if (isKonstruksi) {
-                          autoLatarBelakang = `Untuk memenuhi kebutuhan prasarana fisik, rehabilitasi bangunan, dan/atau peningkatan kapasitas fasilitas kerja yang representatif di lingkungan ${satkerName}, diperlukan pekerjaan pelaksanaan konstruksi fisik yang memenuhi standar teknis, kekuatan, dan keselamatan pada kegiatan ${packageMetadata.sub_kegiatan || selectedPack?.packName || 'tersebut'}.`;
-                          autoMaksudTujuan = `1. Mewujudkan bangunan/fasilitas fisik yang kokoh, aman, dan fungsional sesuai gambar rencana.\n2. Menyediakan sarana kerja fisik yang memadai guna menunjang pelayanan publik di lingkungan ${satkerName}.`;
-                          autoWaktu = '90 (Sembilan puluh) hari kalender';
-                        }
-                        
-                        setDppSpecs({
-                          ...dppSpecs,
-                          latarBelakang: autoLatarBelakang,
-                          maksudTujuan: autoMaksudTujuan,
-                          waktu: autoWaktu
-                        });
-                        
-                        setIsSigned(false); 
-                        if (step === 4) setStep(3);
-                      }}
-                      className="glass-input text-xs font-semibold bg-white text-slate-800 w-full p-2.5 border border-slate-200 rounded-xl shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
-                      disabled={isSigned}
-                    >
-                      {(() => {
-                        const templatesStr = localStorage.getItem('pbj_templates');
-                        let templates = [];
-                        try { if (templatesStr) templates = JSON.parse(templatesStr); } catch (ex) {}
-                        
-                        if (templates.length === 0) {
-                          return <option value="" disabled>Belum ada template tersimpan di sistem</option>;
-                        }
-
-                        const dppTemplates = templates.filter(t => 
-                          t.category === 'Tahap Persiapan' || 
-                          t.id.startsWith('TPL-006') || 
-                          (t.name || '').toLowerCase().includes('persiapan') || 
-                          (t.name || '').toLowerCase().includes('dpp')
-                        );
-                        
-                        const otherTemplates = templates.filter(t => !dppTemplates.includes(t));
-
-                        return (
-                          <>
-                            <option value="">-- Pilih Template Dokumen --</option>
-                            {dppTemplates.length > 0 && (
-                              <optgroup label="Rekomendasi (Tahap Persiapan)">
-                                {dppTemplates.map(t => (
-                                  <option key={t.id} value={t.id}>{t.name}</option>
-                                ))}
-                              </optgroup>
-                            )}
-                            {otherTemplates.length > 0 && (
-                              <optgroup label="Template Lainnya (Manual)">
-                                {otherTemplates.map(t => (
-                                  <option key={t.id} value={t.id}>{t.name}</option>
-                                ))}
-                              </optgroup>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-                        <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Nomor Nota Dinas</label>
-                          <input type="text" value={packageMetadata.nomor_nd || ''} onChange={(e) => setPackageMetadata({...packageMetadata, nomor_nd: e.target.value})} placeholder="Opsional (Kosongi jika otomatis)" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
-                        </div>
-                        <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Nomor DPP</label>
-                          <input type="text" value={packageMetadata.nomor_dpp || ''} onChange={(e) => setPackageMetadata({...packageMetadata, nomor_dpp: e.target.value})} placeholder="Opsional (Kosongi jika otomatis)" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
-                        </div>
-                        <div className="bg-white p-3 rounded-xl border border-blue-100 shadow-sm">
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Tanggal Surat</label>
-                          <input type="date" value={tanggalSurat} onChange={(e) => setTanggalSurat(e.target.value)} className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
-                        </div>
-                      </div>
-
-                      
-                      {isAiEditorOpen && (
-                        <div className="bg-white rounded-xl border border-blue-100 p-3 sm:p-5 mt-4 shadow-sm animate-fade-in space-y-5">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
-                            <h4 className="text-sm font-bold text-slate-800">Penyusunan Klausul & Spesifikasi Teknis</h4>
-                            <button onClick={handleApplyDefaults} className="text-[10px] text-slate-500 hover:text-slate-700 underline font-medium self-start sm:self-auto">Reset ke Teks Standar</button>
-                          </div>
-                          
-                          {/* Justifikasi Teknis Merek */}
-                          {/* Justifikasi Teknis Merek */}
-                          <div>
-                            <div className="flex justify-between items-end mb-1.5">
-                              <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Justifikasi Teknis Merek</label>
-                              <button onClick={() => handleAiAssist('justifikasiMerek')} disabled={aiLoadingField === 'justifikasiMerek'} className="text-[10px] bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white px-2 py-1 rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
-                                {aiLoadingField === 'justifikasiMerek' ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                                ) : (
-                                  <Sparkles className="w-3.5 h-3.5 text-white" />
-                                )}
-                                <span>{aiLoadingField === 'justifikasiMerek' ? 'Memproses...' : 'AI Assist'}</span>
-                              </button>
-                            </div>
-                            <textarea 
-                              value={dppSpecs?.justifikasiMerek || ''} 
-                              onChange={(e) => setDppSpecs({...dppSpecs, justifikasiMerek: e.target.value})}
-                              placeholder="Jelaskan justifikasi jika memilih merek/produk spesifik tertentu..."
-                              className="w-full text-xs p-3 border border-slate-200 rounded-lg min-h-[70px] focus:border-indigo-500 outline-none leading-relaxed"
-                            />
-                          </div>
-
-                          {/* Metode Pemilihan Penyedia */}
-                          <div>
-                            <div className="flex justify-between items-end mb-1.5">
-                              <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Metode Pemilihan Penyedia</label>
-                              <button onClick={() => handleAiAssist('metodePemilihan')} disabled={aiLoadingField === 'metodePemilihan'} className="text-[10px] bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white px-2 py-1 rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
-                                {aiLoadingField === 'metodePemilihan' ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                                ) : (
-                                  <Sparkles className="w-3.5 h-3.5 text-white" />
-                                )}
-                                <span>{aiLoadingField === 'metodePemilihan' ? 'Memproses...' : 'AI Assist'}</span>
-                              </button>
-                            </div>
-                            <textarea 
-                              value={dppSpecs?.metodePemilihan || ''} 
-                              onChange={(e) => setDppSpecs({...dppSpecs, metodePemilihan: e.target.value})}
-                              placeholder="Sebutkan metode pemilihan penyedia (misal: E-Purchasing melalui Negosiasi Harga)..."
-                              className="w-full text-xs p-3 border border-slate-200 rounded-lg min-h-[70px] focus:border-indigo-500 outline-none leading-relaxed"
-                            />
-                          </div>
-
-                          {/* Spesifikasi Layanan/Kualitas */}
-                          <div>
-                            <div className="flex justify-between items-end mb-1.5">
-                              <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Spesifikasi Layanan & Kualitas (Klausul Tambahan)</label>
-                              <button onClick={() => handleAiAssist('spesifikasiLayanan')} disabled={aiLoadingField === 'spesifikasiLayanan'} className="text-[10px] bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white px-2 py-1 rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
-                                {aiLoadingField === 'spesifikasiLayanan' ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                                ) : (
-                                  <Sparkles className="w-3.5 h-3.5 text-white" />
-                                )}
-                                <span>{aiLoadingField === 'spesifikasiLayanan' ? 'Memproses...' : 'AI Assist'}</span>
-                              </button>
-                            </div>
-                            <textarea 
-                              value={dppSpecs?.spesifikasiLayanan || ''} 
-                              onChange={(e) => setDppSpecs({...dppSpecs, spesifikasiLayanan: e.target.value})}
-                              placeholder="Sebutkan syarat garansi, perizinan (SLHS), aturan pengiriman, SLA, dll..."
-                              className="w-full text-xs p-3 border border-slate-200 rounded-lg min-h-[70px] focus:border-indigo-500 outline-none leading-relaxed"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-  
-                  {/* Badge Indikator Jenis DPP */}
-                  <div className="mb-6 p-4 border rounded-xl bg-blue-50 border-blue-200">
-                    <div className="font-bold text-blue-900 text-sm mb-1 flex items-center gap-2">
-                      <ClipboardList className="w-5 h-5 text-blue-700" />
-                      <span>Template DPP: </span> {
-                        getPacketCategory(selectedPack?.packName || '') === 'Mamin-Prasmanan' ? 'Mamin — Prasmanan/Katering' :
-                        getPacketCategory(selectedPack?.packName || '') === 'Mamin-Bungkus' ? 'Mamin — Nasi Kotak / Bungkus' :
-                        getPacketCategory(selectedPack?.packName || '') === 'Mamin-Snack' ? 'Mamin — Snack' :
-                        getPacketCategory(selectedPack?.packName || '') === 'Modal' ? 'Belanja Modal' :
-                        getPacketCategory(selectedPack?.packName || '') === 'Konsolidasi' ? 'Konsolidasi' :
-                        getPacketCategory(selectedPack?.packName || '') === 'Jasa' ? 'Jasa' : 'ATK / Standar'
-                      }
-                    </div>
-                    <div className="text-xs text-blue-800 leading-relaxed">
-                      {getPacketCategory(selectedPack?.packName || '') === 'Mamin-Prasmanan' && "Pasal kunci: I.e (Peralatan saji & Personil Layanan), VII (Wajib SLHS). Status: Jasa Katering."}
-                      {getPacketCategory(selectedPack?.packName || '') === 'Mamin-Bungkus' && "Pasal kunci: I.e (Higienis, kemasan individual, 1 jam sebelum), VII (Wajib SLHS)."}
-                      {getPacketCategory(selectedPack?.packName || '') === 'Mamin-Snack' && "Pasal kunci: I.e (Kemasan tertutup, masa kadaluarsa), VII (Wajib SLHS)."}
-                      {getPacketCategory(selectedPack?.packName || '') === 'Modal' && "Pasal kunci: I.b (Merek & Service Center), VII (Surat Dukungan Pabrikan)."}
-                      {getPacketCategory(selectedPack?.packName || '') === 'Konsolidasi' && "Pasal kunci: VI (Direct Purchasing ke Penyedia Konsolidasi). Status: Bebas HPS."}
-                      {getPacketCategory(selectedPack?.packName || '') === 'Jasa' && "Pasal kunci: standar untuk Jasa lainnya."}
-                      {getPacketCategory(selectedPack?.packName || '') === 'ATK' && "Pasal kunci: standar pengadaan ATK."}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-4">
-                    {!isHpsExemptSelected && (
-                      <button
-                        onClick={() => setActiveDocPreview('hps')}
-                        className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 px-5 py-3 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all"
-                      >
-                        Lihat Surat Penetapan HPS
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setActiveDocPreview('nd')}
-                      className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 px-5 py-3 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all"
-                    >
-                      Lihat Nota Dinas
-                    </button>
-                    <button
-                      onClick={() => setActiveDocPreview('dpp')}
-                      className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 px-5 py-3 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all"
-                    >
-                      Lihat Dokumen DPP PPK
-                    </button>
-                  </div>
-
-                  <div className="border-t border-slate-200/60 pt-4 mt-2">
-                    {isSigned ? (
-                      <div className="flex items-center justify-between bg-white border border-slate-200 p-5 rounded-xl animate-fade-in">
-                        <div className="flex items-center gap-3">
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                          <div>
-                            <div className="text-xs font-semibold text-slate-800">Persiapan Selesai</div>
-                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{currentUser.name} · NIP {currentUser.nip}</div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setIsSigned(false)
-                            setStep(3)
-                          }}
-                          className="text-xs text-slate-400 hover:text-rose-600 font-semibold transition-colors"
-                        >
-                          Batal Selesai
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-50 border border-slate-200 p-5 rounded-xl">
-                        <div className="text-xs text-slate-500 max-w-md leading-relaxed">
-                          Selesaikan persiapan dokumen untuk mengirim berkas pengadaan.
-                        </div>
-                        <button
-                          onClick={() => {
-                            setIsSigned(true)
-                            setStep(4)
-                          }}
-                          disabled={isOverBudget}
-                          className={`text-white text-xs font-semibold px-5 py-3 rounded-xl flex items-center gap-2 transition-all ${isOverBudget ? 'bg-slate-400 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-600'}`}
-                        >
-                          Sahkan Dokumen (TTE)
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-4 pt-4">
-            <button
-              onClick={() => handleSimpanPaket(false)}
-              disabled={isUpdating}
-              className="bg-white border-2 border-slate-200 hover:border-indigo-500 text-slate-700 hover:text-indigo-600 px-6 py-2.5 rounded-xl font-bold transition-all disabled:opacity-50 pointer-events-auto shadow-sm flex items-center gap-1.5"
-            >
-              <Save className="w-4 h-4" />
-              <span>Simpan Paket</span>
-            </button>
-            <button
-              onClick={async () => {
-                const confirmed = await dialog.confirm('Anda yakin ingin menyerahkan dan mengunci dokumen ini untuk PP?');
-                if (confirmed) {
-                  const finalizedItems = getPackageItems(selectedPack).map((item, idx) => {
-                    const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
-                    const surveyProduct = surveyData?.products?.find(p => p.name === item.name);
-                    return {
-                      ...item,
-                      name: surveyProduct?.name || item.name,
-                      price: unitHpsPrice
-                    };
-                  });
-                  
-                  const dppType = getPacketCategory(selectedPack?.packName || '');
-                  
-                  updateRincian(selectedPack.id, {
-                    items: finalizedItems,
-                    totalHps: parseInt(hpsValue || 0),
-                    status: 'Diserahkan ke PP',
-                    isLocked: true,
-                    isHpsExempt: isHpsExemptSelected,
-                    hpsExemptReason: '',
-                    dppType: dppType
-                  });
-                  setStep(1);
-                  alert('Paket berhasil diserahkan ke Pejabat Pengadaan.');
-                }
-              }}
-              disabled={!isSigned || isOverBudget}
-              className={`text-white px-6 py-3 rounded-xl font-bold transition-all pointer-events-auto flex items-center gap-2 ${!isSigned || isOverBudget ? 'bg-slate-400 cursor-not-allowed opacity-50' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-            >
-              Serahkan ke Pejabat Pengadaan →
-            </button>
-          </div>
-          
-          <DocPreviewModal 
-            isHpsExemptSelected={isHpsExemptSelected} 
-          />
+      </div>
+      </div>
+      </div>
+      </div>
+      </div>
+      
+      {/* Action Buttons Step 3 */}
+      <div className="flex justify-end mt-8 border-t border-slate-200 pt-6">
+        <button
+          onClick={() => setStep(4)}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2"
+        >
+          Lanjut ke Persiapan Dokumen &rarr;
+        </button>
+      </div>
     </>
   );
 }

@@ -218,7 +218,7 @@ func (h *BudgetHandler) SaveSirupPackages(w http.ResponseWriter, r *http.Request
 		}
 
 		result := h.DB.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "no_sirup"}, {Name: "tahun_anggaran"}},
+			Columns:   []clause.Column{{Name: "no_sirup"}},
 			DoUpdates: clause.AssignmentColumns([]string{
 				"nama_paket", "pagu_sirup", "sumber_dana", "metode_pemilihan",
 				"jenis_pengadaan", "mak", "uraian", "spesifikasi", "scraped_at", "updated_at",
@@ -299,10 +299,17 @@ func (h *BudgetHandler) SaveRakAccounts(w http.ResponseWriter, r *http.Request) 
 		FileName      string                `json:"file_name"`
 		Accounts      []models.BudgetAccount `json:"accounts"`
 	}
+	bodyBytes, _ := io.ReadAll(r.Body)
+	log.Printf("[SaveRakAccounts] Received body length: %d", len(bodyBytes))
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		log.Printf("[SaveRakAccounts] Decode error: %v", err)
 		http.Error(w, "Format JSON tidak valid: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	log.Printf("[SaveRakAccounts] Unmarshaled accounts: %+v", body.Accounts)
 
 	satkerID := body.SatkerID
 	if satkerID == "" {
@@ -345,16 +352,18 @@ func (h *BudgetHandler) SaveRakAccounts(w http.ResponseWriter, r *http.Request) 
 		acc.RakDocumentID = rkaDoc.ID
 		acc.SatkerID = satkerID
 		acc.TahunAnggaran = tahun
-		err := h.DB.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "satker_id"}, {Name: "tahun_anggaran"}, {Name: "kode_rekening"}},
-			DoUpdates: clause.AssignmentColumns([]string{
-				"rak_document_id", "uraian", "anggaran_tahun", "total_rak",
-				"program", "kegiatan", 
-				"bulan_jan", "bulan_feb", "bulan_mar", "bulan_apr", "bulan_mei", "bulan_jun",
-				"bulan_jul", "bulan_ags", "bulan_sep", "bulan_okt", "bulan_nov", "bulan_des",
-				"updated_at",
-			}),
-		}).Create(&acc).Error
+		var existing models.BudgetAccount
+		findErr := h.DB.Where("satker_id = ? AND tahun_anggaran = ? AND kode_rekening = ? AND sub_kegiatan = ?", 
+			satkerID, tahun, acc.KodeRekening, acc.SubKegiatan).First(&existing).Error
+		
+		var err error
+		if findErr == nil {
+			acc.ID = existing.ID
+			acc.CreatedAt = existing.CreatedAt
+			err = h.DB.Save(&acc).Error
+		} else {
+			err = h.DB.Create(&acc).Error
+		}
 		
 		if err != nil {
 			errLog := fmt.Sprintf("[%s] Error saving account: %v\n", time.Now().Format(time.RFC3339), err)

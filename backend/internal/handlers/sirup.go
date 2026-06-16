@@ -366,7 +366,72 @@ func (h *SirupHandler) GetSirupPackageByID(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// 2. Jika tidak ada di lokal, hubungi survey-service proxy
+	// 2. Jika tidak ada di lokal, coba cari di inaproc langsung berdasarkan Satker
+	satkerID := r.Header.Get("X-User-Satker")
+	if satkerID == "" {
+		satkerID = "67081" // Default Kecamatan Besuk
+	}
+	tahunVal := time.Now().Year()
+
+	log.Printf("[GetSirupPackageByID] Attempting fetchFromInaproc for satker %s to find package %s", satkerID, paketID)
+	pkgs, err := fetchFromInaproc(satkerID, strconv.Itoa(tahunVal))
+	var foundPackage *SirupPackage
+
+	if err == nil {
+		for _, p := range pkgs {
+			if p.NoSirup == paketID {
+				foundPackage = &p
+				break
+			}
+		}
+	} else {
+		log.Printf("[GetSirupPackageByID] fetchFromInaproc error: %v", err)
+	}
+
+	// 3. Jika ketemu di inaproc, simpan ke database lokal
+	if foundPackage != nil {
+		sourceURL := fmt.Sprintf("https://sirup.inaproc.id/sirup/home/detailPaketPenyediaPublic2017?idPaket=%s", foundPackage.NoSirup)
+		
+		// Save to procurement_packs
+		h.DB.Exec(
+			`INSERT INTO procurement_packs (no_sirup, pack_name, budget_allocation, procurement_method, budget_source, year, satker_id, pack_status, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, 'Live', NOW(), NOW())
+			 ON CONFLICT (no_sirup) DO UPDATE SET
+				pack_name = EXCLUDED.pack_name,
+				budget_allocation = EXCLUDED.budget_allocation,
+				procurement_method = EXCLUDED.procurement_method,
+				budget_source = EXCLUDED.budget_source,
+				pack_status = 'Live',
+				updated_at = NOW()`,
+			foundPackage.NoSirup, foundPackage.PackName, foundPackage.Pagu, foundPackage.Method, foundPackage.SumberDana, tahunVal, satkerID,
+		)
+
+		// Save to sirup_package_saveds
+		h.DB.Exec(
+			`INSERT INTO sirup_package_saveds (satker_id, tahun_anggaran, no_sirup, nama_paket, pagu_sirup, sumber_dana, metode_pemilihan, jenis_pengadaan, mak, klpd, satker_nama, volume_pekerjaan, lokasi, uraian, spesifikasi, status_sirup, raw_json, source_url, scraped_at, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, '', '', '', ?, '', '', '', '', 'Live', NULL, ?, NOW(), NOW(), NOW())
+			 ON CONFLICT (no_sirup) DO UPDATE SET
+				nama_paket = EXCLUDED.nama_paket,
+				pagu_sirup = EXCLUDED.pagu_sirup,
+				sumber_dana = EXCLUDED.sumber_dana,
+				metode_pemilihan = EXCLUDED.metode_pemilihan,
+				status_sirup = 'Live',
+				source_url = EXCLUDED.source_url,
+				scraped_at = NOW(),
+				updated_at = NOW()`,
+			satkerID, tahunVal, foundPackage.NoSirup, foundPackage.PackName, foundPackage.Pagu, foundPackage.SumberDana, foundPackage.Method, "Pemerintah Daerah Kabupaten Probolinggo", sourceURL,
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"package": foundPackage,
+		})
+		return
+	}
+
+	// 4. Jika tetap tidak ada, hubungi survey-service proxy sebagai last resort
 	lkppURL := fmt.Sprintf("http://127.0.0.1:3001/api/survey/sirup/package/%s", paketID)
 	req, err := http.NewRequest(http.MethodGet, lkppURL, nil)
 	if err != nil {
@@ -402,18 +467,16 @@ func (h *SirupHandler) GetSirupPackageByID(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	tahunVal, _ := strconv.Atoi(scraped.Tahun)
-	if tahunVal == 0 {
-		tahunVal = time.Now().Year()
+	if scraped.Tahun != "" {
+		t, _ := strconv.Atoi(scraped.Tahun)
+		if t != 0 {
+			tahunVal = t
+		}
 	}
 
 	// Default satker id if empty
-	satkerID := scraped.SatkerID
-	if satkerID == "" {
-		satkerID = r.Header.Get("X-User-Satker")
-		if satkerID == "" {
-			satkerID = "67081" // Kecamatan Besuk default
-		}
+	if scraped.SatkerID != "" {
+		satkerID = scraped.SatkerID
 	}
 
 	// Save to database procurement_packs table

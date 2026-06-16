@@ -23,7 +23,7 @@ import {
   EyeOff
 } from 'lucide-react';
 
-const DEFAULT_TEMPLATES = [
+export const DEFAULT_TEMPLATES = [
   {
     id: 'TPL-001',
     category: 'Tahap Persiapan',
@@ -127,7 +127,8 @@ Pejabat Pengadaan,
 
 {{nama_pejabat_pengadaan}}
 NIP. {{nip_pejabat_pengadaan}}`,
-    isDefault: true
+    isDefault: true,
+    panelRedirect: 'Panel Pejabat Pengadaan (/pp/panel) → Klik "Cetak BAHP"'
   },
   {
     id: 'TPL-005',
@@ -160,7 +161,8 @@ Penyedia,
 
 (Pimpinan {{nama_penyedia}})             ({{nama_ppk}})
                                          NIP. {{nip_ppk}}`,
-    isDefault: true
+    isDefault: true,
+    panelRedirect: 'Panel PPK (/ppk) → Langkah 5 Review → Cetak SP'
   },
   {
     id: 'TPL-006A',
@@ -188,7 +190,8 @@ Pejabat Pembuat Komitmen,
 
 {{nama_ppk}}
 NIP. {{nip_ppk}}`,
-    isDefault: true
+    isDefault: true,
+    panelRedirect: 'Panel PPK (/ppk) → Langkah 2 DPA → Cetak DPP'
   },
   {
     id: 'TPL-006B',
@@ -216,7 +219,8 @@ Pejabat Pembuat Komitmen,
 
 {{nama_ppk}}
 NIP. {{nip_ppk}}`,
-    isDefault: true
+    isDefault: true,
+    panelRedirect: 'Panel PPK (/ppk) → Langkah 2 DPA → Cetak DPP'
   },
   {
     id: 'TPL-006C',
@@ -244,7 +248,8 @@ Pejabat Pembuat Komitmen,
 
 {{nama_ppk}}
 NIP. {{nip_ppk}}`,
-    isDefault: true
+    isDefault: true,
+    panelRedirect: 'Panel PPK (/ppk) → Langkah 2 DPA → Cetak DPP'
   },
   {
     id: 'TPL-006D',
@@ -272,7 +277,8 @@ Pejabat Pembuat Komitmen,
 
 {{nama_ppk}}
 NIP. {{nip_ppk}}`,
-    isDefault: true
+    isDefault: true,
+    panelRedirect: 'Panel PPK (/ppk) → Langkah 2 DPA → Cetak DPP'
   },
   {
     id: 'TPL-006E',
@@ -300,7 +306,8 @@ Pejabat Pembuat Komitmen,
 
 {{nama_ppk}}
 NIP. {{nip_ppk}}`,
-    isDefault: true
+    isDefault: true,
+    panelRedirect: 'Panel PPK (/ppk) → Langkah 2 DPA → Cetak DPP'
   },
   {
     id: 'TPL-006F',
@@ -328,7 +335,8 @@ Pejabat Pembuat Komitmen,
 
 {{nama_ppk}}
 NIP. {{nip_ppk}}`,
-    isDefault: true
+    isDefault: true,
+    panelRedirect: 'Panel PPK (/ppk) → Langkah 2 DPA → Cetak DPP'
   },
   {
     id: 'TPL-006G',
@@ -356,7 +364,8 @@ Pejabat Pembuat Komitmen,
 
 {{nama_ppk}}
 NIP. {{nip_ppk}}`,
-    isDefault: true
+    isDefault: true,
+    panelRedirect: 'Panel PPK (/ppk) → Langkah 2 DPA → Cetak DPP'
   },
   {
     id: 'TPL-007',
@@ -384,7 +393,8 @@ Pejabat Pembuat Komitmen (PPK),
 
 {{nama_ppk}}
 NIP. {{nip_ppk}}`,
-    isDefault: true
+    isDefault: true,
+    panelRedirect: 'Panel PPK (/ppk) → Langkah 3 HPS → Cetak Penetapan HPS'
   }
 ];
 
@@ -412,7 +422,21 @@ const LogoGarudaPlaceholder = () => (
 
 export default function TemplateSuratManager() {
   const { user } = useAuth();
-  
+
+  // Domain kewenangan edit berdasarkan peran
+  const ROLE_TEMPLATE_DOMAIN = {
+    'PP':    ['Tahap Pemilihan'],
+    'PPK':   ['Tahap Persiapan', 'Tahap Kontrak'],
+    'Admin': ['Tahap Persiapan', 'Tahap Pemilihan', 'Tahap Kontrak'],
+  };
+
+  // Cek apakah user berwenang menyimpan draft untuk template ini
+  const canDraftTemplate = (templateCategory) => {
+    if (user?.role === 'Admin') return true;
+    const allowedCategories = ROLE_TEMPLATE_DOMAIN[user?.role] || [];
+    return allowedCategories.includes(templateCategory);
+  };
+
   const [templates, setTemplates] = useState(() => {
     const saved = localStorage.getItem('pbj_templates');
     if (saved) {
@@ -443,9 +467,9 @@ export default function TemplateSuratManager() {
     const defaultSettings = {
       showKop: true,
       logoType: 'pemda', // 'pemda' (Probolinggo), 'garuda' (Nasional), 'custom' (Unggah)
-      namaPemda: 'PEMERINTAH KABUPATEN PROBOLINGGO',
-      namaInstansi: 'DINAS KOPERASI, USAHA MIKRO, PERDAGANGAN DAN PERINDUSTRIAN',
-      alamatLengkap: 'Jl. Jenderal Ahmad Yani No. 23 Probolinggo – Probolinggo - 67219. Laman: https://probolinggokab.go.id, Pos-el: dkuppkabprobolinggo@gmail.com',
+      namaPemda: user?.perangkatDaerah || 'PEMERINTAH KABUPATEN PROBOLINGGO',
+      namaInstansi: user?.department ? user.department.toUpperCase() : 'PENGADAAN BARANG/JASA',
+      alamatLengkap: 'Jl. Jenderal Ahmad Yani No. 23 Probolinggo – Probolinggo - 67219. Laman: https://probolinggokab.go.id',
       paperSize: 'A4',
       marginTop: 20,      // 20 mm (2 cm) Permendagri 1/2023
       marginBottom: 25,   // 25 mm (2.5 cm) Permendagri 1/2023
@@ -608,25 +632,48 @@ export default function TemplateSuratManager() {
     }
   };
 
-  // Re-populate Kop settings and variables dynamically when active user changes
+  // Fetch settings from backend on mount to ensure cross-device persistence
+  useEffect(() => {
+    const effectiveSatkerId = user?.idSatker || (user?.department ? user.department.replace(/\s+/g, '_').toLowerCase() : '67081');
+    if (!effectiveSatkerId) return;
+    const fetchBackendSettings = async () => {
+      try {
+        // Fetch docSettings
+        const resDoc = await fetch(`/api/settings/doc_settings_satker_${effectiveSatkerId}`);
+        if (resDoc.ok) {
+          const data = await resDoc.json();
+          if (data && data.value) {
+            const parsed = JSON.parse(data.value);
+            setDocSettings(prev => ({ ...prev, ...parsed }));
+            localStorage.setItem('pbj_doc_settings', data.value);
+          }
+        }
+        
+        // Fetch templates
+        const resTpl = await fetch(`/api/settings/templates_satker_${effectiveSatkerId}`);
+        if (resTpl.ok) {
+          const data = await resTpl.json();
+          if (data && data.value) {
+            const parsed = JSON.parse(data.value);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setTemplates(parsed);
+              localStorage.setItem('pbj_templates', data.value);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to sync settings from backend', e);
+      }
+    };
+    fetchBackendSettings();
+  }, [user?.idSatker]);
+
+  // Handle active user dynamic variables (without overwriting docSettings)
   useEffect(() => {
     if (user && user.department) {
       const deptName = user.department;
-      const matched = SATKER_DATABASE[deptName] || {
-        singkatan: deptName.replace(/[^A-Z]/g, '') || 'PBJ',
-        alamat: "Jl. Raya Probolinggo No. 81, Probolinggo. Telp: (0335) 422118, Email: info@probolinggokab.go.id, Kode Pos: 67271"
-      };
-
-      // 1. Auto-Adapt Kop Surat & Nomenklatur Nomor Surat
-      setDocSettings(prev => ({
-        ...prev,
-        namaPemda: user.perangkatDaerah || 'PEMERINTAH KABUPATEN PROBOLINGGO',
-        namaInstansi: deptName.toUpperCase(),
-        alamatLengkap: matched.alamat,
-        formatNomorSurat: `027/{nomor}/${matched.singkatan}/2026`
-      }));
-
-      // 2. Auto-Adapt Preview Variables (Isi Variabel)
+      const matched = SATKER_DATABASE[deptName] || { singkatan: 'BPBJ', alamat: 'Gedung Sekretariat Daerah Lt. 2, Jl. Raya Dringu No. 81, Probolinggo' };
+      // Auto-Adapt Preview Variables (Isi Variabel)
       setPreviewVars(prev => {
         const updated = {
           ...prev,
@@ -950,11 +997,12 @@ export default function TemplateSuratManager() {
                   {categories.map(cat => {
                     const catTemplates = templates.filter(t => t.category === cat);
                     if (catTemplates.length === 0) return null;
+                    const isUserDomain = canDraftTemplate(cat);
                     return (
-                      <optgroup key={cat} label={cat.toUpperCase()} className="font-extrabold text-[10px] text-indigo-900 bg-slate-50 py-1">
+                      <optgroup key={cat} label={`${isUserDomain ? '✅' : '🔒'} ${cat.toUpperCase()}`} className="font-extrabold text-[10px] text-indigo-900 bg-slate-50 py-1">
                         {catTemplates.map(t => (
                           <option key={t.id} value={t.id} className="font-semibold text-xs text-slate-800 bg-white py-1">
-                            🏛️ {t.name} {t.isDefault ? '(Bawaan)' : '(Kustom)'}
+                            {t.isDraft ? '📝' : canDraftTemplate(t.category) ? '🏛️' : '🔒'} {t.name} {t.isDraft ? '(Draft Saya)' : t.isDefault ? '(Bawaan)' : '(Kustom)'}
                           </option>
                         ))}
                       </optgroup>
@@ -1345,7 +1393,32 @@ export default function TemplateSuratManager() {
                 </div>
                 {/* Save button for settings tab */}
                 <div className="flex justify-end mt-2 pt-3 border-t border-slate-100">
-                    <button type="button" onClick={() => { localStorage.setItem('pbj_doc_settings', JSON.stringify(docSettings)); setNotification('✅ Pengaturan Kop & Margin berhasil disimpan ke sistem!'); setTimeout(() => setNotification(''), 3000); }} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all shadow-sm flex items-center gap-1.5">
+                    <button type="button" onClick={async () => { 
+                      localStorage.setItem('pbj_doc_settings', JSON.stringify(docSettings)); 
+                      localStorage.setItem('pbj_templates', JSON.stringify(templates));
+                      
+                      // Save to backend for cross-device persistence
+                      const effectiveSatkerId = user?.idSatker || (user?.department ? user.department.replace(/\s+/g, '_').toLowerCase() : '67081');
+                      if (effectiveSatkerId) {
+                        try {
+                          await fetch('/api/settings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ key: `doc_settings_satker_${effectiveSatkerId}`, value: JSON.stringify(docSettings) })
+                          });
+                          await fetch('/api/settings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ key: `templates_satker_${effectiveSatkerId}`, value: JSON.stringify(templates) })
+                          });
+                        } catch (e) {
+                          console.error('Failed to save settings to backend', e);
+                        }
+                      }
+                      
+                      setNotification('✅ Pengaturan Kop, Margin & Template berhasil disimpan ke sistem secara permanen!'); 
+                      setTimeout(() => setNotification(''), 4000); 
+                    }} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all shadow-sm flex items-center gap-1.5">
                       💾 Simpan Pengaturan Naskah
                     </button>
                   </div>
@@ -1356,7 +1429,27 @@ export default function TemplateSuratManager() {
               {controlTab === 'editor' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-fade-in items-stretch flex-1">
                   
+                  {/* Panel Redirect Banner — shown when template is already generated in Panel PP/PPK */}
+                  {selectedTemplate?.panelRedirect && (
+                    <div className="lg:col-span-3 bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
+                      <span className="text-2xl shrink-0">🔗</span>
+                      <div>
+                        <div className="font-black text-blue-900 text-sm mb-1">Dokumen ini Tersedia di Panel dengan Data Real</div>
+                        <p className="text-[11px] text-blue-800 leading-relaxed">
+                          Template <strong>{selectedTemplate.name}</strong> sudah dihasilkan secara otomatis dari data pengadaan nyata (Kode RUP, MAK, Harga Tayang, dll) di:
+                          <br/>
+                          <strong className="text-blue-900">→ {selectedTemplate.panelRedirect}</strong>
+                          <br/>
+                          <span className="text-blue-600 italic mt-1 block">
+                            Template di sini hanya berisi teks placeholder statis yang tidak terhubung ke data pengadaan. Untuk dokumen yang akurat, gunakan Panel di atas.
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Metadata left column (1/3 width) */}
+
                   <div className="space-y-4 bg-slate-50/50 p-4 rounded-xl border border-slate-200/50 flex flex-col justify-start">
                     <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider block border-b border-slate-100 pb-2 mb-1">📝 Metadata Naskah</span>
                     <div>
@@ -1365,9 +1458,9 @@ export default function TemplateSuratManager() {
                         type="text"
                         value={activeTemplateName}
                         onChange={e => setActiveTemplateName(e.target.value)}
-                        readOnly={user?.role !== 'Admin' || !editMode}
+                        readOnly={user?.role === 'Admin' && !editMode}
                         className={`w-full px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-indigo-500 font-bold border transition-all ${
-                          user?.role === 'Admin' && editMode ? 'bg-white border-slate-200' : 'bg-slate-100 border-slate-200 text-slate-700 cursor-not-allowed'
+                          user?.role === 'Admin' && !editMode ? 'bg-slate-100 border-slate-200 text-slate-700 cursor-not-allowed' : 'bg-white border-slate-200'
                         }`}
                       />
                     </div>
@@ -1377,9 +1470,9 @@ export default function TemplateSuratManager() {
                       <select 
                         value={activeCategory}
                         onChange={e => setActiveCategory(e.target.value)}
-                        disabled={user?.role !== 'Admin' || !editMode}
+                        disabled={user?.role === 'Admin' && !editMode}
                         className={`w-full px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-indigo-500 font-semibold border transition-all ${
-                          user?.role === 'Admin' && editMode ? 'bg-white border-slate-200' : 'bg-slate-100 border-slate-200 text-slate-700 cursor-not-allowed'
+                          user?.role === 'Admin' && !editMode ? 'bg-slate-100 border-slate-200 text-slate-700 cursor-not-allowed' : 'bg-white border-slate-200'
                         }`}
                       >
                         {categories.map(c => (
@@ -1389,22 +1482,63 @@ export default function TemplateSuratManager() {
                     </div>
 
                     {user?.role !== 'Admin' ? (
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[10px] text-amber-800 flex items-start gap-2 shadow-inner mt-2">
-                        <LockIcon size={14} className="text-amber-600 shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-extrabold block text-xs mb-0.5">🔒 Read-Only Draft</span>
-                          Perubahan struktur induk surat dinas resmi hanya dapat disimpan oleh **Administrator UKPBJ / BPBJ** demi legalitas hukum.
-                        </div>
+                      <div className="space-y-2 mt-2">
+                        {canDraftTemplate(activeCategory) ? (
+                          <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-[10px] text-sky-800 flex items-start gap-2">
+                            <Edit3 size={14} className="text-sky-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-extrabold block text-xs mb-0.5">✏️ Mode Draft Aktif</span>
+                              Anda bebas mengubah isi naskah ini. Klik <strong>"Simpan sebagai Draft Saya"</strong> untuk menyimpan salinan kustom tanpa mengubah template resmi.
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[10px] text-amber-800 flex items-start gap-2">
+                            <LockIcon size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-extrabold block text-xs mb-0.5">🔒 Di Luar Kewenangan</span>
+                              Template <strong>{activeCategory}</strong> bukan domain {user?.role}.
+                              {user?.role === 'PP' && <><br/>PP berwenang atas template <strong>Tahap Pemilihan</strong> (BAHP, BAKN, Undangan).</>}
+                              {user?.role === 'PPK' && <><br/>PPK berwenang atas template <strong>Tahap Persiapan</strong> (DPP, HPS) &amp; <strong>Tahap Kontrak</strong> (SP).</>}
+                            </div>
+                          </div>
+                        )}
+                        {canDraftTemplate(activeCategory) && (
+                          <button
+                            onClick={() => {
+                              const newId = 'DRAFT-' + Date.now();
+                              const draftName = activeTemplateName.replace(' (Draft Saya)', '') + ' (Draft Saya)';
+                              const newTpl = {
+                                id: newId,
+                                category: activeCategory,
+                                name: draftName,
+                                content: activeTemplateContent,
+                                isDefault: false,
+                                isDraft: true,
+                                ownerName: user?.name || 'User'
+                              };
+                              setTemplates(prev => {
+                                const filtered = prev.filter(t => !(t.isDraft && t.name === draftName));
+                                return [...filtered, newTpl];
+                              });
+                              setSelectedTemplateId(newId);
+                              setNotification('✅ Draft berhasil disimpan sebagai "' + draftName + '"!');
+                              setTimeout(() => setNotification(''), 4000);
+                            }}
+                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                          >
+                            💾 Simpan sebagai Draft Saya
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="flex justify-end mt-4">
                         {editMode ? (
                           <button onClick={handleSaveTemplate} className="w-full py-2 bg-emerald-600 text-white hover:bg-emerald-700 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 shadow-sm">
-                            💾 Simpan Perubahan Naskah
+                            💾 Simpan Perubahan Template Resmi
                           </button>
                         ) : (
                           <button onClick={() => setEditMode(true)} className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-lg border border-indigo-100 transition-all flex items-center justify-center gap-1">
-                            ✏️ Aktifkan Mode Edit
+                            ✏️ Aktifkan Mode Edit (Admin)
                           </button>
                         )}
                       </div>
@@ -1462,10 +1596,12 @@ export default function TemplateSuratManager() {
                       id="template-editor-textarea"
                       value={activeTemplateContent}
                       onChange={(e) => setActiveTemplateContent(e.target.value)}
-                      readOnly={user?.role !== 'Admin' || !editMode}
+                      readOnly={user?.role === 'Admin' && !editMode}
                       spellCheck="false"
-                      className="w-full flex-1 p-3 text-[11px] font-mono text-slate-700 bg-transparent resize-none outline-none leading-relaxed overflow-y-auto"
-                      placeholder="Isi surat resmi disini..."
+                      className={`w-full flex-1 p-3 text-[11px] font-mono text-slate-700 bg-transparent resize-none outline-none leading-relaxed overflow-y-auto ${
+                        user?.role === 'Admin' && !editMode ? 'cursor-not-allowed opacity-70' : 'cursor-text'
+                      }`}
+                      placeholder="Isi surat resmi disini. Klik untuk mulai mengedit..."
                     ></textarea>
                   </div>
 
@@ -1554,9 +1690,9 @@ export default function TemplateSuratManager() {
                     <span className="safe-white-text">Word</span>
                   </button>
 
-                  {/* Delete if custom */}
-                  {user?.role === 'Admin' && !selectedTemplate.isDefault && (
-                    <button onClick={handleDelete} className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg border border-rose-100 transition-colors" title="Hapus Template Kustom">
+                  {/* Delete if custom or own draft */}
+                  {(!selectedTemplate.isDefault && (user?.role === 'Admin' || selectedTemplate.isDraft)) && (
+                    <button onClick={handleDelete} className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg border border-rose-100 transition-colors" title={selectedTemplate.isDraft ? 'Hapus Draft Saya' : 'Hapus Template Kustom'}>
                       <Trash2 size={13} />
                     </button>
                   )}

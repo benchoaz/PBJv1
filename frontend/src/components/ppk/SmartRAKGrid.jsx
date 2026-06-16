@@ -19,16 +19,28 @@ export default function SmartRAKGrid({ dpaAccounts = [], satkerId, packageMetada
           const data = await res.json();
           if (data.accounts) {
             const rakMap = {};
+            const fallbackMap = {};
             data.accounts.forEach(acc => {
-              rakMap[acc.kode_rekening] = acc;
+              const key = `${acc.kode_rekening}-${acc.sub_kegiatan || ''}`.trim();
+              rakMap[key] = acc;
+              fallbackMap[acc.kode_rekening] = acc;
             });
             
             // Merge with current DPA accounts
             const initialRak = {};
             dpaAccounts.forEach(acc => {
-              const existing = rakMap[acc.account];
+              const targetSubKegiatan = packageMetadata?.sub_kegiatan || acc.sub_kegiatan || '';
+              const key = `${acc.account}-${targetSubKegiatan}`.trim();
+              const existing = rakMap[key] || fallbackMap[acc.account];
+              
               if (existing) {
-                initialRak[acc.account] = { ...existing };
+                initialRak[acc.account] = { 
+                  ...existing,
+                  anggaran_tahun: acc.pagu, // ensure pagu matches current DPA
+                  program: packageMetadata?.program || existing.program || '',
+                  kegiatan: packageMetadata?.kegiatan || existing.kegiatan || '',
+                  sub_kegiatan: targetSubKegiatan
+                };
               } else {
                 initialRak[acc.account] = {
                   kode_rekening: acc.account,
@@ -68,6 +80,45 @@ export default function SmartRAKGrid({ dpaAccounts = [], satkerId, packageMetada
       }
     }));
   };
+
+  // Auto-save mechanism (Debounced)
+  useEffect(() => {
+    if (Object.keys(rakAccounts).length === 0 || isLoading || isSaving) return;
+
+    const timeoutId = setTimeout(() => {
+      const idSatker = satkerId || user?.idSatker || '67081';
+      const payload = {
+        satker_id: idSatker,
+        tahun_anggaran: new Date().getFullYear(),
+        nama_skpd: user?.department || 'Satuan Kerja',
+        nilai_anggaran: dpaAccounts.reduce((sum, acc) => sum + (acc.pagu || 0), 0),
+        file_name: 'DPA-Integrasi-SmartRAK',
+        accounts: Object.values(rakAccounts).map(acc => ({
+          ...acc,
+          bulan_jan: parseFloat(acc.bulan_jan) || 0,
+          bulan_feb: parseFloat(acc.bulan_feb) || 0,
+          bulan_mar: parseFloat(acc.bulan_mar) || 0,
+          bulan_apr: parseFloat(acc.bulan_apr) || 0,
+          bulan_mei: parseFloat(acc.bulan_mei) || 0,
+          bulan_jun: parseFloat(acc.bulan_jun) || 0,
+          bulan_jul: parseFloat(acc.bulan_jul) || 0,
+          bulan_ags: parseFloat(acc.bulan_ags) || 0,
+          bulan_sep: parseFloat(acc.bulan_sep) || 0,
+          bulan_okt: parseFloat(acc.bulan_okt) || 0,
+          bulan_nov: parseFloat(acc.bulan_nov) || 0,
+          bulan_des: parseFloat(acc.bulan_des) || 0,
+        }))
+      };
+
+      fetch('/api/rak/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).catch(err => console.error('Auto-save RAK failed:', err));
+    }, 1500); // 1.5 seconds debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [rakAccounts, isLoading, isSaving, satkerId, user, dpaAccounts]);
 
   const bagiRata12Bulan = (accountCode) => {
     const acc = rakAccounts[accountCode];
@@ -165,19 +216,35 @@ export default function SmartRAKGrid({ dpaAccounts = [], satkerId, packageMetada
       {/* Informasi Metadata */}
       <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-4 mb-6 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          <div className="md:col-span-12">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Program</div>
+          <div className="md:col-span-3">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Kode Program</div>
+            <div className="text-[11px] font-semibold text-slate-800">{packageMetadata?.nomor_program || '-'}</div>
+          </div>
+          <div className="md:col-span-9">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Nama Program</div>
             <div className="text-[11px] font-semibold text-slate-800">{packageMetadata?.program || '-'}</div>
           </div>
-          <div className="md:col-span-12">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Kegiatan</div>
+          <div className="md:col-span-3">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Kode Kegiatan</div>
+            <div className="text-[11px] font-semibold text-slate-800">{packageMetadata?.nomor_kegiatan || '-'}</div>
+          </div>
+          <div className="md:col-span-9">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Nama Kegiatan</div>
             <div className="text-[11px] font-semibold text-slate-800">{packageMetadata?.kegiatan || '-'}</div>
           </div>
-          <div className="md:col-span-8">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Sub Kegiatan</div>
+          <div className="md:col-span-3">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Kode Sub Kegiatan</div>
+            <div className="text-[11px] font-semibold text-slate-800">{packageMetadata?.nomor_sub_kegiatan || '-'}</div>
+          </div>
+          <div className="md:col-span-4">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Nama Sub Kegiatan</div>
             <div className="text-[11px] font-semibold text-slate-800">{packageMetadata?.sub_kegiatan || '-'}</div>
           </div>
-          <div className="md:col-span-4 border-l border-slate-200 pl-4">
+          <div className="md:col-span-3">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Sumber Dana</div>
+            <div className="text-[11px] font-semibold text-slate-800">{packageMetadata?.sumber_dana || '-'}</div>
+          </div>
+          <div className="md:col-span-2 border-l border-slate-200 pl-4">
             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Nilai Anggaran</div>
             <div className="text-sm font-bold text-indigo-700">Rp {dpaAccounts.reduce((sum, acc) => sum + (acc.pagu || 0), 0).toLocaleString()}</div>
           </div>
@@ -191,7 +258,7 @@ export default function SmartRAKGrid({ dpaAccounts = [], satkerId, packageMetada
           {Object.entries(groupedAccounts).map(([subKegiatan, accounts]) => (
             <div key={subKegiatan} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full">
                   <span className="text-lg">📁</span>
                   <input
                     type="text"
@@ -201,7 +268,7 @@ export default function SmartRAKGrid({ dpaAccounts = [], satkerId, packageMetada
                       const newSub = e.target.value;
                       accounts.forEach(acc => handleInputChange(acc.kode_rekening, 'sub_kegiatan', newSub));
                     }}
-                    className="font-bold text-slate-800 text-sm bg-transparent border-b border-dashed border-slate-300 focus:border-indigo-500 focus:outline-none px-1 w-80"
+                    className="font-bold text-slate-800 text-sm bg-transparent border-b border-dashed border-slate-300 focus:border-indigo-500 focus:outline-none px-1 w-full"
                   />
                 </div>
               </div>
