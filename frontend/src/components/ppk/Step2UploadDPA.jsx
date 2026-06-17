@@ -88,6 +88,7 @@ export default function Step2UploadDPA() {
   const [isParsing, setIsParsing] = useState(false);
   const [parseProgress, setParseProgress] = useState(0);
   const [parseLogs, setParseLogs] = useState([]);
+  const [selectedIndices, setSelectedIndices] = useState(new Set());
   const [dpaOcrMode, setDpaOcrMode] = useState(false);
   const [sirupSearchQuery, setSirupSearchQuery] = useState('');
   const [isAnalyzingDpa, setIsAnalyzingDpa] = useState(false);
@@ -698,7 +699,21 @@ export default function Step2UploadDPA() {
                   <span>Klik pada kolom untuk melakukan Edit Inline</span>
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                {selectedIndices.size > 0 && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Hapus ${selectedIndices.size} rekening yang dipilih?`)) {
+                        setDpaAccounts(prev => prev.filter((_, i) => !selectedIndices.has(i)));
+                        setSelectedIndices(new Set());
+                      }
+                    }}
+                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Hapus Terpilih ({selectedIndices.size})</span>
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setDpaAccounts(prev => prev.map(acc => ({ ...acc, verified: true })));
@@ -716,11 +731,26 @@ export default function Step2UploadDPA() {
               <table className="w-full text-left border-collapse block md:table md:min-w-[1000px]">
                 <thead className="hidden md:table-header-group bg-slate-50/70">
                   <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    <th className="px-5 py-3 w-[140px]">Tingkat Keyakinan</th>
-                    <th className="px-5 py-3 w-[200px]">Kode Rekening</th>
-                    <th className="px-5 py-3 min-w-[300px]">Uraian Rekening</th>
-                    <th className="px-5 py-3 text-right w-[160px]">Pagu DPA</th>
-                    <th className="px-5 py-3 text-center w-[180px]">Aksi / Status</th>
+                    <th className="px-5 py-3 w-[40px] text-center border-b border-slate-200">
+                      <input 
+                        type="checkbox" 
+                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                        checked={dpaAccounts.length > 0 && selectedIndices.size === dpaAccounts.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIndices(new Set(dpaAccounts.map((_, i) => i)));
+                          } else {
+                            setSelectedIndices(new Set());
+                          }
+                        }}
+                        title="Pilih Semua"
+                      />
+                    </th>
+                    <th className="px-5 py-3 w-[140px] border-b border-slate-200">Tingkat Keyakinan</th>
+                    <th className="px-5 py-3 w-[200px] border-b border-slate-200">Kode Rekening</th>
+                    <th className="px-5 py-3 min-w-[300px] border-b border-slate-200">Uraian Rekening</th>
+                    <th className="px-5 py-3 text-right w-[160px] border-b border-slate-200">Pagu DPA</th>
+                    <th className="px-5 py-3 text-center w-[180px] border-b border-slate-200">Aksi / Status</th>
                   </tr>
                 </thead>
                 <tbody className="block md:table-row-group text-sm">
@@ -732,9 +762,24 @@ export default function Step2UploadDPA() {
                     const isUnverified = !acc.verified && (acc.pagu_method === 'fallback_max' || acc.ocr_engine === 'tesseract');
 
                     return (
-                      <tr key={index} className="block md:table-row bg-white border border-slate-200 md:border-x-0 md:border-t-0 md:border-b-slate-100 rounded-xl md:rounded-none mb-4 md:mb-0 p-4 md:p-0 relative hover:bg-slate-50/40 transition-colors">
+                      <tr key={index} className={`block md:table-row bg-white border border-slate-200 md:border-x-0 md:border-t-0 md:border-b-slate-100 rounded-xl md:rounded-none mb-4 md:mb-0 p-4 md:p-0 relative transition-colors ${selectedIndices.has(index) ? 'bg-indigo-50/50' : 'hover:bg-slate-50/40'}`}>
+                        {/* 0. Checkbox Column */}
+                        <td className="hidden md:table-cell px-5 py-3 border-b border-slate-100 text-center align-middle">
+                          <input 
+                            type="checkbox" 
+                            className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                            checked={selectedIndices.has(index)}
+                            onChange={(e) => {
+                              const newSet = new Set(selectedIndices);
+                              if (e.target.checked) newSet.add(index);
+                              else newSet.delete(index);
+                              setSelectedIndices(newSet);
+                            }}
+                          />
+                        </td>
+                        
                         {/* 1. Confidence Column */}
-                        <td className="block md:table-cell px-0 md:px-5 py-2 md:py-3 border-b border-dashed border-slate-200 md:border-0 mb-3 md:mb-0 pb-3 md:pb-0 flex justify-between items-center md:items-start md:block">
+                        <td className="block md:table-cell px-0 md:px-5 py-2 md:py-3 border-b border-dashed border-slate-200 md:border-b-slate-100 mb-3 md:mb-0 pb-3 md:pb-0 flex justify-between items-center md:items-start md:block align-middle">
                           <span className="md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider">Keyakinan AI</span>
                           <div className="flex items-center gap-2">
                             <span className={`w-2.5 h-2.5 rounded-full ${isHigh ? 'bg-emerald-500 animate-pulse' : isMedium ? 'bg-amber-400' : 'bg-rose-500'}`} />
@@ -745,8 +790,21 @@ export default function Step2UploadDPA() {
                         </td>
 
                         {/* 2. Kode Rekening Input */}
-                        <td className="block md:table-cell px-0 md:px-5 py-2 font-mono">
-                          <div className="md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kode Rekening</div>
+                        <td className="block md:table-cell px-0 md:px-5 py-2 font-mono border-b-0 md:border-b border-slate-100 align-middle">
+                          <div className="md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                            <span>Kode Rekening</span>
+                            <input 
+                              type="checkbox" 
+                              className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                              checked={selectedIndices.has(index)}
+                              onChange={(e) => {
+                                const newSet = new Set(selectedIndices);
+                                if (e.target.checked) newSet.add(index);
+                                else newSet.delete(index);
+                                setSelectedIndices(newSet);
+                              }}
+                            />
+                          </div>
                           <input
                             type="text"
                             value={acc.account}
@@ -757,7 +815,7 @@ export default function Step2UploadDPA() {
                         </td>
 
                         {/* 3. Uraian Rekening Input */}
-                        <td className="block md:table-cell px-0 md:px-5 py-2">
+                        <td className="block md:table-cell px-0 md:px-5 py-2 border-b-0 md:border-b border-slate-100 align-middle">
                           <div className="md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 mt-2">Uraian Rekening</div>
                           <textarea
                             value={acc.name}
@@ -769,7 +827,7 @@ export default function Step2UploadDPA() {
                         </td>
 
                         {/* 4. Pagu DPA Input */}
-                        <td className="block md:table-cell px-0 md:px-5 py-2 text-left md:text-right">
+                        <td className="block md:table-cell px-0 md:px-5 py-2 text-left md:text-right border-b-0 md:border-b border-slate-100 align-middle">
                           <div className="md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 mt-2">Pagu DPA</div>
                           <div className="flex items-center md:justify-end border border-slate-200 focus-within:border-indigo-500 rounded-lg px-3 py-1.5 hover:bg-slate-100/50 focus-within:bg-white transition-all w-fit md:ml-auto">
                             <span className="text-xs text-slate-400 font-sans mr-1.5 select-none">Rp</span>
@@ -784,7 +842,7 @@ export default function Step2UploadDPA() {
                         </td>
 
                         {/* 5. Aksi / Status */}
-                        <td className="block md:table-cell px-0 md:px-5 py-3 md:py-2 text-center md:whitespace-nowrap border-t border-dashed border-slate-200 md:border-0 mt-3 md:mt-0 pt-3 md:pt-0">
+                        <td className="block md:table-cell px-0 md:px-5 py-3 md:py-2 text-center md:whitespace-nowrap border-t border-dashed border-slate-200 md:border-b md:border-slate-100 md:border-t-0 mt-3 md:mt-0 pt-3 md:pt-0 align-middle">
                           <div className="flex flex-wrap items-center justify-between md:justify-center gap-2">
                             {isUnverified ? (
                               <button
