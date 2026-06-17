@@ -1059,7 +1059,7 @@ export default function Step4TemplateSurat() {
 
     {dppSpecs.justifikasiMerek && (
       <>
-        <div className="font-bold mt-4">C. Justifikasi Teknis Merek</div>
+        <div className="font-bold mt-4">C. Spesifikasi Tambahan / Catatan Kebutuhan</div>
         <p className="indent-8 mb-4 leading-relaxed whitespace-pre-wrap">{dppSpecs.justifikasiMerek}</p>
       </>
     )}
@@ -1194,8 +1194,8 @@ export default function Step4TemplateSurat() {
                 </td>
                 <td className="border border-slate-900 p-1 text-[9px] align-top">
                   {comp ? (comp.alasan || (hargaTayang < item.price 
-                    ? 'Harga e-Katalog lebih efisien dari pagu DPA' 
-                    : 'Sesuai pagu DPA, efisien')) : <span className="font-semibold text-emerald-800">Satu-satunya pelaku usaha potensial di wilayah kerja</span>}
+                    ? 'Harga e-Katalog terindikasi efisien (di bawah pagu DPA)' 
+                    : 'Harga e-Katalog wajar (sesuai pagu DPA)')) : <span className="font-semibold text-emerald-800">Satu-satunya penyedia lokal terdekat yang memenuhi kriteria teknis dan waktu layanan</span>}
                 </td>
               </tr>
             );
