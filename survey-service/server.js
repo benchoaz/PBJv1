@@ -1173,7 +1173,8 @@ async function searchItem(page, item, index) {
       searchImg: fs.existsSync(searchFile) ? `/screenshots/${safeId}_search.png` : null,
       success: isSuccess,
       comparators: comparators,
-      isFallbackScreenshot: !isDetailShot && isValidMatch
+      isFallbackScreenshot: !isDetailShot && isValidMatch,
+      minPrice: item.explicitMinPrice || null
     };
 
   } catch (err) {
@@ -1186,7 +1187,8 @@ async function searchItem(page, item, index) {
       img: null,
       searchImg: null,
       success: false,
-      error: err.message
+      error: err.message,
+      minPrice: item.explicitMinPrice || null
     };
   }
 }
