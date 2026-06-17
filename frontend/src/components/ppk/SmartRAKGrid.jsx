@@ -120,6 +120,17 @@ export default function SmartRAKGrid({ dpaAccounts = [], satkerId, packageMetada
     return () => clearTimeout(timeoutId);
   }, [rakAccounts, isLoading, isSaving, satkerId, user, dpaAccounts]);
 
+  const cleanUraian = (uraian) => {
+    if (!uraian) return '';
+    const junkRegex = /(Nama\s+[A-Z\s]+,\s*(SE|ST|MM|M\.Si|S\.Pd|M\.Pd|S\.E\.|S\.T\.|S\.Kom)|Tolak Ukur|Dana Yang|Jumlah Laporan|Kinerja|Indikator|Sumber Dana).*/i;
+    let match = uraian.match(junkRegex);
+    if (match) {
+      const idx = uraian.search(junkRegex);
+      return uraian.substring(0, idx).trim();
+    }
+    return uraian.trim();
+  };
+
   const bagiRata12Bulan = (accountCode) => {
     const acc = rakAccounts[accountCode];
     if (!acc || acc.anggaran_tahun <= 0) return;
@@ -316,7 +327,7 @@ export default function SmartRAKGrid({ dpaAccounts = [], satkerId, packageMetada
                           <tr className="hover:bg-slate-50/80 transition-colors">
                             <td className="px-3 py-3 border-r border-slate-100">
                               <div className="font-mono text-[10px] font-bold text-slate-700">{acc.kode_rekening}</div>
-                              <div className="text-[11px] text-slate-600 w-48 leading-tight mt-0.5">{acc.uraian}</div>
+                              <div className="text-[11px] text-slate-600 w-48 leading-tight mt-0.5">{cleanUraian(acc.uraian)}</div>
                             </td>
                             <td className="px-3 py-3 text-right text-[11px] font-bold text-indigo-700 border-r border-slate-100">
                               Rp {(acc.anggaran_tahun||0).toLocaleString()}

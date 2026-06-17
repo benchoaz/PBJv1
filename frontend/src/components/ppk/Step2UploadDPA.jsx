@@ -39,6 +39,17 @@ function findBestSirupMatch(acc, packages, selectedPack = null) {
   return bestScore >= 40 ? { ...bestPack, _score: bestScore } : null;
 }
 
+const cleanUraian = (uraian) => {
+  if (!uraian) return '';
+  const junkRegex = /(Nama\s+[A-Z\s]+,\s*(SE|ST|MM|M\.Si|S\.Pd|M\.Pd|S\.E\.|S\.T\.|S\.Kom)|Tolak Ukur|Dana Yang|Jumlah Laporan|Kinerja|Indikator|Sumber Dana).*/i;
+  let match = uraian.match(junkRegex);
+  if (match) {
+    const idx = uraian.search(junkRegex);
+    return uraian.substring(0, idx).trim();
+  }
+  return uraian.trim();
+};
+
 export default function Step2UploadDPA() {
   const { 
     docSettings, setDocSettings,
@@ -140,7 +151,7 @@ export default function Step2UploadDPA() {
       if (data.success && data.accounts?.length > 0) {
         const mapped = data.accounts.map(acc => ({
           account: acc.kode_rekening,
-          name: acc.uraian_rekening,
+          name: cleanUraian(acc.uraian_rekening),
           pagu: acc.pagu_dpa,
           confidence: acc.confidence,
           ocr_engine: acc.ocr_engine,
@@ -546,7 +557,7 @@ export default function Step2UploadDPA() {
                       const isMatched = r.kode_rekening === acc.kode_rekening
                       return {
                         account: r.kode_rekening,
-                        name: r.uraian,
+                        name: cleanUraian(r.uraian),
                         // JIKA cocok dengan RUP terpilih, pagu wajib sama dengan pagu RUP Resmi (MAK)!
                         pagu: isMatched && selectedPack ? selectedPack.pagu : r.pagu,
                         confidence: r.confidence || 95,
