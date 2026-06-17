@@ -774,7 +774,8 @@ export default function Step3RincianHPS() {
           searchImg: r.searchImg,
           success: r.success,
           location: r.location || r.location_name || r.address || '',
-          comparators: r.comparators || []
+          comparators: r.comparators || [],
+          minPrice: r.minPrice || null
         })),
         timestamp: new Date().toLocaleString('id-ID')
       });
@@ -902,7 +903,8 @@ export default function Step3RincianHPS() {
           searchImg: singleRes.searchImg || singleRes.img,
           success: singleRes.success,
           location: singleRes.location || singleRes.location_name || singleRes.address || '',
-          comparators: singleRes.comparators || []
+          comparators: singleRes.comparators || [],
+          minPrice: singleRes.minPrice || null
         };
         if (prodIdx !== -1) {
           updatedProducts[prodIdx] = newProductObj;
