@@ -1042,7 +1042,7 @@ export default function Step4TemplateSurat() {
     {/* BAB II */}
     <div className="font-bold uppercase mt-8 mb-2 text-center">BAB I. PRIORITAS PENGGUNAAN PRODUK DALAM NEGERI (PDN) & UMK</div>
     <p className="indent-8 mb-2 text-justify">
-      Mengacu pada Pasal 66 Peraturan Presiden Nomor 16 Tahun 2018 tentang Pengadaan Barang/Jasa Pemerintah sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021, serta Instruksi Presiden Nomor 2 Tahun 2022, Pejabat Pembuat Komitmen (PPK) diwajibkan untuk mengutamakan penggunaan produk dalam negeri dan memberdayakan Pelaku Usaha Mikro, Usaha Kecil, dan Koperasi. Pemilihan produk dalam proses <em>e-Purchasing</em> ini dilakukan dengan mempedomani hierarki prioritas sebagai berikut:
+      Mengacu pada Pasal 66 Peraturan Presiden Nomor 16 Tahun 2018 tentang Pengadaan Barang/Jasa Pemerintah sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021, serta Instruksi Presiden Nomor 2 Tahun 2022, proses pengadaan ini diwajibkan untuk mengutamakan penggunaan produk dalam negeri dan memberdayakan Pelaku Usaha Mikro, Usaha Kecil, dan Koperasi. Oleh karena itu, pemilihan produk dalam proses <em>e-Purchasing</em> ini dilakukan dengan mempedomani hierarki prioritas sebagai berikut:
     </p>
     <ol className="list-decimal pl-12 mb-6 text-justify pr-4">
       <li className="pl-1 mb-1">Barang/Jasa yang memiliki nilai Tingkat Komponen Dalam Negeri (TKDN) beserta nilai Bobot Manfaat Perusahaan (BMP) paling sedikit 40% (empat puluh persen).</li>
