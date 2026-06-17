@@ -1041,12 +1041,14 @@ export default function Step4TemplateSurat() {
 
     {/* BAB II */}
     <div className="font-bold uppercase mt-8 mb-2 text-center">BAB I. PRIORITAS PENGGUNAAN PRODUK DALAM NEGERI (PDN) & UMK</div>
-    <p className="indent-8 mb-2">Berdasarkan Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah, PPK mengutamakan penyedia dengan kualifikasi usaha kecil/koperasi serta produk dalam negeri berdasarkan tingkatan prioritas berikut:</p>
-    <ol className="list-decimal pl-12 mb-6">
-      <li>Produk Dalam Negeri (PDN) dengan nilai TKDN &ge; 25%.</li>
-      <li>PDN dengan nilai TKDN &lt; 25%.</li>
-      <li>Produk berlabel PDN namun belum memiliki nilai TKDN.</li>
-      <li>Produk Impor (jika tidak ada pilihan lokal dan disertai justifikasi).</li>
+    <p className="indent-8 mb-2 text-justify">
+      Mengacu pada Pasal 66 Peraturan Presiden Nomor 16 Tahun 2018 tentang Pengadaan Barang/Jasa Pemerintah sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021, serta Instruksi Presiden Nomor 2 Tahun 2022, Pejabat Pembuat Komitmen (PPK) diwajibkan untuk mengutamakan penggunaan produk dalam negeri dan memberdayakan Pelaku Usaha Mikro, Usaha Kecil, dan Koperasi. Pemilihan produk dalam proses <em>e-Purchasing</em> ini dilakukan dengan mempedomani hierarki prioritas sebagai berikut:
+    </p>
+    <ol className="list-decimal pl-12 mb-6 text-justify pr-4">
+      <li className="pl-1 mb-1">Barang/Jasa yang memiliki nilai Tingkat Komponen Dalam Negeri (TKDN) beserta nilai Bobot Manfaat Perusahaan (BMP) paling sedikit 40% (empat puluh persen).</li>
+      <li className="pl-1 mb-1">Barang/Jasa Produk Dalam Negeri (PDN) dengan nilai TKDN kurang dari 40% (empat puluh persen).</li>
+      <li className="pl-1 mb-1">Barang/Jasa Produk Dalam Negeri (PDN) yang belum memiliki sertifikat TKDN namun diakui sebagai produk lokal.</li>
+      <li className="pl-1 mb-1">Barang/Jasa Impor, yang pemilihannya <strong>hanya dapat dilakukan</strong> dalam hal spesifikasi teknis tidak dapat dipenuhi oleh produk dalam negeri dan/atau volume produksi nasional tidak mencukupi, dibuktikan melalui justifikasi teknis yang memadai.</li>
     </ol>
 
     <div className="font-bold uppercase mt-8 mb-2 text-center">BAB II. SPESIFIKASI TEKNIS E-PURCHASING</div>
