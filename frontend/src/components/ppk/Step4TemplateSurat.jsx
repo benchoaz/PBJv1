@@ -44,6 +44,39 @@ function terbilang(angka) {
   return "Angka terlalu besar";
 }
 
+const getDynamicProductLink = (vendorName, keyword) => {
+  if (!vendorName || vendorName === 'TIDAK DITEMUKAN' || vendorName === 'PENYEDIA INAPROC') {
+    return `https://katalog.inaproc.id/search?keyword=${encodeURIComponent(keyword || '')}`;
+  }
+  const cleanVendor = vendorName.trim();
+  let vendorSlug = '';
+  
+  if (cleanVendor.includes('katalog.inaproc.id/')) {
+    try {
+      const fullUrl = cleanVendor.startsWith('http') ? cleanVendor : 'https://' + cleanVendor;
+      const urlObj = new URL(fullUrl);
+      const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+      vendorSlug = pathSegments[0] ? pathSegments[0].toLowerCase() : '';
+    } catch (e) {
+      // ignore
+    }
+  }
+  
+  if (!vendorSlug) {
+    if (cleanVendor.includes('katalog.inaproc.id/')) {
+      const match = cleanVendor.match(/katalog\.inaproc\.id\/([^/?&#]+)/);
+      vendorSlug = match ? match[1].toLowerCase() : cleanVendor.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    } else if (/^[a-z0-9][a-z0-9-]*[a-z0-9]$/i.test(cleanVendor) && cleanVendor.includes('-')) {
+      vendorSlug = cleanVendor.toLowerCase();
+    } else {
+      vendorSlug = cleanVendor.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+  }
+  
+  const q = keyword || '';
+  return `https://katalog.inaproc.id/${vendorSlug}?catalogueSearch=${encodeURIComponent(q)}`;
+};
+
 export default function Step4TemplateSurat() {
   const { 
     selectedPack, currentUser,
