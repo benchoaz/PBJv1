@@ -1272,7 +1272,11 @@ export default function Step4TemplateSurat() {
   }
   
   const hpsPrice = hpsPrices && hpsPrices[p.name] !== undefined ? hpsPrices[p.name] : p.price;
-  const searchUrl = `https://katalog.inaproc.id/search?keyword=${encodeURIComponent(p.name)}&maxPrice=${hpsPrice}`;
+  let regionCode = '35.13'; // Default Kab. Probolinggo
+  if (currentUser?.department?.toLowerCase().includes('surabaya')) regionCode = '35.78';
+  else if (currentUser?.department?.toLowerCase().includes('kota') && currentUser?.department?.toLowerCase().includes('probolinggo')) regionCode = '35.74';
+  
+  const searchUrl = `https://katalog.inaproc.id/search?keyword=${encodeURIComponent(p.name)}&maxPrice=${hpsPrice}&regionCode=${regionCode}`;
   const targetLinkHref = p.link && !p.link.includes('/search?keyword=') ? p.link : getDynamicProductLink(p.vendor, p.name);
 
   return (
