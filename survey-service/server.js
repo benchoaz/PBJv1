@@ -151,7 +151,7 @@ async function createIsolatedPage(proxyStr = null) {
   const browser = await getSharedBrowser(proxyStr);
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
-  await page.setViewport({ width: 1280, height: 900 });
+  await page.setViewport({ width: 900, height: 650, deviceScaleFactor: 2.0 });
   await page.setUserAgent(USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)]);
 
   if (proxyStr && proxyStr.split(':').length === 4) {
@@ -409,6 +409,14 @@ async function injectWatermark(page) {
       wm.innerText = '🔒 BUKTI SURVEI E-KATALOG\\n' + now.toLocaleString('id-ID');
       
       document.body.appendChild(wm);
+
+      // Sembunyikan elemen pengganggu (footer, sticky nav) agar fokus pada produk
+      const style = document.createElement('style');
+      style.innerHTML = `
+        footer, .footer, #footer, .site-footer, .global-footer, .main-footer { display: none !important; }
+        header, .header, #header, .navbar, .top-nav { position: static !important; }
+      `;
+      document.head.appendChild(style);
     });
   } catch (err) {
     console.error('Gagal menyuntikkan watermark:', err);
@@ -1418,7 +1426,7 @@ app.post('/api/survey/screenshot', async (req, res) => {
       , '--disable-blink-features=AutomationControlled']
     });
     const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 900 });
+    await page.setViewport({ width: 900, height: 650, deviceScaleFactor: 2.0 });
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
@@ -1462,7 +1470,7 @@ app.post('/api/survey/analyze', async (req, res) => {
       , '--disable-blink-features=AutomationControlled']
     });
     const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 900 });
+    await page.setViewport({ width: 900, height: 650, deviceScaleFactor: 2.0 });
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
