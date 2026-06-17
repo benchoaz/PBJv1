@@ -1276,7 +1276,8 @@ export default function Step4TemplateSurat() {
   if (currentUser?.department?.toLowerCase().includes('surabaya')) regionCode = '35.78';
   else if (currentUser?.department?.toLowerCase().includes('kota') && currentUser?.department?.toLowerCase().includes('probolinggo')) regionCode = '35.74';
   
-  const searchUrl = `https://katalog.inaproc.id/search?keyword=${encodeURIComponent(p.name)}&maxPrice=${hpsPrice}&regionCode=${regionCode}`;
+  const minPriceParam = p.minPrice ? `&minPrice=${p.minPrice}` : '';
+  const searchUrl = `https://katalog.inaproc.id/search?keyword=${encodeURIComponent(p.name)}&maxPrice=${hpsPrice}${minPriceParam}&regionCode=${regionCode}`;
   const targetLinkHref = p.link && !p.link.includes('/search?keyword=') ? p.link : getDynamicProductLink(p.vendor, p.name);
 
   return (
@@ -1285,7 +1286,7 @@ export default function Step4TemplateSurat() {
   <img src={imgSrc} alt={p.name} className="w-full h-auto object-contain border-2 border-slate-300 shadow-sm mb-2" style={{ maxHeight: '800px' }} />
   
   <div className="mt-4 bg-white p-3 border border-slate-200 rounded-md shadow-sm">
-      <div className="font-bold text-[11px] text-slate-800 mb-1">Tautan Hasil Pencarian (Berdasarkan Wilayah & Harga Max):</div>
+      <div className="font-bold text-[11px] text-slate-800 mb-1">Tautan Hasil Pencarian (Berdasarkan Wilayah, Harga Min & Max):</div>
       <a href={searchUrl} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:text-blue-900 underline break-all text-[10px] font-mono">{searchUrl}</a>
       
       <div className="font-bold text-[11px] text-slate-800 mt-4 mb-2">Tautan Produk Masing-Masing Penyedia Potensial:</div>
