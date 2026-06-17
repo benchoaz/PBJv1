@@ -21,4 +21,4 @@ def run_cmd(cmd):
     return os.WEXITSTATUS(status)
 
 host, user = '43.134.166.153', 'ubuntu'
-run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", f"{user}@{host}", "docker ps --format '{{.Names}}' && ls -la PBJv1"])
+run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", f"{user}@{host}", "docker exec pbjv1-db-1 psql -U postgres -d pbj_db -c '\\d budget_accounts'"])

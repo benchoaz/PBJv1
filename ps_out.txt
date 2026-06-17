@@ -1,0 +1,8 @@
+CONTAINER ID  IMAGE                                 COMMAND               CREATED       STATUS            PORTS       NAMES
+09f50ecf9404  docker.io/library/postgres:17-alpine  postgres              29 hours ago  Up 5 minutes ago              pbj_db_1
+2a0976b1aff6  localhost/pbj_scraper:latest          node src/index.js     29 hours ago  Up 4 minutes ago              pbj_scraper_1
+f4d09d938c04  localhost/pbj_survey-service:latest   node server.js        29 hours ago  Up 4 minutes ago              pbj_survey-service_1
+7db8ac86b94f  docker.io/library/redis:7-alpine      redis-server          29 hours ago  Up 4 minutes ago              pbj_redis_1
+9f3b509dd6a1  localhost/pbj_frontend:latest         nginx -g daemon o...  22 hours ago  Up 7 minutes ago              pbj_frontend_1
+3f7103c7ee78  localhost/pbj_api:latest              ./main                21 hours ago  Up 4 minutes ago              pbj_api_1
+4861f856a529  localhost/pbj_dpa-parser:latest       uvicorn main:app ...  20 hours ago  Up 1 second ago               pbj_dpa-parser_1

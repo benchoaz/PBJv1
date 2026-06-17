@@ -21,4 +21,12 @@ def run_cmd(cmd):
     return os.WEXITSTATUS(status)
 
 host, user = '43.134.166.153', 'ubuntu'
-run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", f"{user}@{host}", "docker ps --format '{{.Names}}' && ls -la PBJv1"])
+
+print("\nFixing database on VPS...")
+db_cmd = "docker exec pbjv1-db-1 psql -U postgres -d pbj_db -c \"ALTER TABLE budget_accounts DROP COLUMN IF EXISTS rka_document_id CASCADE;\""
+run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", f"{user}@{host}", db_cmd])
+
+print("\nRebuilding API and Frontend on VPS...")
+cmd_build = "cd PBJv1 && docker compose build api frontend && docker compose up -d api frontend"
+run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", f"{user}@{host}", cmd_build])
+print("\nDone deploying fixes to VPS!")

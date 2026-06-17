@@ -21,4 +21,4 @@ def run_cmd(cmd):
     return os.WEXITSTATUS(status)
 
 host, user = '43.134.166.153', 'ubuntu'
-run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", f"{user}@{host}", "docker ps --format '{{.Names}}' && ls -la PBJv1"])
+run_cmd(["ssh", "-o", "StrictHostKeyChecking=no", f"{user}@{host}", "cat /home/ubuntu/PBJv1/docker-compose.yml"])

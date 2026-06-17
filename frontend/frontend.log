@@ -1,0 +1,35 @@
+nohup: ignoring input
+
+> pbj-frontend@1.0.0 dev
+> vite
+
+
+  VITE v5.4.21  ready in 1970 ms
+
+  ➜  Local:   http://localhost:3000/
+  ➜  Network: http://10.255.255.254:3000/
+  ➜  Network: http://172.23.130.16:3000/
+10:55:43 PM [vite] http proxy error: /screenshots/item_0__Pembinaan_LINMAS___Snack__Sna_detail.png
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)
+10:56:58 PM [vite] http proxy error: /api/survey/run
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)
+10:57:00 PM [vite] http proxy error: /api/survey/run
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)
+10:57:46 PM [vite] http proxy error: /api/survey/run
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)
+10:57:50 PM [vite] http proxy error: /api/survey/run
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)
+11:01:17 PM [vite] http proxy error: /api/survey/run
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)
+11:01:19 PM [vite] http proxy error: /api/survey/run
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)
+11:01:45 PM [vite] http proxy error: /api/survey/run
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16)
