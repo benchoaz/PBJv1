@@ -816,6 +816,7 @@ export default function Step4TemplateSurat() {
  const templatesStr = localStorage.getItem('pbj_templates');
  let templates = [];
  try { if (templatesStr) templates = JSON.parse(templatesStr); } catch (e) {}
+ if (!templates || templates.length === 0) templates = DEFAULT_TEMPLATES;
  
  const ndTemplate = templates.find(t => t.id === selectedNdTplId) || templates.find(t => t.id === 'TPL-001');
  
@@ -906,6 +907,7 @@ export default function Step4TemplateSurat() {
  const templatesStr = localStorage.getItem('pbj_templates');
  let templates = [];
  try { if (templatesStr) templates = JSON.parse(templatesStr); } catch (e) {}
+ if (!templates || templates.length === 0) templates = DEFAULT_TEMPLATES;
 
  const cat = getPacketCategory(selectedPack?.packName || '');
  let tplId = 'TPL-006A';
@@ -1099,9 +1101,10 @@ export default function Step4TemplateSurat() {
                       <a href={p.link} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 break-all">{p.name}</a>
                     </td>
                     <td className="border border-slate-900 p-1 text-xs text-slate-800">
-                      {p.vendor}
+                      <div className="font-semibold">{p.vendor}</div>
+                      <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 break-all text-[9px] print:text-[8px]">{p.link}</a>
                     </td>
-                    <td className="border border-slate-900 p-1 text-right text-xs text-slate-800">
+                    <td className="border border-slate-900 p-1 text-right text-xs text-slate-800 align-top">
                       {(p.price || 0).toLocaleString('id-ID')}
                     </td>
                   </tr>
@@ -1113,9 +1116,10 @@ export default function Step4TemplateSurat() {
                     rows.push(
                       <tr key={`comp-${pIdx}-${cIdx}`}>
                         <td className="border border-slate-900 p-1 text-xs text-slate-800">
-                          {comp.vendor}
+                          <div className="font-semibold">{comp.vendor}</div>
+                          {comp.link && <a href={comp.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 break-all text-[9px] print:text-[8px]">{comp.link}</a>}
                         </td>
-                        <td className="border border-slate-900 p-1 text-right text-xs text-slate-800">
+                        <td className="border border-slate-900 p-1 text-right text-xs text-slate-800 align-top">
                           {(comp.price || 0).toLocaleString('id-ID')}
                         </td>
                       </tr>
@@ -1262,19 +1266,40 @@ export default function Step4TemplateSurat() {
  <div className="font-bold uppercase mb-6 text-center border-b-2 border-slate-900 pb-2">LAMPIRAN: BUKTI TANGKAPAN LAYAR (SCREENSHOT) REFERENSI E-KATALOG LOKAL/NASIONAL</div>
  <div className="flex flex-col gap-8">
  {foundWithImages.map((p, index) => {
-  let imgSrc = p.img || p.searchImg;
+  let imgSrc = p.searchImg || p.img;
   if (imgSrc && imgSrc.startsWith('/screenshots/')) {
     imgSrc = window.location.origin + imgSrc;
   }
-  const linkHref = p.link && !p.link.includes('/search?keyword=') ? p.link : getDynamicProductLink(p.vendor, p.name);
+  
+  const hpsPrice = hpsPrices && hpsPrices[p.name] !== undefined ? hpsPrices[p.name] : p.price;
+  const searchUrl = `https://katalog.inaproc.id/search?keyword=${encodeURIComponent(p.name)}&maxPrice=${hpsPrice}`;
+  const targetLinkHref = p.link && !p.link.includes('/search?keyword=') ? p.link : getDynamicProductLink(p.vendor, p.name);
+
   return (
-  <div key={p.id} className="border border-slate-400 p-4 bg-slate-50" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-  <div className="font-bold mb-2 ">Gambar {index + 1}: {p.name} - {p.vendor}</div>
+  <div key={p.id} className="border border-slate-400 p-4 bg-slate-50 mb-8" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+  <div className="font-bold mb-2">Gambar {index + 1}: Hasil Pencarian e-Katalog untuk "{p.name}"</div>
   <img src={imgSrc} alt={p.name} className="w-full h-auto object-contain border-2 border-slate-300 shadow-sm mb-2" style={{ maxHeight: '800px' }} />
-  <div className="font-mono text-blue-800 break-all underline mt-2">
-  <a href={linkHref} target="_blank" rel="noopener noreferrer" className="hover:text-blue-900">{linkHref}</a>
- </div>
- <div className="font-bold mt-1 text-slate-800">Harga Tayang: Rp&nbsp;{(p.price || 0).toLocaleString('id-ID')}</div>
+  
+  <div className="mt-4 bg-white p-3 border border-slate-200 rounded-md shadow-sm">
+      <div className="font-bold text-[11px] text-slate-800 mb-1">Tautan Hasil Pencarian (Berdasarkan Wilayah & Harga Max):</div>
+      <a href={searchUrl} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:text-blue-900 underline break-all text-[10px] font-mono">{searchUrl}</a>
+      
+      <div className="font-bold text-[11px] text-slate-800 mt-4 mb-2">Tautan Produk Masing-Masing Penyedia Potensial:</div>
+      <ul className="list-disc pl-5 space-y-2">
+        <li className="text-[11px] text-slate-700">
+           <span className="font-semibold">{p.vendor}</span> - Rp {(p.price || 0).toLocaleString('id-ID')}
+           <br/>
+           <a href={targetLinkHref} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline break-all print:text-[10px]">{targetLinkHref}</a>
+        </li>
+        {p.comparators && p.comparators.map((comp, cIdx) => (
+          <li key={cIdx} className="text-[11px] text-slate-700">
+            <span className="font-semibold">{comp.vendor}</span> - Rp {(comp.price || 0).toLocaleString('id-ID')}
+            <br/>
+            <a href={comp.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline break-all print:text-[10px]">{comp.link}</a>
+          </li>
+        ))}
+      </ul>
+  </div>
  </div>
  );
  })}

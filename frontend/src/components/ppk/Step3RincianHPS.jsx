@@ -228,23 +228,33 @@ export default function Step3RincianHPS() {
 
     // If there is NO comparator or comparator price is 0
     if (!compVendor || cPrice === 0) {
-      if (targetIsZone1 || targetIsZone2) {
-        return `Pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) didasarkan pada kesesuaian harga tayang e-Katalog. Dari aspek logistik, penyedia berlokasi di ${targetLocLabel} yang mengefisienkan waktu pengiriman Mamin agar tetap segar saat dikerjakan. Hal ini juga selaras dengan aspek pemerataan penyedia lokal dalam SE Bupati Probolinggo.`;
+      if (isMamin) {
+        return `Pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) didasarkan pada kesesuaian harga tayang e-Katalog. Berdasarkan prinsip pengadaan yang efektif dan efisien, pemilihan ini didukung oleh aspek logistik penyedia yang berlokasi di ${targetLocLabel}. Lokasi yang strategis mengefisienkan waktu pengiriman Mamin agar terjamin kesegarannya (Food Safety) serta selaras dengan aspek pemberdayaan usaha lokal.`;
       }
-      return `Pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) didasarkan pada kesesuaian harga tayang e-Katalog. Dari sisi lokasi, penyedia berlokasi di ${targetLocLabel} yang memudahkan koordinasi logistik serah terima barang.`;
+      return `Pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) didasarkan pada kesesuaian spesifikasi teknis dan harga tayang e-Katalog. Dari sisi lokasi, penyedia berlokasi di ${targetLocLabel} yang sangat mendukung koordinasi operasional dan mempermudah proses serah terima barang.`;
     }
 
     if (diff > 0) {
-      if (targetIsZone1 || targetIsZone2) {
-        return `Pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) didasarkan pada harga tayang e-Katalog yang lebih efisien dibandingkan penyedia lainnya ${compVendor} (Rp ${formatPrice(cPrice)}) ${diffText}. Selain itu, dari aspek logistik, penyedia berlokasi di ${targetLocLabel} yang mengefisienkan waktu pengiriman Mamin agar tetap segar saat dikerjakan. Hal ini juga selaras dengan aspek pemerataan penyedia lokal dalam SE Bupati Probolinggo.`;
+      // Target is cheaper
+      if (isMamin) {
+         return `Pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) ditetapkan karena memberikan harga tayang e-Katalog yang lebih efisien dibandingkan ${compVendor} (Rp ${formatPrice(cPrice)}) ${diffText}. Selain pertimbangan ekonomis, dari aspek teknis dan logistik, lokasi penyedia di ${targetLocLabel} memastikan kecepatan waktu pengiriman sehingga kualitas dan kesegaran Mamin tetap terjaga. Hal ini sangat selaras dengan prinsip pengadaan yang efektif, efisien, dan pro-usaha lokal.`;
+      } else {
+         return `Pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) ditetapkan karena menawarkan harga e-Katalog yang lebih efisien dibandingkan referensi lain yaitu ${compVendor} (Rp ${formatPrice(cPrice)}) ${diffText}. Keputusan ini mengacu pada prinsip Pengadaan Barang/Jasa yang efektif dan efisien. Ditunjang oleh lokasi penyedia di ${targetLocLabel}, proses koordinasi logistik dan percepatan serah terima fisik barang dapat dilakukan dengan optimal.`;
       }
-      return `Pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) diberikan karena menawarkan harga tayang e-Katalog yang lebih kompetitif dibandingkan penyedia lainnya ${compVendor} (Rp ${formatPrice(cPrice)}) ${diffText}. Dari sisi lokasi, penyedia berlokasi di ${targetLocLabel} yang memudahkan koordinasi logistik serah terima barang.`;
+    } else if (diff === 0) {
+      // Prices are identical
+      if (isMamin) {
+         return `Berdasarkan survei e-Katalog, penyedia ${targetVendor || 'Kandidat Produk'} dan referensi ${compVendor} menawarkan harga yang sama persis yaitu Rp ${formatPrice(tPrice)}. Mengacu pada pedoman Pengadaan Barang/Jasa terkait kondisi penawaran harga yang sama, pemilihan ${targetVendor || 'Kandidat Produk'} diprioritaskan berdasarkan pertimbangan mitigasi risiko pengiriman dan jaminan kesegaran produk (Food Safety). Penyedia berlokasi di ${targetLocLabel} yang dinilai paling efisien secara jarak, waktu, dan sangat mendukung kebijakan pemberdayaan penyedia lokal setempat.`;
+      } else {
+         return `Berdasarkan hasil survei e-Katalog, penyedia ${targetVendor || 'Kandidat Produk'} dan referensi ${compVendor} menawarkan harga yang identik yaitu Rp ${formatPrice(tPrice)}. Sesuai dengan kaidah Pengadaan Barang/Jasa Pemerintah (Perpres 16/2018 jo Perpres 12/2021), apabila terdapat penawaran harga yang sama, evaluasi dilanjutkan dengan memprioritaskan capaian Tingkat Komponen Dalam Negeri (TKDN), kapasitas dan kesiapan stok penyedia, serta rekam jejak kinerja. Berdasarkan pertimbangan tersebut serta efisiensi jarak logistik di ${targetLocLabel}, maka ${targetVendor || 'Kandidat Produk'} dinilai memberikan keuntungan teknis terbaik.`;
+      }
     } else {
-      const conditionText = tPrice === cPrice ? 'setara' : 'lebih efisien';
-      if (targetIsZone1 || targetIsZone2) {
-        return `Meskipun penyedia lainnya ${compVendor} ${conditionText} (Rp ${formatPrice(cPrice)}), pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) diprioritaskan berdasarkan efisiensi jarak dan waktu logistik. Penyedia berlokasi di ${targetLocLabel} yang memastikan Mamin tiba lebih cepat dan terjamin kesegarannya. Hal ini selaras dengan aspek pemerataan penyedia lokal dalam SE Bupati Probolinggo.`;
+      // Target is more expensive (diff < 0)
+      if (isMamin) {
+         return `Meskipun terdapat referensi dari ${compVendor} dengan penawaran lebih rendah (Rp ${formatPrice(cPrice)}), pemilihan penyedia ${targetVendor || 'Kandidat Produk'} (Rp ${formatPrice(tPrice)}) tetap ditetapkan dengan mendasarkan pada prinsip *Best Value for Money* dan manajemen risiko teknis logistik pengiriman Mamin. Penyedia berlokasi di ${targetLocLabel} yang menjamin kecepatan pengiriman untuk meminimalisir risiko keterlambatan konsumsi dan memastikan makanan/minuman tidak basi. Nilai efisiensi teknis ini dinilai sepadan dengan selisih harga tersebut.`;
+      } else {
+         return `Meskipun terdapat referensi ${compVendor} dengan harga yang secara nominal lebih rendah (Rp ${formatPrice(cPrice)}), pemilihan ${targetVendor || 'Kandidat Produk'} (Rp ${formatPrice(tPrice)}) ditetapkan berdasarkan prinsip *Best Value for Money* (Nilai Manfaat Uang). Pemilihan ini telah memperhitungkan secara komprehensif berbagai aspek teknis seperti kualitas barang, purna jual, pemenuhan kriteria Tingkat Komponen Dalam Negeri (TKDN), serta keandalan rekam jejak penyedia. Selain itu, kedekatan penyedia di ${targetLocLabel} signifikan mengurangi risiko operasional dan kendala distribusi barang.`;
       }
-      return `Meskipun penyedia lainnya ${compVendor} ${conditionText} (Rp ${formatPrice(cPrice)}), pemilihan penyedia ${targetVendor || 'Kandidat Produk Potensial'} (Rp ${formatPrice(tPrice)}) diberikan dengan pertimbangan efisiensi jarak pengiriman dan jaminan ketersediaan barang. Penyedia berlokasi di ${targetLocLabel} yang mempermudah koordinasi serta percepatan serah terima logistik.`;
     }
   };
 
