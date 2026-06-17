@@ -1110,7 +1110,7 @@ async function searchItem(page, item, index) {
 
       } catch (err) {
         console.log(`  ⚠️ Gagal buka detail (${err.message}), menggunakan data hasil pencarian`);
-        detailUrl = originalSearchUrl; // Revert link to match the fallback search screenshot
+        // detailUrl = originalSearchUrl; // DIHAPUS: Tetap pertahankan link produk asli agar tidak terjadi mismatch di dokumen!
         
         // --- VISUAL HIGHLIGHT FALLBACK ---
         console.log(`  → Menyuntikkan KOTAK MERAH pada hasil pencarian global...`);
@@ -1118,17 +1118,17 @@ async function searchItem(page, item, index) {
            await page.goto(originalSearchUrl, { waitUntil: 'networkidle2', timeout: 45000 });
            await randomDelay(3500, 6500); await autoScroll(page);
            
-           await page.evaluate((targetTitle) => {
+           await page.evaluate((targetHref) => {
               const anchors = Array.from(document.querySelectorAll('a[href]'));
               let targetElement = null;
               
-              // Cari kartu yang mengandung judul target
+              // Cari kartu yang secara spesifik memiliki URL/Link persis produk ini (menghindari produk kembar)
               for (const a of anchors) {
-                const text = a.innerText || '';
+                const href = a.getAttribute('href');
                 // Abaikan link header/footer
-                if (!a.getAttribute('href').startsWith('/') || a.getAttribute('href') === '/' || a.getAttribute('href') === '/search') continue;
+                if (!href || !href.startsWith('/') || href === '/' || href === '/search') continue;
                 
-                if (text.toLowerCase().includes(targetTitle.toLowerCase())) {
+                if (href.includes(targetHref)) {
                    targetElement = a;
                    break;
                 }
@@ -1153,8 +1153,8 @@ async function searchItem(page, item, index) {
                 targetElement.style.position = 'relative';
                 targetElement.style.zIndex = '9999';
                 targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }
-           }, bestCandidate.title);
+               }
+            }, bestCandidate.productHref);
            
            await new Promise(r => setTimeout(r, 1500)); // Tunggu render
            await injectWatermark(page);
