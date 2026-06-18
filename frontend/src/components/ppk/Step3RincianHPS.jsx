@@ -120,6 +120,27 @@ export default function Step3RincianHPS() {
   const [rakAccounts, setRakAccounts] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1); // 1-12
 
+  // Backward compatibility: saat surveyData dimuat dari context (sesi sebelumnya),
+  // inisialisasi screenshotStatus dari p.img yang sudah ada.
+  // Ini memastikan produk yang sudah punya screenshot lama tetap menampilkan 'done'.
+  useEffect(() => {
+    if (surveyData && surveyData.products) {
+      setScreenshotStatus(prev => {
+        const initialized = { ...prev };
+        let changed = false;
+        surveyData.products.forEach(p => {
+          // Hanya inisialisasi jika status belum diset sama sekali (undefined)
+          // dan produk memang sudah punya gambar screenshot valid
+          if (prev[p.id] === undefined && p.img && p.img.includes('/screenshots/')) {
+            initialized[p.id] = 'done';
+            changed = true;
+          }
+        });
+        return changed ? initialized : prev;
+      });
+    }
+  }, [surveyData]);
+
   useEffect(() => {
     const fetchRAK = async () => {
       try {
@@ -291,7 +312,7 @@ export default function Step3RincianHPS() {
       }
     } catch (e) {
       console.error(e);
-      alert('Gagal menghasilkan spesifikasi otomatis: ' + e.message);
+      dialog.error('Gagal menghasilkan spesifikasi otomatis: ' + e.message);
     } finally {
       setAiLoadingSpecIndex(null);
     }
@@ -785,12 +806,20 @@ export default function Step3RincianHPS() {
 
       setSurveyProgressPercent(100);
       setIsSurveying(false);
+      // Reset semua status screenshot agar tombol "Ambil Screenshot" muncul untuk semua produk baru
+      setScreenshotStatus({});
       setTimeout(() => setSurveyProgressPercent(0), 1000);
 
       if (results && results.wasCanceled) {
-        alert('⏹ Survei dihentikan oleh pengguna. Menyimpan data yang sudah berhasil diperoleh.');
+        dialog.warning(
+          'Data yang berhasil ditemukan sudah tersimpan.\n\nSelanjutnya: Klik tombol "📸 Ambil Semua Screenshot" untuk mengambil bukti gambar produk.',
+          '⏹ Survei Dihentikan'
+        );
       } else {
-        alert('⚡ Sistem PBJ: Survei E-Katalog otomatis telah selesai! Bukti tautan dan gambar telah dilampirkan.');
+        dialog.success(
+          'Data harga & link produk berhasil dikumpulkan dari e-Katalog LKPP.\n\nSelanjutnya: Klik tombol "📸 Ambil Semua Screenshot" di bawah untuk mengambil bukti gambar yang valid.',
+          '⚡ Survei Selesai!'
+        );
       }
 
     } catch (err) {
@@ -798,7 +827,7 @@ export default function Step3RincianHPS() {
       setIsSurveying(false);
       setSurveyProgress('');
       setSurveyProgressPercent(0);
-      alert('Gagal melakukan survei E-Katalog: ' + err.message);
+      dialog.error('Gagal melakukan survei E-Katalog:\n' + err.message, 'Survei Gagal');
     }
   };
 
@@ -913,6 +942,8 @@ export default function Step3RincianHPS() {
         }
         const updatedData = { ...surveyData, products: updatedProducts };
         setSurveyData(updatedData);
+        // Reset status screenshot item ini agar tombol ambil screenshot muncul kembali
+        setScreenshotStatus(prev => ({ ...prev, [newProductObj.id]: undefined }));
         // Update di konteks global (jika ingin disimpan permanen)
         const matchedAcc = getMatchingDpaAccount(selectedPack);
         const kodeRekening = matchedAcc?.account || `nosirup_${selectedPack?.noSirup}`;
@@ -977,23 +1008,35 @@ export default function Step3RincianHPS() {
         }
         
         if (singleRes.success) {
-           alert(`✅ Berhasil! Produk "${singleRes.name}" ditemukan.`);
+           dialog.success(`Produk "${singleRes.name}" ditemukan di e-Katalog.\nSilakan klik tombol "📸 Ambil Screenshot Bukti" untuk mengambil gambar.`, 'Pencarian Berhasil');
         } else {
-           alert(`⚠️ Pencarian ulang selesai, namun barang tidak ditemukan di e-Katalog.`);
+           dialog.warning('Pencarian ulang selesai, namun barang tidak ditemukan di e-Katalog.\nCoba gunakan kata kunci yang berbeda.', 'Barang Tidak Ditemukan');
         }
       }
     } catch (err) {
       console.error('Single survey error:', err);
-      alert('Gagal mencari ulang: ' + err.message);
+      dialog.error('Gagal mencari ulang:\n' + err.message, 'Pencarian Gagal');
     } finally {
       setLoadingProductIndex(null);
     }
   };
 
   const captureScreenshot = async (p) => {
+    if (!p.link) {
+      dialog.warning(`Link produk "${p.name}" tidak tersedia.\n\nCoba jalankan ulang survei untuk item ini.`, 'Link Tidak Tersedia');
+      return;
+    }
     try {
       setScreenshotStatus(prev => ({ ...prev, [p.id]: 'loading' }));
-      const screenshotUrl = getDynamicProductLink(p.vendor, p.name) || p.link;
+      
+      const hpsPrice = hpsPrices && hpsPrices[p.name] !== undefined ? hpsPrices[p.name] : p.price;
+      let regionCode = '35.13'; // Default Kab. Probolinggo
+      if (currentUser?.department?.toLowerCase().includes('surabaya')) regionCode = '35.78';
+      else if (currentUser?.department?.toLowerCase().includes('kota') && currentUser?.department?.toLowerCase().includes('probolinggo')) regionCode = '35.74';
+      
+      const minPriceParam = p.minPrice ? `&minPrice=${p.minPrice}` : '';
+      const screenshotUrl = `https://katalog.inaproc.id/search?keyword=${encodeURIComponent(p.name)}&maxPrice=${hpsPrice}${minPriceParam}&regionCode=${regionCode}`;
+
       const response = await fetch('/api/survey/screenshot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1002,16 +1045,19 @@ export default function Step3RincianHPS() {
       if (!response.ok) throw new Error('Gagal mengambil tangkapan layar');
       const data = await response.json();
       if (data.success && data.img) {
-        const updatedProducts = surveyData.products.map(prod => 
-          prod.id === p.id ? { ...prod, img: data.img, searchImg: data.img } : prod
-        );
-        setSurveyData({ ...surveyData, products: updatedProducts });
+        setSurveyData(prev => {
+          if (!prev || !prev.products) return prev;
+          const updatedProducts = prev.products.map(prod => 
+            prod.id === p.id ? { ...prod, img: data.img, searchImg: data.img } : prod
+          );
+          return { ...prev, products: updatedProducts };
+        });
       }
       setScreenshotStatus(prev => ({ ...prev, [p.id]: 'done' }));
     } catch (err) {
       console.error(err);
       setScreenshotStatus(prev => ({ ...prev, [p.id]: 'error' }));
-      alert(`Gagal tangkap layar untuk ${p.name}: ${err.message}`);
+      dialog.error(`Gagal mengambil screenshot untuk:\n"${p.name}"\n\nError: ${err.message}`, 'Screenshot Gagal');
     }
   };
 
@@ -1022,7 +1068,7 @@ export default function Step3RincianHPS() {
     const toCapture = activeData.products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN' && screenshotStatus[p.id] !== 'done');
     
     if (toCapture.length === 0) {
-      alert('Semua screenshot produk sudah tersedia atau tidak ada produk valid.');
+      dialog.alert('Semua screenshot produk sudah tersedia atau tidak ada produk valid.', 'Informasi', 'info');
       return;
     }
 
@@ -1058,13 +1104,15 @@ export default function Step3RincianHPS() {
     const indicesToSearch = [];
     const requestItems = [];
 
-    // Cari barang yang punya ketikan baru di customKeywords atau customTargets (baik sukses maupun gagal)
+    // Cari barang yang punya perubahan pada keyword, target, minPrice, atau maxPrice
     items.forEach((item, idx) => {
       const qty = item.qty === '' ? 0 : (item.qty || 0);
       const hasCustomKeyword = customKeywords[idx] && customKeywords[idx].trim() !== '';
       const hasCustomTarget = customTargets[idx] && customTargets[idx].trim() !== '';
+      const hasCustomMin = customMinPrices[idx] && customMinPrices[idx].toString().trim() !== '';
+      const hasCustomMax = customMaxPrices[idx] && customMaxPrices[idx].toString().trim() !== '';
       
-      if (qty > 0 && (hasCustomKeyword || hasCustomTarget)) {
+      if (qty > 0 && (hasCustomKeyword || hasCustomTarget || hasCustomMin || hasCustomMax)) {
         let itemQuery = hasCustomKeyword ? customKeywords[idx].trim() : autoCleanKeyword(item.name);
         if (category === 'Konsolidasi' && !itemQuery.toLowerCase().includes('konsolidasi')) {
           itemQuery += ' konsolidasi';
@@ -1086,7 +1134,7 @@ export default function Step3RincianHPS() {
     });
 
     if (requestItems.length === 0) {
-      alert("⚠️ Tidak ada barang yang diberi kata kunci baru. Ketikkan kata kuncinya dulu di kotak pencarian masing-masing barang!");
+      dialog.warning('Tidak ada perubahan kustom (Kata Kunci / Target Toko / Harga Min / Harga Max) yang ditemukan pada barang apa pun.\n\nSilakan isi salah satu parameter pencarian kustom terlebih dahulu!', 'Tidak Ada Perubahan');
       return;
     }
 
@@ -1263,11 +1311,11 @@ export default function Step3RincianHPS() {
       setIsSurveying(false);
       setTimeout(() => setSurveyProgressPercent(0), 1000);
       
-      alert(`✅ Berhasil mencari ulang! ${successCount} dari ${requestItems.length} barang ditemukan.`);
+      dialog.success(`${successCount} dari ${requestItems.length} barang berhasil ditemukan di e-Katalog.\n\nSelanjutnya klik "📸 Ambil Semua Screenshot" untuk bukti gambar.`, 'Pencarian Massal Selesai');
       
     } catch (err) {
       console.error(err);
-      alert('Terjadi kesalahan saat pencarian massal: ' + err.message);
+      dialog.error('Terjadi kesalahan saat pencarian massal:\n' + err.message, 'Pencarian Gagal');
       setIsSurveying(false);
       setSurveyProgressPercent(0);
     }
@@ -1956,7 +2004,7 @@ export default function Step3RincianHPS() {
                                                     onClick={() => {
                                                       const currentJustification = justifications[p.id] || '';
                                                       if (!currentJustification.trim()) {
-                                                        alert('Isi justifikasi terlebih dahulu sebelum diterapkan ke semua barang!');
+                                                        dialog.warning('Isi justifikasi terlebih dahulu sebelum diterapkan ke semua barang!', 'Justifikasi Kosong');
                                                         return;
                                                       }
                                                       const newJustifications = { ...justifications };
@@ -1974,25 +2022,33 @@ export default function Step3RincianHPS() {
                                                   </button>
                                                 </div>
                                               </div>
-                                              
+
                                               <div className="pt-2 border-t border-slate-200">
-                                                { (screenshotStatus[p.id] === 'done' || (p.img && p.img.includes('/screenshots/'))) ? (
+                                                { screenshotStatus[p.id] === 'done' ? (
                                                   <div className="text-[10px] font-bold text-emerald-600 flex items-center gap-1.5 bg-emerald-50 w-fit px-3 py-1.5 rounded-lg border border-emerald-200">
                                                     <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                                    <span>Screenshot Tersimpan</span>
+                                                    <span>✓ Bukti Screenshot Tersimpan</span>
                                                   </div>
                                                 ) : screenshotStatus[p.id] === 'loading' ? (
-                                                  <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1.5">
-                                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
-                                                    <span>Menyimpan Screenshot...</span>
+                                                  <div className="text-[10px] font-bold text-amber-600 flex items-center gap-1.5 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
+                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    <span>Mengambil screenshot...</span>
                                                   </div>
+                                                ) : screenshotStatus[p.id] === 'error' ? (
+                                                  <button
+                                                    onClick={() => captureScreenshot(p)}
+                                                    className="text-[10px] font-bold text-white bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm active:scale-95"
+                                                  >
+                                                    <Camera className="w-3.5 h-3.5" />
+                                                    <span>Gagal — Coba Lagi</span>
+                                                  </button>
                                                 ) : (
                                                   <button
                                                     onClick={() => captureScreenshot(p)}
-                                                    className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                                                    className="text-[10px] font-bold text-white bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 shadow-sm active:scale-95 border border-indigo-400"
                                                   >
-                                                    <Camera className="w-3.5 h-3.5 text-white" />
-                                                    <span>Sepakati &amp; Ambil Screenshot</span>
+                                                    <Camera className="w-3.5 h-3.5" />
+                                                    <span>📸 Ambil Screenshot Bukti</span>
                                                   </button>
                                                 )}
                                               </div>
@@ -2247,7 +2303,7 @@ export default function Step3RincianHPS() {
                             type="button"
                             onClick={() => {
                               setHpsValue(totalHps.toString())
-                              alert(`✅ Nilai HPS Resmi disetujui sebesar Rp ${totalHps.toLocaleString()} (Hasil kalkulasi survei pasar).`)
+                              dialog.success(`Nilai HPS Resmi telah disetujui:\n\nRp ${totalHps.toLocaleString('id-ID')}\n\nBerdasarkan hasil kalkulasi survei pasar e-Katalog.`, 'HPS Disetujui')
                             }}
                             className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-semibold px-4 py-2 rounded-xl transition-all text-[11px] active:scale-95 flex items-center gap-1.5 shadow-sm"
                           >
@@ -2263,25 +2319,94 @@ export default function Step3RincianHPS() {
 
               {surveyData && (
                 <div className="mb-6 bg-slate-50/50 p-5 rounded-2xl border border-slate-200/80">
-                  <div className="text-xs font-bold text-slate-800 mb-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="text-xs font-bold text-slate-800 mb-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-1.5 text-slate-900">
                       <FileText className="w-4 h-4 text-slate-600" />
                       <span>Referensi Hasil Survei e-Katalog (Kategori: {surveyData.category})</span>
                     </div>
-                    <div className="flex items-center gap-2 self-start">
-                      <button
-                        onClick={captureAllScreenshots}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-bold px-3 py-1 rounded shadow-sm transition-all flex items-center gap-1 active:scale-95"
-                        title="Ambil tangkapan layar untuk semua produk yang ditemukan"
-                      >
-                        <Camera className="w-3.5 h-3.5" />
-                        <span>Ambil Semua Screenshot</span>
-                      </button>
-                      <div className="text-[10px] text-slate-500 font-mono font-medium bg-slate-100 px-2 py-0.5 rounded">
-                        Terakhir diupdate: {surveyData.timestamp}
-                      </div>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                      {/* Hitung berapa produk sudah screenshot dan belum */}
+                      {(() => {
+                        const validProducts = surveyData.products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN');
+                        const doneCount = validProducts.filter(p => screenshotStatus[p.id] === 'done').length;
+                        const totalCount = validProducts.length;
+                        const allDone = doneCount === totalCount && totalCount > 0;
+                        const isAnyLoading = validProducts.some(p => screenshotStatus[p.id] === 'loading');
+                        return (
+                          <div className="flex flex-col items-end gap-1.5">
+                            {/* Progress indicator */}
+                            {totalCount > 0 && (
+                              <div className="flex items-center gap-2">
+                                <div className="flex gap-0.5">
+                                  {validProducts.map(p => (
+                                    <div
+                                      key={p.id}
+                                      className={`w-2 h-2 rounded-full transition-all ${
+                                        screenshotStatus[p.id] === 'done' ? 'bg-emerald-500' :
+                                        screenshotStatus[p.id] === 'loading' ? 'bg-amber-400 animate-pulse' :
+                                        'bg-slate-300'
+                                      }`}
+                                      title={p.name}
+                                    />
+                                  ))}
+                                </div>
+                                <span className={`text-[10px] font-bold ${
+                                  allDone ? 'text-emerald-600' : 'text-slate-500'
+                                }`}>
+                                  {doneCount}/{totalCount} screenshot
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={captureAllScreenshots}
+                                disabled={isAnyLoading || allDone}
+                                className={`text-[11px] font-bold px-4 py-2 rounded-xl shadow transition-all flex items-center gap-2 active:scale-95 ${
+                                  allDone
+                                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-300 cursor-not-allowed'
+                                    : isAnyLoading
+                                    ? 'bg-amber-100 text-amber-700 border border-amber-300 cursor-wait'
+                                    : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white border border-emerald-400 cursor-pointer'
+                                }`}
+                                title={allDone ? 'Semua screenshot sudah diambil' : 'Ambil tangkapan layar untuk semua produk yang ditemukan (pastikan survei sudah final)'}
+                              >
+                                {isAnyLoading ? (
+                                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Mengambil Screenshot...</span></>
+                                ) : allDone ? (
+                                  <><Check className="w-3.5 h-3.5" /><span>Semua Screenshot Tersimpan ✓</span></>
+                                ) : (
+                                  <><Camera className="w-4 h-4" /><span>📸 Ambil Semua Screenshot ({totalCount - doneCount} belum)</span></>
+                                )}
+                              </button>
+                              <div className="text-[9px] text-slate-400 font-mono bg-slate-100 px-2 py-0.5 rounded">
+                                {surveyData.timestamp}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
+                  {/* Panduan langkah untuk user */}
+                  {(() => {
+                    const validProducts = surveyData.products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN');
+                    const doneCount = validProducts.filter(p => screenshotStatus[p.id] === 'done').length;
+                    const allDone = doneCount === validProducts.length && validProducts.length > 0;
+                    if (allDone) return null;
+                    return (
+                      <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
+                        <span className="text-amber-500 text-lg mt-0.5">💡</span>
+                        <div>
+                          <p className="text-[11px] font-bold text-amber-800">Langkah selanjutnya setelah survei selesai:</p>
+                          <ol className="text-[10px] text-amber-700 mt-1 space-y-0.5 list-decimal list-inside">
+                            <li>Pastikan data harga & link di bawah sudah benar (klik "Lihat di e-Katalog" untuk verifikasi)</li>
+                            <li>Klik tombol <strong>"📸 Ambil Semua Screenshot"</strong> di atas untuk mengambil bukti gambar</li>
+                            <li>Screenshot akan otomatis tersimpan sebagai lampiran dokumen HPS</li>
+                          </ol>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   
                   <div className="flex gap-4 overflow-x-auto pb-3 pt-1">
                     {surveyData.products.map((p, idx) => {
@@ -2356,23 +2481,31 @@ export default function Step3RincianHPS() {
                                   </div>
                                   
                                   <div className="mt-2 pt-2 border-t border-slate-100">
-                                    { (screenshotStatus[p.id] === 'done' || (p.img && p.img.includes('/screenshots/'))) ? (
-                                      <div className="text-[9px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 w-fit px-2 py-1 rounded">
+                                    { screenshotStatus[p.id] === 'done' ? (
+                                      <div className="text-[9px] font-bold text-emerald-600 flex items-center gap-1.5 bg-emerald-50 w-fit px-2.5 py-1.5 rounded-lg border border-emerald-200">
                                         <Check className="w-3 h-3 text-emerald-600" />
-                                        <span>Screenshot Tersimpan</span>
+                                        <span>✓ Bukti Screenshot Tersimpan</span>
                                       </div>
                                     ) : screenshotStatus[p.id] === 'loading' ? (
-                                      <div className="text-[9px] font-bold text-slate-500 flex items-center gap-1">
-                                        <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
-                                        <span>Menyimpan...</span>
+                                      <div className="text-[9px] font-bold text-amber-600 flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        <span>Mengambil screenshot...</span>
                                       </div>
+                                    ) : screenshotStatus[p.id] === 'error' ? (
+                                      <button
+                                        onClick={() => captureScreenshot(p)}
+                                        className="text-[9px] font-bold text-white bg-red-500 hover:bg-red-600 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 w-full justify-center shadow-sm"
+                                      >
+                                        <Camera className="w-3 h-3" />
+                                        <span>Gagal — Coba Lagi</span>
+                                      </button>
                                     ) : (
                                       <button
                                         onClick={() => captureScreenshot(p)}
-                                        className="text-[9px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1.5 rounded transition-colors flex items-center gap-1 w-full justify-center shadow-sm"
+                                        className="text-[9px] font-bold text-white bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 w-full justify-center shadow-sm active:scale-95 border border-indigo-400"
                                       >
-                                        <Camera className="w-3 h-3 text-white" />
-                                        <span>Sepakati &amp; Ambil Screenshot</span>
+                                        <Camera className="w-3 h-3" />
+                                        <span>📸 Ambil Screenshot Bukti</span>
                                       </button>
                                     )}
                                   </div>
@@ -2529,7 +2662,7 @@ export default function Step3RincianHPS() {
                                     onClick={() => {
                                       const currentJustification = justifications[p.id] || '';
                                       if (!currentJustification.trim()) {
-                                        alert('Isi justifikasi terlebih dahulu sebelum diterapkan ke semua barang!');
+                                        dialog.warning('Isi justifikasi terlebih dahulu sebelum diterapkan ke semua barang!', 'Justifikasi Kosong');
                                         return;
                                       }
                                       const newJustifications = { ...justifications };
