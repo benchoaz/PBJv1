@@ -1220,7 +1220,9 @@ export default function Step3RincianHPS() {
           img: res.img,
           searchImg: res.searchImg,
           success: res.success,
-          location: res.location || res.location_name || res.address || ''
+          location: res.location || res.location_name || res.address || '',
+          comparators: res.comparators || [],
+          minPrice: res.minPrice || null
         };
 
         if (prodIdx !== -1) {
