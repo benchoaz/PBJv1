@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 
 const PPKContext = createContext();
@@ -147,7 +147,16 @@ export function PPKProvider({ children }) {
   }, [satkerId]);
 
   // Load state and Project tracking
-  const [currentProjectId, setCurrentProjectId] = useState(() => localStorage.getItem('pbj_current_project_id') || null);
+  const [currentProjectIdState, setCurrentProjectIdState] = useState(() => localStorage.getItem('pbj_current_project_id') || null);
+  const currentProjectIdRef = useRef(localStorage.getItem('pbj_current_project_id') || null);
+  const isSavingRef = useRef(false);
+
+  const setCurrentProjectId = (id) => {
+    currentProjectIdRef.current = id;
+    setCurrentProjectIdState(id);
+  };
+
+  const currentProjectId = currentProjectIdState;
   const [status, setStatus] = useState(() => localStorage.getItem('pbj_status') || 'Draft');
 
   // Persist effects
@@ -486,7 +495,13 @@ export function PPKProvider({ children }) {
   };
 
   const handleSimpanPaket = async (silent = false) => {
+    // Prevent overlapping saves to avoid duplicate creation race conditions
+    if (silent && isSavingRef.current) {
+      return;
+    }
+    
     try {
+      isSavingRef.current = true;
       if (!silent) setIsUpdating(true);
       let totalPagu = 0;
       if (selectedPack && selectedPack.pagu) {
@@ -534,14 +549,16 @@ export function PPKProvider({ children }) {
         })
       };
 
-      let res = await fetch(currentProjectId ? `/api/projects/${currentProjectId}` : '/api/projects', {
-        method: currentProjectId ? 'PUT' : 'POST',
+      const activeProjectId = currentProjectIdRef.current;
+      
+      let res = await fetch(activeProjectId ? `/api/projects/${activeProjectId}` : '/api/projects', {
+        method: activeProjectId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(submissionPayload)
       });
       
       // Auto-fallback: Jika PUT gagal karena project tidak ditemukan (404), buat baru (POST)
-      if (currentProjectId && res.status === 404) {
+      if (activeProjectId && res.status === 404) {
         console.warn('Proyek lama tidak ditemukan (404), membuat proyek baru sebagai fallback...');
         setCurrentProjectId(null);
         localStorage.removeItem('pbj_current_project_id');
@@ -558,12 +575,12 @@ export function PPKProvider({ children }) {
       }
       
       const savedData = await res.json();
-      if (!currentProjectId && savedData.id) {
+      if (!activeProjectId && savedData.id) {
         setCurrentProjectId(savedData.id.toString());
       }
       
       if (!silent) {
-        alert(currentProjectId ? '✅ Draft DPP berhasil diperbarui di Database Sentral!' : '✅ Draft DPP berhasil disimpan ke Database Sentral!');
+        alert(activeProjectId ? '✅ Draft DPP berhasil diperbarui di Database Sentral!' : '✅ Draft DPP berhasil disimpan ke Database Sentral!');
       }
     } catch (e) {
       console.error('Simpan paket error:', e);
@@ -572,6 +589,7 @@ export function PPKProvider({ children }) {
       }
     } finally {
       if (!silent) setIsUpdating(false);
+      isSavingRef.current = false;
     }
   };
 

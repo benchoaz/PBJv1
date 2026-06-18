@@ -1294,54 +1294,69 @@ export default function Step4TemplateSurat() {
  <div className="pt-4 space-y-3">
  {/* Lampiran Screenshot Jika Ada */}
  {getActiveSurveyData() && (() => {
- const foundWithImages = getActiveSurveyData().products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN' && (p.searchImg || p.img));
- if (foundWithImages.length === 0) return null;
+ const foundProducts = getActiveSurveyData().products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN');
+ if (foundProducts.length === 0) return null;
  return (
  <div className="mt-8 break-before-page" style={{ pageBreakBefore: 'always', breakBefore: 'page' }}>
  <div className="font-bold uppercase mb-6 text-center border-b-2 border-slate-900 pb-2">LAMPIRAN: BUKTI TANGKAPAN LAYAR (SCREENSHOT) REFERENSI E-KATALOG LOKAL/NASIONAL</div>
  <div className="flex flex-col gap-8">
- {foundWithImages.map((p, index) => {
+ {foundProducts.map((p, index) => {
   let imgSrc = p.searchImg || p.img;
   if (imgSrc && imgSrc.startsWith('/screenshots/')) {
     imgSrc = window.location.origin + imgSrc;
   }
-  
-  const hpsPrice = hpsPrices && hpsPrices[p.name] !== undefined ? hpsPrices[p.name] : p.price;
-  let regionCode = '35.13'; // Default Kab. Probolinggo
-  if (currentUser?.department?.toLowerCase().includes('surabaya')) regionCode = '35.78';
-  else if (currentUser?.department?.toLowerCase().includes('kota') && currentUser?.department?.toLowerCase().includes('probolinggo')) regionCode = '35.74';
-  
-  const minPriceParam = p.minPrice ? `&minPrice=${p.minPrice}` : '';
-  const searchUrl = `https://katalog.inaproc.id/search?keyword=${encodeURIComponent(p.name)}&maxPrice=${hpsPrice}${minPriceParam}&regionCode=${regionCode}`;
+
   const targetLinkHref = p.link && !p.link.includes('/search?keyword=') ? p.link : getDynamicProductLink(p.vendor, p.name);
 
+  // Kumpulkan semua penyedia: utama + comparators
+  const allProviders = [
+    { vendor: p.vendor, price: p.price, link: targetLinkHref, img: imgSrc, label: 'Penyedia Utama' },
+    ...(p.comparators || []).map((comp, cIdx) => {
+      let compImg = comp.img;
+      if (compImg && compImg.startsWith('/screenshots/')) compImg = window.location.origin + compImg;
+      return {
+        vendor: comp.vendor,
+        price: comp.price,
+        link: comp.link,
+        img: compImg,
+        label: `Penyedia Pembanding ${cIdx + 1}`
+      };
+    })
+  ];
+
   return (
-  <div key={p.id} className="border border-slate-400 p-4 bg-slate-50 mb-8" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-  <div className="font-bold mb-2">Gambar {index + 1}: Hasil Pencarian e-Katalog untuk "{p.name}"</div>
-  <img src={imgSrc} alt={p.name} className="w-full h-auto object-contain border-2 border-slate-300 shadow-sm mb-2" style={{ maxHeight: '800px' }} />
-  
-  <div className="mt-4 bg-white p-3 border border-slate-200 rounded-md shadow-sm">
-      <div className="font-bold text-[11px] text-slate-800 mb-1">Tautan Hasil Pencarian (Berdasarkan Wilayah, Harga Min & Max):</div>
-      <a href={searchUrl} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:text-blue-900 underline break-all text-[10px] font-mono">{searchUrl}</a>
-      
-      <div className="font-bold text-[11px] text-slate-800 mt-4 mb-2">Tautan Produk Masing-Masing Penyedia Potensial:</div>
-      <ul className="list-disc pl-5 space-y-2">
-        <li className="text-[11px] text-slate-700">
-           <span className="font-semibold">{p.vendor}</span> - Rp {(p.price || 0).toLocaleString('id-ID')}
-           <br/>
-           <a href={targetLinkHref} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline break-all print:text-[10px]">{targetLinkHref}</a>
-        </li>
-        {p.comparators && p.comparators.map((comp, cIdx) => (
-          <li key={cIdx} className="text-[11px] text-slate-700">
-            <span className="font-semibold">{comp.vendor}</span> - Rp {(comp.price || 0).toLocaleString('id-ID')}
-            <br/>
-            <a href={comp.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline break-all print:text-[10px]">{comp.link}</a>
-          </li>
-        ))}
-      </ul>
+  <div key={p.id} style={{ pageBreakBefore: 'always', breakBefore: 'page', marginBottom: '32px' }}>
+    {/* Header nama barang */}
+    <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', background: '#1e293b', color: 'white', padding: '6px 12px', marginBottom: '12px' }}>
+      Barang {index + 1}: {p.name}
+    </div>
+    {/* Blok per penyedia — semua seragam sebagai Penyedia Potensial */}
+    {allProviders.map((prov, pIdx) => (
+      <div key={pIdx} style={{ border: '1.5px solid #64748b', background: '#ffffff', marginBottom: '16px', padding: '10px', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+        {/* Info penyedia */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px', marginBottom: '8px' }}>
+          <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', background: '#f1f5f9', color: '#334155', padding: '2px 8px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+            Penyedia Potensial {pIdx + 1}
+          </span>
+          <span style={{ fontSize: '11px', fontWeight: 'bold' }}>{prov.vendor} — Rp {(prov.price || 0).toLocaleString('id-ID')}</span>
+        </div>
+        {/* Screenshot */}
+        {prov.img ? (
+          <img src={prov.img} alt={prov.vendor} style={{ width: '100%', maxHeight: '420px', objectFit: 'contain', border: '1px solid #cbd5e1', display: 'block' }} />
+        ) : (
+          <div style={{ width: '100%', minHeight: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '2px dashed #cbd5e1', background: '#f8fafc', padding: '16px', textAlign: 'center' }}>
+            <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#94a3b8' }}>Screenshot Belum Tersedia</span>
+            <span style={{ fontSize: '9px', color: '#94a3b8', marginTop: '4px' }}>Klik "📸 Ambil Screenshot Bukti" di halaman persiapan survei</span>
+          </div>
+        )}
+        {/* Tautan produk */}
+        <div style={{ marginTop: '6px', fontSize: '8px', color: '#475569', wordBreak: 'break-all' }}>
+          🔗 <a href={prov.link} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb' }}>{prov.link}</a>
+        </div>
+      </div>
+    ))}
   </div>
- </div>
- );
+  );
  })}
  </div>
  </div>

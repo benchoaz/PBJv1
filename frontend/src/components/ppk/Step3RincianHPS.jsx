@@ -1028,31 +1028,50 @@ export default function Step3RincianHPS() {
     }
     try {
       setScreenshotStatus(prev => ({ ...prev, [p.id]: 'loading' }));
-      
-      const hpsPrice = hpsPrices && hpsPrices[p.name] !== undefined ? hpsPrices[p.name] : p.price;
-      let regionCode = '35.13'; // Default Kab. Probolinggo
-      if (currentUser?.department?.toLowerCase().includes('surabaya')) regionCode = '35.78';
-      else if (currentUser?.department?.toLowerCase().includes('kota') && currentUser?.department?.toLowerCase().includes('probolinggo')) regionCode = '35.74';
-      
-      const minPriceParam = p.minPrice ? `&minPrice=${p.minPrice}` : '';
-      const screenshotUrl = `https://katalog.inaproc.id/search?keyword=${encodeURIComponent(p.name)}&maxPrice=${hpsPrice}${minPriceParam}&regionCode=${regionCode}`;
 
-      const response = await fetch('/api/survey/screenshot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: screenshotUrl, id: p.id })
-      });
-      if (!response.ok) throw new Error('Gagal mengambil tangkapan layar');
-      const data = await response.json();
-      if (data.success && data.img) {
-        setSurveyData(prev => {
-          if (!prev || !prev.products) return prev;
-          const updatedProducts = prev.products.map(prod => 
-            prod.id === p.id ? { ...prod, img: data.img, searchImg: data.img } : prod
-          );
-          return { ...prev, products: updatedProducts };
+      // ── Helper: ambil 1 screenshot dari 1 URL ─────────────────────────
+      const fetchScreenshot = async (url) => {
+        const response = await fetch('/api/survey/screenshot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
         });
+        if (!response.ok) throw new Error('Gagal mengambil tangkapan layar: ' + url);
+        const data = await response.json();
+        if (!data.success || !data.img) throw new Error('Respons tidak valid dari server screenshot');
+        return data.img;
+      };
+
+      // ── 1. Screenshot penyedia UTAMA ─────────────────────────────────
+      const mainImg = await fetchScreenshot(p.link);
+
+      // ── 2. Screenshot setiap COMPARATOR yang punya link produk ───────
+      const comparators = p.comparators || [];
+      const updatedComparators = [...comparators];
+      for (let i = 0; i < updatedComparators.length; i++) {
+        const comp = updatedComparators[i];
+        if (comp.link && comp.link.startsWith('http')) {
+          try {
+            const compImg = await fetchScreenshot(comp.link);
+            updatedComparators[i] = { ...comp, img: compImg };
+          } catch (compErr) {
+            console.warn(`Screenshot comparator ${i + 1} (${comp.vendor}) gagal:`, compErr.message);
+            // Lanjutkan meski satu comparator gagal
+          }
+        }
       }
+
+      // ── 3. Simpan ke surveyData ──────────────────────────────────────
+      setSurveyData(prev => {
+        if (!prev || !prev.products) return prev;
+        const updatedProducts = prev.products.map(prod =>
+          prod.id === p.id
+            ? { ...prod, img: mainImg, searchImg: mainImg, comparators: updatedComparators }
+            : prod
+        );
+        return { ...prev, products: updatedProducts };
+      });
+
       setScreenshotStatus(prev => ({ ...prev, [p.id]: 'done' }));
     } catch (err) {
       console.error(err);

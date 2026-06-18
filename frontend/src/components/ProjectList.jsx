@@ -24,6 +24,7 @@ export default function ProjectList() {
   const [ppkSignMethod, setPpkSignMethod] = useState('scan')
   const [ppkSignImg, setPpkSignImg] = useState('')
   const [ppkSignSaving, setPpkSignSaving] = useState(false)
+  const [selectedIds, setSelectedIds] = useState([])
   const { user } = useAuth()
   const navigate = useNavigate()
 
@@ -170,6 +171,34 @@ export default function ProjectList() {
       alert('Kesalahan: ' + err.message)
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      // Hanya bisa memilih yang statusnya Draft
+      setSelectedIds(filtered.filter(p => p.status === 'Draft').map(p => p.id))
+    } else {
+      setSelectedIds([])
+    }
+  }
+
+  const handleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
+  }
+
+  const handleHapusBanyak = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Anda yakin ingin MENGHAPUS ${selectedIds.length} paket terpilih?\n\nTindakan ini TIDAK DAPAT dibatalkan dan semua data DPP pada paket ini akan hilang permanen.`)) return;
+    setIsDeleting(true);
+    try {
+      await Promise.all(selectedIds.map(id => fetch(`/api/projects/${id}`, { method: 'DELETE' })));
+      setSelectedIds([]);
+      fetchProjects();
+    } catch (err) {
+      alert('Kesalahan saat menghapus: ' + err.message);
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -347,6 +376,17 @@ export default function ProjectList() {
               />
             </div>
 
+            {selectedIds.length > 0 && (
+              <button
+                onClick={handleHapusBanyak}
+                disabled={isDeleting || isUpdating}
+                className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm disabled:opacity-50 shrink-0"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                Hapus Terpilih ({selectedIds.length})
+              </button>
+            )}
+
             {/* View Toggle */}
             <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden shrink-0">
               <button onClick={() => setView('table')} className={`px-2.5 py-1.5 transition-colors ${view === 'table' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-50'}`}>
@@ -394,7 +434,19 @@ export default function ProjectList() {
             <table className="w-full text-sm min-w-[700px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/80">
-                  <th className="text-left px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 w-10">No</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 w-12">
+                    <div className="flex items-center gap-2">
+                      {user?.role !== 'PP' && (
+                        <input 
+                          type="checkbox" 
+                          onChange={handleSelectAll} 
+                          checked={selectedIds.length > 0 && selectedIds.length === filtered.filter(p => p.status === 'Draft').length} 
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                        />
+                      )}
+                      <span>No</span>
+                    </div>
+                  </th>
                   <th className="text-left px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">Nama Paket Pekerjaan</th>
                   <th className="text-right px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">Pagu (Rp.)</th>
                   <th className="text-center px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">Metode</th>
@@ -412,8 +464,22 @@ export default function ProjectList() {
                   const tgl = project.created_at ? new Date(project.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' }) : '-'
 
                   return (
-                    <tr key={project.id} className="hover:bg-indigo-50/30 transition-colors group">
-                      <td className="px-5 py-4 text-slate-400 font-mono text-xs">{idx + 1}</td>
+                    <tr key={project.id} className={`hover:bg-indigo-50/30 transition-colors group ${selectedIds.includes(project.id) ? 'bg-rose-50/50' : ''}`}>
+                      <td className="px-5 py-4 text-slate-400 font-mono text-xs">
+                        <div className="flex items-center gap-2">
+                          {user?.role !== 'PP' && project.status === 'Draft' ? (
+                            <input 
+                              type="checkbox" 
+                              checked={selectedIds.includes(project.id)} 
+                              onChange={() => handleSelect(project.id)} 
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer" 
+                            />
+                          ) : user?.role !== 'PP' ? (
+                            <span className="w-3.5 h-3.5 inline-block"></span>
+                          ) : null}
+                          <span>{idx + 1}</span>
+                        </div>
+                      </td>
                       <td className="px-4 py-4 max-w-xs">
                         <button
                           onClick={() => navigate(`/ppk/persiapan?paketId=${project.id}`)}

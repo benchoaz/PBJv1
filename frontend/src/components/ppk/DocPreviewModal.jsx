@@ -1252,47 +1252,54 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
             return (
               <React.Fragment key={p.id}>
                 <div className="border border-slate-400 p-4 bg-slate-50 mb-4" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                   <div className="font-bold text-lg mb-2 border-b border-slate-300 pb-2">Item {idx + 1}: {p.name} <span className="text-emerald-600 text-sm">(Daftar Produk Potensial)</span></div>
-                   <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                     <div><strong>Pelaku Usaha:</strong> {p.vendor}</div>
-                     <div><strong>Harga Tayang:</strong> Rp {(p.price || 0).toLocaleString('id-ID')}</div>
-                     <div className="col-span-2"><strong>Tautan (Link):</strong> <a href={linkHref} target="_blank" className="text-blue-600 break-all">{linkHref}</a></div>
-                   </div>
-                  {imgSrc && (
-                    <div className="mt-2 text-center">
-                      <div className="text-xs font-semibold text-slate-500 mb-1">Bukti Tangkapan Layar Katalog</div>
-                      <img src={imgSrc} alt="Tangkapan Layar" className="max-w-[450px] h-auto max-h-[260px] mx-auto border border-slate-200 shadow-sm" style={{ maxWidth: '450px', maxHeight: '260px' }} />
-                    </div>
-                  )}
+                   <div className="font-bold text-lg mb-4 border-b border-slate-300 pb-2">Item {idx + 1}: {p.name} <span className="text-emerald-600 text-sm">(Daftar Produk Potensial)</span></div>
+                   
+                   {(() => {
+                     const allProvs = [
+                       { vendor: p.vendor, price: p.price, link: linkHref, img: imgSrc },
+                       ...(p.comparators || []).map(c => {
+                         let cImg = c.img;
+                         if (cImg && cImg.startsWith('/screenshots/')) cImg = window.location.origin + cImg;
+                         return { vendor: c.vendor, price: c.price, link: c.link, img: cImg };
+                       })
+                     ];
+                     
+                     return allProvs.map((prov, pIdx) => (
+                       <div key={pIdx} className="border border-slate-300 bg-white mb-6 p-4 rounded-md shadow-sm" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                         {/* Info penyedia */}
+                         <div className="flex justify-between items-center border-b border-slate-200 pb-2 mb-3">
+                           <span className="text-xs font-bold uppercase bg-slate-100 text-slate-700 px-2 py-1 rounded border border-slate-300">
+                             Penyedia Potensial {pIdx + 1}
+                           </span>
+                           <span className="text-sm font-bold text-slate-800">
+                             {prov.vendor} — Rp {(prov.price || 0).toLocaleString('id-ID')}
+                           </span>
+                         </div>
+                         
+                         {/* Tautan */}
+                         <div className="text-xs text-slate-600 mb-3 break-all">
+                           🔗 <a href={prov.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">{prov.link}</a>
+                         </div>
+                         
+                         {/* Screenshot */}
+                         {prov.img ? (
+                           <div className="mt-2 text-center">
+                             <div className="text-xs font-semibold text-slate-500 mb-2">Bukti Tangkapan Layar — Detail Produk e-Katalog</div>
+                             <img src={prov.img} alt={prov.vendor} className="w-full h-auto mx-auto border border-slate-200 shadow-sm rounded-sm" style={{ maxWidth: '100%', maxHeight: '380px', objectFit: 'contain' }} />
+                           </div>
+                         ) : (
+                           <div className="mt-2 w-full py-8 flex flex-col items-center justify-center bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg text-center">
+                             <svg className="w-10 h-10 text-slate-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                             </svg>
+                             <span className="text-sm font-bold text-slate-500 mb-1">Screenshot Belum Ada</span>
+                             <span className="text-xs text-slate-400">Klik "📸 Ambil Screenshot Bukti" di halaman persiapan survei.</span>
+                           </div>
+                         )}
+                       </div>
+                     ));
+                   })()}
                 </div>
-                
-                {autoComparator && comp && (
-                  <div className="border border-slate-400 p-4 bg-amber-50 mb-8" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                    <div className="font-bold text-lg mb-2 border-b border-slate-300 pb-2">Pembanding Item {idx + 1}: {comp.name}</div>
-                    <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                      <div><strong>Pelaku Usaha:</strong> {comp.vendor}</div>
-                      <div><strong>Harga Tayang:</strong> Rp {(comp.price || 0).toLocaleString('id-ID')}</div>
-                      <div className="col-span-2"><strong>Tautan (Link):</strong> <a href={comp.link} target="_blank" className="text-blue-600 break-all">{comp.link}</a></div>
-                      <div className="col-span-2"><strong>Alasan:</strong> {comp.alasan || 'Harga e-Katalog lebih efisien dari harga pembanding'}</div>
-                    </div>
-                    {/* Kami tidak mengambil screenshot untuk pembanding demi kecepatan, tapi menyertakan tautannya */}
-                    <div className="mt-2 text-center italic text-slate-500 text-xs">
-                      Tangkapan layar tidak dilampirkan otomatis. Silakan merujuk pada tautan di atas untuk melihat detail produk pembanding.
-                    </div>
-                  </div>
-                )}
-                
-                {autoComparator && comp2 && (
-                  <div className="border border-slate-400 p-4 bg-amber-50 mb-8" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                    <div className="font-bold text-lg mb-2 border-b border-slate-300 pb-2">Pembanding 2 Item {idx + 1}: {comp2.name}</div>
-                    <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                      <div><strong>Pelaku Usaha:</strong> {comp2.vendor}</div>
-                      <div><strong>Harga Tayang:</strong> Rp {(comp2.price || 0).toLocaleString('id-ID')}</div>
-                      <div className="col-span-2"><strong>Tautan (Link):</strong> <a href={comp2.link} target="_blank" className="text-blue-600 break-all">{comp2.link}</a></div>
-                      <div className="col-span-2"><strong>Alasan:</strong> {comp2.alasan || 'Alternatif pembanding e-Katalog dengan harga lebih tinggi'}</div>
-                    </div>
-                  </div>
-                )}
               </React.Fragment>
             );
           })}

@@ -448,9 +448,7 @@ async function searchItem(page, item, index) {
         try {
           await page.goto(item.targetUrl, { waitUntil: 'networkidle2', timeout: 45000 });
           await randomDelay(3500, 6500); await autoScroll(page);
-          const detailFile = path.join(screenshotDir, safeId + '_detail.png');
-          await injectWatermark(page);
-          await page.screenshot({ path: detailFile, fullPage: false });
+          // [SCREENSHOT ON-DEMAND] Tidak ada screenshot di sini. Gambar diambil oleh user via tombol di frontend.
           
           const detailData = await page.evaluate(() => {
             let price = null, vendor = null;
@@ -480,8 +478,8 @@ async function searchItem(page, item, index) {
               vendor: detailData.vendor ? detailData.vendor : (item.targetVendor ? item.targetVendor.toUpperCase() : 'PENYEDIA TARGET'),
               price: bpPrice,
               link: item.targetUrl,
-              img: `/screenshots/${path.basename(detailFile)}`,
-              searchImg: `/screenshots/${path.basename(detailFile)}`,
+              img: null,
+              searchImg: null,
               success: true
             };
           }
@@ -504,7 +502,7 @@ async function searchItem(page, item, index) {
 
     let searchData = [];
     let successfulQuery = '';
-    let searchFile = path.join(screenshotDir, safeId + '_search.png');
+    // [SCREENSHOT ON-DEMAND] searchFile tidak lagi digunakan - screenshot diambil oleh frontend
 
     let searchScenarios = [];
     
@@ -516,6 +514,7 @@ async function searchItem(page, item, index) {
       // 3. Nama biasa: SULTONI → sultoni (mungkin salah, tapi dicoba)
       let vendorSlug;
       const rawVendor = item.targetVendor.trim();
+
       
       // Deteksi Cerdas Alias Vendor untuk vendor langganan lokal OPD
       const VENDOR_SLUG_ALIASES = {
@@ -751,16 +750,14 @@ async function searchItem(page, item, index) {
             }
             searchData = candidates;
             successfulQuery = query;
-            await injectWatermark(page);
-            await page.screenshot({ path: searchFile, fullPage: false });
+            // [SCREENSHOT ON-DEMAND] Tidak ada screenshot pencarian di sini.
           } else {
             // Merge results to ensure we have enough data for autoComparator
             searchData = [...searchData, ...candidates.filter(nc => 
               !searchData.some(sd => sd.productHref === nc.productHref)
             )];
             successfulQuery = query;
-            await injectWatermark(page);
-            await page.screenshot({ path: searchFile, fullPage: false });
+            // [SCREENSHOT ON-DEMAND] Tidak ada screenshot pencarian di sini.
             console.log(`    ✅ Berhasil menemukan ${candidates.length} produk dengan query: "${query}"`);
             
             // Break if we don't need comparator or if we have found at least one candidate from a different vendor
@@ -1020,7 +1017,6 @@ async function searchItem(page, item, index) {
         if (rNames.length > 0) detailUrl += '&regionNames=' + encodeURIComponent(rNames.join(','));
         if (rCodes.length > 0) detailUrl += '&regionCode=' + encodeURIComponent(rCodes.join(','));
     }
-    let detailFile = searchFile; // fallback to search screenshot
     let finalVendor = 'PENYEDIA INAPROC';
     let finalPrice = item.fallbackPrice;
     const originalSearchUrl = detailUrl;
@@ -1051,10 +1047,9 @@ async function searchItem(page, item, index) {
         }
         // -------------------------------------------
 
-        // Ambil screenshot detail asli
-        detailFile = path.join(screenshotDir, safeId + '_detail.png');
-        await page.screenshot({ path: detailFile, fullPage: false });
-        console.log(`  ✅ Screenshot detail disimpan: ${path.basename(detailFile)}`);
+        // [SCREENSHOT ON-DEMAND] Screenshot tidak diambil di sini.
+        // Gambar diambil oleh user via tombol di frontend setelah survei selesai.
+        console.log(`  ✅ Detail produk diverifikasi: ${directUrl}`);
 
         // Update harga atau vendor jika ada informasi yang lebih akurat di halaman detail
         const detailData = await page.evaluate(() => {
@@ -1156,11 +1151,8 @@ async function searchItem(page, item, index) {
                }
             }, bestCandidate.productHref);
            
-           await new Promise(r => setTimeout(r, 1500)); // Tunggu render
-           await injectWatermark(page);
-           // Timpa screenshot pencarian lama dengan yang sudah di-highlight
-           await page.screenshot({ path: searchFile, fullPage: false });
-           console.log(`  ✅ Highlight berhasil. Screenshot pencarian diperbarui.`);
+           // [SCREENSHOT ON-DEMAND] Highlight dilakukan tapi tidak di-screenshot di sini.
+           console.log(`  ✅ Detail gagal dibuka, link pencarian akan digunakan sebagai fallback.`);
         } catch (highlighterr) {
            console.log(`  ⚠️ Gagal melakukan highlight fallback: ${highlighterr.message}`);
         }
@@ -1168,7 +1160,6 @@ async function searchItem(page, item, index) {
       }
     }
 
-    const isDetailShot = detailFile !== searchFile;
     const isSuccess = !!bestCandidate;
 
     return {
@@ -1177,11 +1168,10 @@ async function searchItem(page, item, index) {
       price: isSuccess ? (finalPrice || item.fallbackPrice) : 0,
       link: detailUrl,
       location: bestCandidate ? bestCandidate.location : '',
-      img: isSuccess && isDetailShot ? `/screenshots/${safeId}_detail.png` : (fs.existsSync(searchFile) ? `/screenshots/${safeId}_search.png` : null),
-      searchImg: fs.existsSync(searchFile) ? `/screenshots/${safeId}_search.png` : null,
+      img: null,        // [SCREENSHOT ON-DEMAND] Gambar diambil oleh user via tombol di frontend
+      searchImg: null,  // [SCREENSHOT ON-DEMAND] Gambar diambil oleh user via tombol di frontend
       success: isSuccess,
       comparators: comparators,
-      isFallbackScreenshot: !isDetailShot && isValidMatch,
       minPrice: item.explicitMinPrice || null
     };
 
@@ -1409,6 +1399,14 @@ app.post('/api/survey/find-comparator', async (req, res) => {
 app.post('/api/survey/screenshot', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
+
+  // Deteksi apakah ini URL detail produk (path: /vendor/produk) atau URL pencarian
+  const isDetailUrl = (() => {
+    try {
+      const u = new URL(url);
+      return !u.pathname.startsWith('/search') && !u.search.includes('keyword=') && u.pathname.split('/').filter(Boolean).length >= 2;
+    } catch { return false; }
+  })();
   
   const jobId = Date.now().toString() + '_' + Math.floor(Math.random() * 1000);
   try {
@@ -1422,33 +1420,85 @@ app.post('/api/survey/screenshot', async (req, res) => {
         '--disable-gpu',
         '--window-size=1280,900',
         '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process'
-      , '--disable-blink-features=AutomationControlled']
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--disable-blink-features=AutomationControlled'
+      ]
     });
+
     const page = await browser.newPage();
-    await page.setViewport({ width: 900, height: 650, deviceScaleFactor: 2.0 });
+    // Viewport 1280px agar layout desktop e-Katalog terbuka penuh (2 kolom: gambar kiri, info kanan)
+    await page.setViewport({ width: 1280, height: 850, deviceScaleFactor: 1.5 });
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
+
+    console.log(`[Screenshot] Membuka URL (${isDetailUrl ? 'Detail Produk' : 'Pencarian'}): ${url}`);
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-    
-    // Tambah waktu tunggu agar konten (misal gambar produk) selesai dimuat
-    await randomDelay(3500, 6500); await autoScroll(page);
-    
-    // Gunakan metode yang aman (inject watermark) seperti survei di PPK
+
+    // Tunggu gambar produk selesai loading (lazy-load)
+    await randomDelay(4000, 6000);
+
+    if (isDetailUrl) {
+      // ─── Mode Detail Produk ─────────────────────────────────────────────
+      // Sembunyikan HANYA popup/cookie banner yang mengganggu, BUKAN header utama
+      // Header e-Katalog (logo INAPROC + menu) harus tetap terlihat agar tampak resmi
+      await page.evaluate(() => {
+        const toHide = [
+          '[class*="cookie"]', '[id*="cookie"]',
+          '[class*="popup"]',  '[id*="popup"]',
+          '[class*="chat"]',   '[id*="chat"]',
+          '[class*="whatsapp"]',
+          'footer', '.footer', '#footer',
+          '[class*="toast"]',  '[class*="notification"]'
+        ];
+        toHide.forEach(sel => {
+          try {
+            document.querySelectorAll(sel).forEach(el => {
+              if (el && el.style) el.style.setProperty('display', 'none', 'important');
+            });
+          } catch(e) {}
+        });
+      });
+
+      // Scroll ke area konten produk (gambar + harga) — di bawah header navbar
+      await page.evaluate(() => {
+        // Cari elemen gambar produk utama (biasanya tag img di area kiri)
+        const imgEl = document.querySelector('img[src*="inaproc"], img[alt*="produk"], img[class*="product"], .product-image img, .detail-image img');
+        if (imgEl) {
+          const rect = imgEl.getBoundingClientRect();
+          // Scroll agar gambar ada di 1/5 bagian atas viewport
+          window.scrollTo({ top: Math.max(0, window.scrollY + rect.top - 80), behavior: 'instant' });
+        } else {
+          // Fallback: scroll sedikit ke bawah melewati breadcrumb
+          window.scrollTo({ top: 100, behavior: 'instant' });
+        }
+      });
+
+      await randomDelay(1500, 2000);
+
+    } else {
+      // ─── Mode Pencarian / Grid ─────────────────────────────────────────
+      await autoScroll(page);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await randomDelay(800, 1200);
+    }
+
+    // Inject watermark resmi
     await injectWatermark(page);
-    
+
     const screenshotPath = path.join(screenshotDir, `manual_${jobId}.png`);
     await page.screenshot({ path: screenshotPath, fullPage: false });
-    
+
     await browser.close();
-    
+    console.log(`[Screenshot] Berhasil disimpan: manual_${jobId}.png`);
+
     res.json({ success: true, img: `/screenshots/manual_${jobId}.png` });
   } catch (err) {
     console.error('Manual screenshot error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 app.post('/api/survey/analyze', async (req, res) => {
   const { keyword, targetVendor, pagu } = req.body;
   if (!keyword) return res.status(400).json({ error: 'Keyword is required' });
