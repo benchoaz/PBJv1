@@ -1230,6 +1230,10 @@ export default function Step3RincianHPS() {
         } else {
           updatedProducts.push(newProductObj);
         }
+        
+        // Reset status screenshot karena produk baru saja dicari ulang
+        setScreenshotStatus(prev => ({ ...prev, [newProductObj.id]: undefined }));
+        
         if (res.success) {
           successCount++;
         }
