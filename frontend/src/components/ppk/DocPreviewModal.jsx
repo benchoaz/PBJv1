@@ -815,23 +815,23 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  content = content.replace(/(?:<p>\s*<br\s*\/?>\s*<\/p>|\s*<br\s*\/?>){2,}/g, '<br/>');
 
   // Inject PPK and PP Signatures
-  if (docSettingsFallback?.signatureMethodPpk === 'tte' && currentUser?.nip) {
+  if (docSettings?.signatureMethodPpk === 'tte' && currentUser?.nip) {
     const ppkNipLine = `NIP. ${currentUser?.nip}`;
     const tteBadgeSrc = getTteBadge(currentUser?.name || 'PPK', currentUser?.nip);
     content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${tteBadgeSrc}" alt="TTE PPK" style="display:block; max-height:85px; margin-top:6px; margin-bottom:4px;" />${ppkNipLine}`);
-  } else if (docSettingsFallback && docSettingsFallback.ttdPpk && currentUser?.nip) {
+  } else if (docSettings?.ttdPpk && currentUser?.nip) {
     const ppkNipLine = `NIP. ${currentUser?.nip}`;
-    const ttdPpkStyle = 'display:block; max-height:75px; max-width:200px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);';
-    content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${docSettingsFallback.ttdPpk}" alt="TTD PPK" style="${ttdPpkStyle}" />${ppkNipLine}`);
+    const ttdPpkStyle = 'display:block; max-height:85px; max-width:250px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);';
+    content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${docSettings.ttdPpk}" alt="TTD PPK" style="${ttdPpkStyle}" />${ppkNipLine}`);
   }
 
-  if (docSettingsFallback?.signatureMethodPp === 'tte' && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
+  if (docSettings?.signatureMethodPp === 'tte' && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
     const ppNipLine = `NIP. ${replacements['{{nip_pejabat_pengadaan}}']}`;
     const tteBadgeSrc = getTteBadge(replacements['{{nama_pejabat_pengadaan}}'] || 'Pejabat Pengadaan', replacements['{{nip_pejabat_pengadaan}}']);
     content = content.replace(new RegExp(ppNipLine, 'g'), `<img src="${tteBadgeSrc}" alt="TTE PP" style="display:block; max-height:85px; margin-top:6px; margin-bottom:4px;" />${ppNipLine}`);
-  } else if (docSettingsFallback && docSettingsFallback.ttdPp && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
+  } else if (docSettings?.ttdPp && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
     const ppNipLine = `NIP. ${replacements['{{nip_pejabat_pengadaan}}']}`;
-    content = content.replace(new RegExp(ppNipLine, 'g'), `<img src="${docSettingsFallback.ttdPp}" alt="TTD PP" style="display:block; max-height:75px; max-width:200px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);" />${ppNipLine}`);
+    content = content.replace(new RegExp(ppNipLine, 'g'), `<img src="${docSettings.ttdPp}" alt="TTD PP" style="display:block; max-height:85px; max-width:250px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);" />${ppNipLine}`);
   }
 
  return <div style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', textAlign: 'justify', fontSize: '12pt', fontFamily: 'Arial, sans-serif' }} dangerouslySetInnerHTML={{ __html: parseSmartColons(content) }} />;
@@ -944,23 +944,23 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  });
 
  // Inject PPK and PP Signatures
- if (docSettingsFallback?.signatureMethodPpk === 'tte' && currentUser?.nip) {
+ if (docSettings?.signatureMethodPpk === 'tte' && currentUser?.nip) {
    const ppkNipLine = `NIP. ${currentUser?.nip}`;
    const tteBadgeSrc = getTteBadge(currentUser?.name || 'PPK', currentUser?.nip);
    content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${tteBadgeSrc}" alt="TTE PPK" style="display:block; max-height:85px; margin-top:6px; margin-bottom:4px;" />${ppkNipLine}`);
- } else if (docSettingsFallback && docSettingsFallback.ttdPpk && currentUser?.nip) {
+ } else if (docSettings?.ttdPpk && currentUser?.nip) {
    const ppkNipLine = `NIP. ${currentUser?.nip}`;
-   const ttdPpkStyle = 'display:block; max-height:75px; max-width:200px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);';
-   content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${docSettingsFallback.ttdPpk}" alt="TTD PPK" style="${ttdPpkStyle}" />${ppkNipLine}`);
+   const ttdPpkStyle = 'display:block; max-height:85px; max-width:250px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);';
+   content = content.replace(new RegExp(ppkNipLine, 'g'), `<img src="${docSettings.ttdPpk}" alt="TTD PPK" style="${ttdPpkStyle}" />${ppkNipLine}`);
  }
 
- if (docSettingsFallback?.signatureMethodPp === 'tte' && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
+ if (docSettings?.signatureMethodPp === 'tte' && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
    const ppNipLine = `NIP. ${replacements['{{nip_pejabat_pengadaan}}']}`;
    const tteBadgeSrc = getTteBadge(replacements['{{nama_pejabat_pengadaan}}'] || 'Pejabat Pengadaan', replacements['{{nip_pejabat_pengadaan}}']);
    content = content.replace(new RegExp(ppNipLine, 'g'), `<img src="${tteBadgeSrc}" alt="TTE PP" style="display:block; max-height:85px; margin-top:6px; margin-bottom:4px;" />${ppNipLine}`);
- } else if (docSettingsFallback && docSettingsFallback.ttdPp && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
+ } else if (docSettings?.ttdPp && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
    const ppNipLine = `NIP. ${replacements['{{nip_pejabat_pengadaan}}']}`;
-   content = content.replace(new RegExp(ppNipLine, 'g'), `<img src="${docSettingsFallback.ttdPp}" alt="TTD PP" style="display:block; max-height:75px; max-width:200px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);" />${ppNipLine}`);
+   content = content.replace(new RegExp(ppNipLine, 'g'), `<img src="${docSettings.ttdPp}" alt="TTD PP" style="display:block; max-height:85px; max-width:250px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.1);" />${ppNipLine}`);
  }
 
  const parts = content.split('{{komponen_dinamis_dpp}}');
@@ -1329,9 +1329,9 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
    <div className="w-max min-w-[14rem] px-4 text-center space-y-1">
      <div>{(docSettings?.kotaSurat || (currentUser?.department?.toLowerCase().includes('besuk') ? 'Besuk' : (currentUser?.department || 'Probolinggo')))}, {formatTanggalIndo(tanggalSurat)}</div>
      <div className="font-bold uppercase">Pejabat Pembuat Komitmen,</div>
-     {docSettings.ttdPpk ? (
-       <div className="flex justify-center items-center h-24 my-2">
-         <img src={docSettings.ttdPpk} alt="TTD PPK" style={{ maxHeight: '96px', objectFit: 'contain', mixBlendMode: 'multiply' }} />
+     {docSettings?.ttdPpk ? (
+       <div className="flex justify-center">
+         <img src={docSettings.ttdPpk} alt="TTD PPK" style={{ maxHeight: '85px', maxWidth: '250px', width: 'auto', height: 'auto', objectFit: 'contain', mixBlendMode: 'multiply', margin: '6px 0 4px 0', filter: 'contrast(1.2)' }} />
        </div>
      ) : (
        <div className="h-24"></div>

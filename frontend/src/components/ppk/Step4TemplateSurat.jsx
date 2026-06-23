@@ -4,6 +4,19 @@ import { usePPK } from './PPKContext';
 import { Settings, Printer, Download, ClipboardList, Wand2 } from 'lucide-react';
 import { DEFAULT_TEMPLATES } from '../TemplateSuratManager';
 
+export const injectSignatureHelper = (htmlContent, name, nip, imgHtml) => {
+  if (!nip) return htmlContent;
+  if (name) {
+    const safeName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const safeNip = nip.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const sigBlockRegex = new RegExp(`(${safeName})([\\s\\r\\n]+NIP\\.\\s*${safeNip})`, 'g');
+    if (htmlContent.match(sigBlockRegex)) {
+      return htmlContent.replace(sigBlockRegex, `${imgHtml}$1$2`);
+    }
+  }
+  return htmlContent.replace(new RegExp(`NIP\\.\\s*${nip.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'), `${imgHtml}NIP. ${nip}`);
+};
+
 function terbilang(angka) {
   if (!angka) return "Nol";
   const huruf = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
@@ -77,6 +90,23 @@ const getDynamicProductLink = (vendorName, keyword) => {
   return `https://katalog.inaproc.id/${vendorSlug}?catalogueSearch=${encodeURIComponent(q)}`;
 };
 
+const getTteBadge = (name, nip) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="90" viewBox="0 0 220 90" style="border: 1px solid %23cbd5e1; border-radius: 6px; background: %23f8fafc; font-family: Arial, sans-serif; margin-top: 6px; margin-bottom: 6px; display: inline-block;">
+    <rect x="0" y="0" width="220" height="90" fill="%23f8fafc" rx="6" />
+    <rect x="10" y="10" width="70" height="70" fill="white" stroke="%23334155" stroke-width="1.5" />
+    <path d="M15 15h10v10H15zm0 15h10v10H15zm15-15h10v10H30zm0 15h10v10H30zm15-15h10v10H45zm0 15h10v10H45zm15 0h10v10H60zm0-15h10v10H60z" fill="%23334155" />
+    <path d="M20 20h20v20H20zm25 25h15v15H45z" fill="%23000" />
+    <text x="90" y="22" font-size="7" font-weight="bold" fill="%230f172a" letter-spacing="0.5">TANDA TANGAN ELEKTRONIK</text>
+    <text x="90" y="32" font-size="6" font-weight="bold" fill="%23475569">Sertifikat Elektronik Diterbitkan Oleh:</text>
+    <text x="90" y="42" font-size="7" font-weight="black" fill="%231e3a8a">BSrE BSSN</text>
+    <line x1="90" y1="48" x2="210" y2="48" stroke="%23cbd5e1" stroke-width="1" />
+    <text x="90" y="58" font-size="6.5" font-weight="bold" fill="%230f172a">${name}</text>
+    <text x="90" y="68" font-size="6" fill="%23475569">NIP: ${nip}</text>
+    <text x="90" y="78" font-size="5" font-weight="bold" fill="%2316a34a">✓ VERIFIED &amp; SECURED BY BSSN</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${svg}`;
+};
+
 export default function Step4TemplateSurat() {
   const { 
     selectedPack, currentUser,
@@ -88,6 +118,7 @@ export default function Step4TemplateSurat() {
     hpsValue, isHpsExemptSelected,
     surveyData, hpsPrices, getPackageItems,
     selectedTplId, setSelectedTplId, autoComparator,
+    selectedNdTplId, setSelectedNdTplId,
     comparisons
   } = usePPK();
 
@@ -881,6 +912,7 @@ export default function Step4TemplateSurat() {
  '{{nama_pekerjaan}}': (selectedPack.packName || '').replace(/\n/g, ' '),
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
  '{{sumber_dana}}': `${packageMetadata.sumber_dana || selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date().getFullYear()}`,
+ '{{tahun_anggaran}}': `${new Date().getFullYear()}`,
  '{{nama_ppk}}': currentUser?.name || '',
  '{{nip_ppk}}': currentUser?.nip || '',
  '{{nomor_surat}}': nomorBase.replace('{nomor}', '045.2'),
@@ -925,6 +957,33 @@ export default function Step4TemplateSurat() {
  Object.keys(replacements).forEach(key => {
  content = content.replace(new RegExp(key, 'g'), replacements[key]);
  });
+ 
+  if (docSettings?.signatureMethodPpk === 'tte' && currentUser?.nip) {
+    const tteBadgeSrc = getTteBadge(currentUser?.name || 'PPK', currentUser?.nip);
+    const imgHtml = `<img src="${tteBadgeSrc}" alt="TTE PPK" style="display:block; max-height:85px; margin-top:6px; margin-bottom:4px;" />`;
+    content = injectSignatureHelper(content, currentUser?.name, currentUser?.nip, imgHtml);
+  } else if (docSettings && docSettings.ttdPpk) {
+    if (currentUser?.nip) {
+      const ttdPpkStyle = 'display:block; max-height:85px; max-width:250px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.2);';
+      const imgHtml = `<img src="${docSettings.ttdPpk}" alt="TTD PPK" style="${ttdPpkStyle}" />`;
+      content = injectSignatureHelper(content, currentUser?.name, currentUser?.nip, imgHtml);
+    } else {
+      content = content.replace(/Pejabat Pembuat Komitmen,/g, `Pejabat Pembuat Komitmen,<br/><img src="${docSettings.ttdPpk}" alt="TTD PPK" style="display:block; max-height:85px; max-width:250px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.2);" />`);
+    }
+  }
+
+  if (docSettings?.signatureMethodPp === 'tte' && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
+    const ppName = replacements['{{nama_pejabat_pengadaan}}'];
+    const ppNip = replacements['{{nip_pejabat_pengadaan}}'];
+    const tteBadgeSrc = getTteBadge(ppName || 'Pejabat Pengadaan', ppNip);
+    const imgHtml = `<img src="${tteBadgeSrc}" alt="TTE PP" style="display:block; max-height:85px; margin-top:6px; margin-bottom:4px;" />`;
+    content = injectSignatureHelper(content, ppName, ppNip, imgHtml);
+  } else if (docSettings?.ttdPp && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
+    const ppName = replacements['{{nama_pejabat_pengadaan}}'];
+    const ppNip = replacements['{{nip_pejabat_pengadaan}}'];
+    const imgHtml = `<img src="${docSettings.ttdPp}" alt="TTD PP" style="display:block; max-height:85px; max-width:250px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.2);" />`;
+    content = injectSignatureHelper(content, ppName, ppNip, imgHtml);
+  }
  
  return <div style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', textAlign: 'justify', fontSize: '12pt', fontFamily: 'Arial, sans-serif' }} dangerouslySetInnerHTML={{ __html: parseSmartColons(content) }} />;
  }
@@ -973,6 +1032,7 @@ export default function Step4TemplateSurat() {
  '{{nama_pekerjaan}}': (selectedPack.packName || '').replace(/\n/g, ' '),
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
  '{{sumber_dana}}': `${packageMetadata.sumber_dana || selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date().getFullYear()}`,
+ '{{tahun_anggaran}}': `${new Date().getFullYear()}`,
  '{{nama_ppk}}': currentUser?.name || '',
  '{{nip_ppk}}': currentUser?.nip || '',
  '{{nomor_surat}}': nomorBase.replace('{nomor}', '045.2'),
@@ -1017,6 +1077,34 @@ export default function Step4TemplateSurat() {
  Object.keys(replacements).forEach(key => {
  content = content.replace(new RegExp(key, 'g'), replacements[key]);
  });
+
+ // Inject PPK and PP Signatures
+  if (docSettings?.signatureMethodPpk === 'tte' && currentUser?.nip) {
+    const tteBadgeSrc = getTteBadge(currentUser?.name || 'PPK', currentUser?.nip);
+    const imgHtml = `<img src="${tteBadgeSrc}" alt="TTE PPK" style="display:block; max-height:85px; margin-top:6px; margin-bottom:4px;" />`;
+    content = injectSignatureHelper(content, currentUser?.name, currentUser?.nip, imgHtml);
+  } else if (docSettings && docSettings.ttdPpk) {
+    if (currentUser?.nip) {
+      const ttdPpkStyle = 'display:block; max-height:85px; max-width:250px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.2);';
+      const imgHtml = `<img src="${docSettings.ttdPpk}" alt="TTD PPK" style="${ttdPpkStyle}" />`;
+      content = injectSignatureHelper(content, currentUser?.name, currentUser?.nip, imgHtml);
+    } else {
+      content = content.replace(/Pejabat Pembuat Komitmen,/g, `Pejabat Pembuat Komitmen,<br/><img src="${docSettings.ttdPpk}" alt="TTD PPK" style="display:block; max-height:85px; max-width:250px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.2);" />`);
+    }
+  }
+
+  if (docSettings?.signatureMethodPp === 'tte' && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
+    const ppName = replacements['{{nama_pejabat_pengadaan}}'];
+    const ppNip = replacements['{{nip_pejabat_pengadaan}}'];
+    const tteBadgeSrc = getTteBadge(ppName || 'Pejabat Pengadaan', ppNip);
+    const imgHtml = `<img src="${tteBadgeSrc}" alt="TTE PP" style="display:block; max-height:85px; margin-top:6px; margin-bottom:4px;" />`;
+    content = injectSignatureHelper(content, ppName, ppNip, imgHtml);
+  } else if (docSettings?.ttdPp && replacements['{{nip_pejabat_pengadaan}}'] && replacements['{{nip_pejabat_pengadaan}}'] !== '_______________________') {
+    const ppName = replacements['{{nama_pejabat_pengadaan}}'];
+    const ppNip = replacements['{{nip_pejabat_pengadaan}}'];
+    const imgHtml = `<img src="${docSettings.ttdPp}" alt="TTD PP" style="display:block; max-height:85px; max-width:250px; width:auto; height:auto; object-fit:contain; mix-blend-mode:multiply; margin-top:6px; margin-bottom:4px; filter:contrast(1.2);" />`;
+    content = injectSignatureHelper(content, ppName, ppNip, imgHtml);
+  }
 
  const parts = content.split('{{komponen_dinamis_dpp}}');
 
@@ -1380,8 +1468,15 @@ export default function Step4TemplateSurat() {
  </div>
 
  {/* Ruang kosong untuk tanda tangan basah */}
- <div className="h-24"></div>
-
+ {(() => {
+   if (docSettings?.signatureMethodPpk === 'tte' && currentUser?.nip) {
+     return <img src={getTteBadge(currentUser?.name || 'PPK', currentUser?.nip)} alt="TTE PPK" style={{ display: 'block', maxHeight: '85px', margin: '6px auto 4px auto' }} />;
+   } else if (docSettings?.ttdPpk) {
+     return <img src={docSettings.ttdPpk} alt="TTD PPK" style={{ display: 'block', maxHeight: '85px', maxWidth: '250px', width: 'auto', height: 'auto', objectFit: 'contain', mixBlendMode: 'multiply', margin: '6px auto 4px auto', filter: 'contrast(1.2)' }} />;
+   }
+   return <div style={{ height: '96px', width: '100%' }}></div>;
+ })()}
+ 
  <div className=" font-bold uppercase underline">
  {currentUser?.name}
  </div>

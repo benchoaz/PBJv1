@@ -326,16 +326,28 @@ export default function Step3RincianHPS() {
   
   const [ignorePriceLimit, setIgnorePriceLimit] = useState(false);
 
-  const handleTtdUpload = (e, role) => {
+  const handleTtdUpload = (e, type) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
-      const base64Str = event.target.result;
-      const key = role === 'ppk' ? 'ttdPpk' : 'ttdPp';
-      const newSettings = { ...docSettings, [key]: base64Str };
+      const base64data = event.target.result;
+      const newSettings = {
+        ...docSettings,
+        [type === 'ppk' ? 'ttdPpk' : 'ttdPp']: base64data
+      };
       setDocSettings(newSettings);
       localStorage.setItem('pbj_doc_settings', JSON.stringify(newSettings));
+      
+      // Save to backend immediately so it survives cache clears
+      const effectiveSatkerId = currentUser?.idSatker || (currentUser?.department ? currentUser.department.replace(/\s+/g, '_').toLowerCase() : '67081');
+      if (effectiveSatkerId) {
+        fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: `doc_settings_satker_${effectiveSatkerId}`, value: JSON.stringify(newSettings) })
+        }).catch(err => console.error('Failed to save signature to backend', err));
+      }
     };
     reader.readAsDataURL(file);
   };
