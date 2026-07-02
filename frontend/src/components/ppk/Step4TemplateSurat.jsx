@@ -1387,7 +1387,7 @@ export default function Step4TemplateSurat() {
  return (
  <div className="mt-8 break-before-page" style={{ pageBreakBefore: 'always', breakBefore: 'page' }}>
  <div className="font-bold uppercase mb-6 text-center border-b-2 border-slate-900 pb-2">LAMPIRAN: BUKTI TANGKAPAN LAYAR (SCREENSHOT) REFERENSI E-KATALOG LOKAL/NASIONAL</div>
- <div className="flex flex-col gap-8">
+ <div className="block" style={{ marginTop: '2rem' }}>
  {foundProducts.map((p, index) => {
   let imgSrc = p.searchImg || p.img;
   if (imgSrc && imgSrc.startsWith('/screenshots/')) {
@@ -1413,7 +1413,7 @@ export default function Step4TemplateSurat() {
   ];
 
   return (
-  <div key={p.id} style={{ pageBreakBefore: 'always', breakBefore: 'page', marginBottom: '32px' }}>
+  <div key={p.id} style={{ pageBreakBefore: index === 0 ? 'auto' : 'always', breakBefore: index === 0 ? 'auto' : 'page', marginBottom: '32px' }}>
     {/* Header nama barang */}
     <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', background: '#1e293b', color: 'white', padding: '6px 12px', marginBottom: '12px' }}>
       Barang {index + 1}: {p.name}
