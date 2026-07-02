@@ -225,7 +225,10 @@ export default function Step2UploadDPA() {
       const response = await fetch(`/api/sirup/satker/${target}?tahun=${new Date().getFullYear()}`);
       if (!response.ok) throw new Error(`Server returned error: ${response.status}`);
       const data = await response.json();
-      const pkgs = data.packages || data.data || (Array.isArray(data) ? data : null);
+      let pkgs = data.packages || data.data || (Array.isArray(data) ? data : null);
+      if (data.success && pkgs === null && data.total === 0) {
+        pkgs = []; // Use empty array if server returned null but success is true
+      }
       if (data.success !== false && pkgs) {
         setSirupPackages(pkgs);
         const nowIso = new Date().toISOString();

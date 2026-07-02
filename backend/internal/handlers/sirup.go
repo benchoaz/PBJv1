@@ -119,7 +119,7 @@ func (h *SirupHandler) GetSirupPackages(w http.ResponseWriter, r *http.Request) 
 		tahun = strconv.Itoa(time.Now().Year())
 	}
 
-	var packages []SirupPackage
+	packages := make([]SirupPackage, 0)
 	var useFallback bool
 
 	// ── Layer 1: Fetch langsung dari sirup.inaproc.id ─────────────────────────
@@ -197,7 +197,7 @@ func (h *SirupHandler) GetSirupPackages(w http.ResponseWriter, r *http.Request) 
 		}
 		
 		err := h.DB.Raw("SELECT no_sirup, pack_name, budget_allocation, procurement_method, budget_source, year FROM procurement_packs WHERE satker_id = ? AND year = ?", satkerID, tahun).Scan(&dbPackages).Error
-		if err == nil && len(dbPackages) > 0 {
+		if err == nil {
 			for _, dp := range dbPackages {
 				packages = append(packages, SirupPackage{
 					NoSirup:         dp.NoSirup,
@@ -218,6 +218,9 @@ func (h *SirupHandler) GetSirupPackages(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if packages == nil {
+		packages = make([]SirupPackage, 0)
+	}
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":  true,
 		"satkerId": satkerID,
