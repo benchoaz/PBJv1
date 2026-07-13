@@ -123,6 +123,7 @@ export default function RAKDashboard() {
                     <th className="px-4 py-3 sticky left-0 bg-slate-50 z-10 w-80 border-r border-slate-200 shadow-[1px_0_0_0_#e2e8f0]">Kode Rekening & Uraian</th>
                     <th className="px-3 py-3 text-right border-r border-slate-200">Pagu Total RAK</th>
                     <th className="px-4 py-3 text-right text-indigo-700 bg-indigo-50/50 border-r border-indigo-100">Anggaran Tersedia (Akumulatif)</th>
+                    <th className="px-3 py-3 text-right text-amber-600 border-r border-slate-200">Komitmen Belanja</th>
                     <th className="px-3 py-3 text-right text-rose-600 border-r border-slate-200">Realisasi Belanja</th>
                     <th className="px-4 py-3 text-right text-emerald-700">Sisa Anggaran Aktif</th>
                   </tr>
@@ -141,7 +142,7 @@ export default function RAKDashboard() {
 
                       rows.push(
                         <tr key={`header-${idx}`} className="bg-slate-100/80 border-y border-slate-200">
-                          <td colSpan="5" className="px-4 py-3 sticky left-0 space-y-1.5">
+                          <td colSpan="6" className="px-4 py-3 sticky left-0 space-y-1.5">
                             {(acc.program || acc.kegiatan) && (
                               <div className="flex flex-wrap items-center gap-2 mb-1">
                                 {acc.program && <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded shadow-sm">Program: {acc.program}</span>}
@@ -163,8 +164,9 @@ export default function RAKDashboard() {
                     
                     const months = ['bulan_jan','bulan_feb','bulan_mar','bulan_apr','bulan_mei','bulan_jun','bulan_jul','bulan_ags','bulan_sep','bulan_okt','bulan_nov','bulan_des'];
                     const anggaranTersedia = months.slice(0, currentMonth).reduce((sum, m) => sum + (acc[m] || 0), 0);
-                    const realisasi = 0; // Mock 0 for now since transaction module is not fully present
-                    const sisa = anggaranTersedia - realisasi;
+                    const komitmen = acc.total_komitmen || 0;
+                    const realisasi = acc.total_realisasi || 0;
+                    const sisa = anggaranTersedia - komitmen - realisasi;
 
                     rows.push(
                     <tr key={`row-${idx}`} className={`transition-colors ${!isValid ? 'bg-rose-50/80 hover:bg-rose-100' : 'hover:bg-slate-50'}`}>
@@ -178,6 +180,9 @@ export default function RAKDashboard() {
                       </td>
                       <td className="px-4 py-3 text-sm font-extrabold text-indigo-700 text-right whitespace-nowrap bg-indigo-50/30 border-r border-indigo-100/50">
                         Rp {anggaranTersedia.toLocaleString()}
+                      </td>
+                      <td className="px-3 py-3 text-xs font-semibold text-amber-500 text-right whitespace-nowrap border-r border-slate-100">
+                        Rp {komitmen.toLocaleString()}
                       </td>
                       <td className="px-3 py-3 text-xs font-semibold text-rose-500 text-right whitespace-nowrap border-r border-slate-100">
                         Rp {realisasi.toLocaleString()}

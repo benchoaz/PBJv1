@@ -55,6 +55,7 @@ func main() {
 		&models.SirupPackageSaved{},
 		&models.BudgetRealization{},
 		&models.ProjectAddendum{},
+		&models.BudgetCommitment{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate models: %v", err)
@@ -95,6 +96,7 @@ func main() {
 	sirupHandler := handlers.NewSirupHandler(gormDB)
 	budgetHandler := handlers.NewBudgetHandler(gormDB)
 	addendumHandler := handlers.NewAddendumHandler(gormDB)
+	refineTextHandler := handlers.NewRefineTextHandler(gormDB)
 
 	mux := http.NewServeMux()
 
@@ -127,6 +129,7 @@ func main() {
 	mux.HandleFunc("POST /api/projects", projectHandler.Create)
 	mux.HandleFunc("PUT /api/projects/{id}", projectHandler.Update)
 	mux.HandleFunc("DELETE /api/projects/{id}", projectHandler.Delete)
+	mux.HandleFunc("POST /api/projects/{id}/finalize", projectHandler.Finalize)
 	mux.HandleFunc("GET /api/projects/stats", projectHandler.Stats)
 	
 	// Reports Route
@@ -233,8 +236,8 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	// AI Generic Text Refinement endpoint
-	mux.HandleFunc("POST /api/ai/refine-text", handlers.RefineText)
+	// AI Generic Text Refinement endpoint (with DB-based key fallback)
+	mux.HandleFunc("POST /api/ai/refine-text", refineTextHandler.Handle)
 	mux.HandleFunc("OPTIONS /api/ai/refine-text", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -250,6 +253,14 @@ func main() {
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-AI-Provider, X-AI-Key")
 		w.WriteHeader(http.StatusOK)
 	})
+
+	// Debug logs reader endpoint
+	mux.HandleFunc("GET /api/debug-logs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "text/plain")
+		http.ServeFile(w, r, "./api_debug.log")
+	})
+
 
 	addr := ":8080"
 	if port := os.Getenv("PORT"); port != "" {

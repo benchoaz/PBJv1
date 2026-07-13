@@ -446,3 +446,71 @@ func (r *ProjectRepository) syncProjectWithSirup(p *models.Project) (bool, error
 
 	return false, nil
 }
+
+func (r *ProjectRepository) Finalize(id int64) error {
+	p, err := r.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if p == nil {
+		return fmt.Errorf("project not found")
+	}
+
+	var descMap map[string]interface{}
+	if err := json.Unmarshal([]byte(p.Description), &descMap); err != nil {
+		return fmt.Errorf("failed to parse project description: %v", err)
+	}
+
+	// Hapus komitmen lama agar tidak duplikat jika di-finalize ulang
+	r.gorm.Where("project_id = ?", id).Delete(&models.BudgetCommitment{})
+
+	// Hitung dan simpan komitmen per rekening DPA rincian
+	dpaRincianVal, ok := descMap["dpaRincian"]
+	if ok && dpaRincianVal != nil {
+		dpaRincian, ok := dpaRincianVal.(map[string]interface{})
+		if ok {
+			for reqCode, rincianRaw := range dpaRincian {
+				rincian, ok := rincianRaw.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				var pagu float64
+				if val, ok := rincian["pagu"]; ok {
+					if f, ok := val.(float64); ok {
+						pagu = f
+					}
+				}
+				if pagu == 0 {
+					if val, ok := rincian["harga_total"]; ok {
+						if f, ok := val.(float64); ok {
+							pagu = f
+						}
+					}
+				}
+
+				if pagu <= 0 {
+					continue
+				}
+
+				var budgetAccount models.BudgetAccount
+				err := r.gorm.Where("satker_id = ? AND tahun_anggaran = ? AND kode_rekening = ?",
+					p.IdSatker, p.CreatedAt.Year(), reqCode).First(&budgetAccount).Error
+				if err == nil {
+					commitment := models.BudgetCommitment{
+						ProjectID:       uint64(p.ID),
+						BudgetAccountID: budgetAccount.ID,
+						SatkerID:        p.IdSatker,
+						TahunAnggaran:   p.CreatedAt.Year(),
+						NamaPaket:       p.Name,
+						NilaiKomitmen:   pagu,
+					}
+					r.gorm.Create(&commitment)
+				}
+			}
+		}
+	}
+
+	_, err = r.db.Exec("UPDATE projects SET status = 'Final', updated_at = NOW() WHERE id = $1", id)
+	return err
+}

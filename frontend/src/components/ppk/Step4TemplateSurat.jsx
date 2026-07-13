@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePPK } from './PPKContext';
-import { Settings, Printer, Download, ClipboardList, Wand2 } from 'lucide-react';
+import { Settings, Printer, Download, ClipboardList, Wand2, ShieldCheck, AlertTriangle, Loader2 } from 'lucide-react';
 import { DEFAULT_TEMPLATES } from '../TemplateSuratManager';
 
 export const injectSignatureHelper = (htmlContent, name, nip, imgHtml) => {
@@ -119,27 +119,134 @@ export default function Step4TemplateSurat() {
     surveyData, hpsPrices, getPackageItems,
     selectedTplId, setSelectedTplId, autoComparator,
     selectedNdTplId, setSelectedNdTplId,
-    comparisons
+    comparisons, currentProjectId, status, loadProjectData
   } = usePPK();
 
   const [activeDocPreview, setActiveDocPreview] = useState(null);
   const [isEnhancingDPP, setIsEnhancingDPP] = useState({});
+  const [isFinalizing, setIsFinalizing] = useState(false);
+
+  const handleFinalizeBudget = async () => {
+    if (!currentProjectId) {
+      alert('Simpan draft terlebih dahulu sebelum memfinalisasi.');
+      return;
+    }
+    const isLock = status !== 'Final';
+    const confirmMsg = isLock
+      ? 'Apakah Anda yakin ingin memfinalisasi DPP dan mengunci komitmen anggaran untuk paket ini?\n\nAnggaran HPS paket akan dipotong dari RAK Dashboard dan pengeditan spesifikasi akan dikunci.'
+      : 'Apakah Anda yakin ingin membuka kunci anggaran?\n\nStatus paket akan kembali menjadi Draft.';
+      
+    if (!confirm(confirmMsg)) return;
+
+    setIsFinalizing(true);
+    try {
+      let res;
+      if (isLock) {
+        res = await fetch(`/api/projects/${currentProjectId}/finalize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } else {
+        res = await fetch(`/api/projects/${currentProjectId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'Draft' })
+        });
+      }
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+
+      alert(isLock ? '🔒 Anggaran berhasil dikunci!' : '🔓 Kunci anggaran dibuka kembali.');
+      if (loadProjectData) {
+        await loadProjectData(currentProjectId);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Gagal mengubah status anggaran: ' + err.message);
+    } finally {
+      setIsFinalizing(false);
+    }
+  };
+
 
   const enhanceDPPTextWithAI = async (field, currentText) => {
     if (!currentText || !currentText.trim()) return;
     setIsEnhancingDPP(prev => ({ ...prev, [field]: true }));
     try {
-      const response = await fetch('/api/ai/enhance-justification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: currentText })
-      });
-      const data = await response.json();
-      if (data.success) {
-        setDppSpecs(prev => ({ ...prev, [field]: data.result }));
-      } else {
-        alert('Gagal memproses teks dengan AI.');
+      const contextLabel = field === 'spesifikasiLayanan'
+        ? 'Spesifikasi Layanan Tambahan DPP'
+        : 'Justifikasi Pemilihan Merek DPP';
+
+      // Ambil SEMUA API key yang tersedia dari DB (satker-specific + global)
+      const checkOrder = ['deepseek', 'cohere', 'gemini', 'groq', 'openai', 'anthropic', 'mistral'];
+      const providersList = [];
+      try {
+        const satker = currentUser?.idSatker;
+        const keySources = [];
+
+        if (satker) {
+          const resSatker = await fetch(`/api/settings/ocr_api_keys_satker_${satker}`);
+          if (resSatker.ok) {
+            const dataSatker = await resSatker.json();
+            if (dataSatker.value) keySources.push(JSON.parse(dataSatker.value));
+          }
+        }
+        const resGlobal = await fetch('/api/settings/ocr_api_keys');
+        if (resGlobal.ok) {
+          const dataGlobal = await resGlobal.json();
+          if (dataGlobal.value) keySources.push(JSON.parse(dataGlobal.value));
+        }
+
+        const seen = new Set();
+        for (const prov of checkOrder) {
+          for (const keys of keySources) {
+            if (keys[prov] && !seen.has(prov)) {
+              providersList.push({ provider: prov, key: keys[prov] });
+              seen.add(prov);
+              break;
+            }
+          }
+        }
+      } catch (keyErr) {
+        console.warn('Gagal mengambil AI key dari DB:', keyErr);
       }
+
+      if (providersList.length === 0) {
+        alert('Tidak ada AI API key tersedia. Silakan atur di menu Pemindai Dokumen (AI).');
+        return;
+      }
+
+      // Coba tiap provider satu per satu hingga berhasil
+      let lastError = '';
+      for (const { provider, key } of providersList) {
+        try {
+          const response = await fetch('/api/ai/refine-text', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              raw_text: currentText,
+              context: contextLabel,
+              ai_provider: provider,
+              ai_key: key
+            })
+          });
+          const data = await response.json();
+          if (data.success && data.refined_text) {
+            setDppSpecs(prev => ({ ...prev, [field]: data.refined_text }));
+            return; // Berhasil, hentikan loop
+          }
+          lastError = data.error || `Provider ${provider} gagal`;
+          console.warn(`[AI Fallback] ${provider} gagal:`, lastError);
+        } catch (provErr) {
+          lastError = provErr.message;
+          console.warn(`[AI Fallback] ${provider} error:`, provErr);
+        }
+      }
+      // Semua provider gagal
+      alert(`Gagal memproses teks: ${lastError}`);
     } catch (err) {
       console.error('Enhance error:', err);
       alert('Terjadi kesalahan saat memproses AI.');
@@ -147,6 +254,8 @@ export default function Step4TemplateSurat() {
       setIsEnhancingDPP(prev => ({ ...prev, [field]: false }));
     }
   };
+
+
   
   const getPacketCategory = (packName) => {
     const name = (packName || '').toLowerCase();
@@ -538,6 +647,47 @@ export default function Step4TemplateSurat() {
 
                   </div>
 
+                  {/* Status Komitmen Anggaran */}
+                  <div className={`mb-6 p-4 border rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${status === 'Final' ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${status === 'Final' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
+                        {status === 'Final' ? <ShieldCheck className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Status Komitmen Anggaran</h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {status === 'Final' 
+                            ? 'Anggaran terkunci. Nilai HPS dipotong dari RAK Dashboard.' 
+                            : 'Anggaran belum dikunci. Lakukan finalisasi agar terintegrasi ke RAK.'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleFinalizeBudget}
+                      disabled={isFinalizing || !currentProjectId}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm hover:scale-102 shrink-0 ${
+                        status === 'Final' 
+                          ? 'bg-rose-100 hover:bg-rose-200 text-rose-700 border border-rose-200' 
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50'
+                      }`}
+                    >
+                      {isFinalizing ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Memproses...
+                        </>
+                      ) : status === 'Final' ? (
+                        <>
+                          🔓 Buka Kunci Anggaran
+                        </>
+                      ) : (
+                        <>
+                          🔒 Finalisasi & Kunci Anggaran
+                        </>
+                      )}
+                    </button>
+                  </div>
+
                   {/* Pengaturan Khusus Kerangka Surat DPP (AI Assisted) */}
                   <div className="mb-6 p-4 border rounded-xl bg-indigo-50/50 border-indigo-200">
                     <div className="font-bold text-indigo-900 text-sm mb-4 flex items-center gap-2">
@@ -549,21 +699,21 @@ export default function Step4TemplateSurat() {
                       <div>
                         <div className="flex justify-between items-center mb-1">
                           <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Spesifikasi Layanan Tambahan</label>
-                          <button onClick={() => enhanceDPPTextWithAI('spesifikasiLayanan', dppSpecs.spesifikasiLayanan)} disabled={isEnhancingDPP['spesifikasiLayanan']} className="text-[9px] font-bold bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200 transition-colors flex items-center gap-1 disabled:opacity-50">
+                          <button onClick={() => enhanceDPPTextWithAI('spesifikasiLayanan', dppSpecs.spesifikasiLayanan)} disabled={isEnhancingDPP['spesifikasiLayanan'] || status === 'Final'} className="text-[9px] font-bold bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200 transition-colors flex items-center gap-1 disabled:opacity-50">
                             {isEnhancingDPP['spesifikasiLayanan'] ? '✨ Merapikan...' : '✨ Rapikan Bahasa (AI)'}
                           </button>
                         </div>
-                        <textarea value={dppSpecs.spesifikasiLayanan || ''} onChange={(e) => setDppSpecs({...dppSpecs, spesifikasiLayanan: e.target.value})} placeholder="Contoh: Barang harus diantar beserta teknisi..." className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none min-h-[60px] resize-y"></textarea>
+                        <textarea disabled={status === 'Final'} value={dppSpecs.spesifikasiLayanan || ''} onChange={(e) => setDppSpecs({...dppSpecs, spesifikasiLayanan: e.target.value})} placeholder="Contoh: Barang harus diantar beserta teknisi..." className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none min-h-[60px] resize-y disabled:bg-slate-50 disabled:text-slate-500"></textarea>
                       </div>
 
                       <div>
                         <div className="flex justify-between items-center mb-1">
                           <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Justifikasi Pemilihan Merek</label>
-                          <button onClick={() => enhanceDPPTextWithAI('justifikasiMerek', dppSpecs.justifikasiMerek)} disabled={isEnhancingDPP['justifikasiMerek']} className="text-[9px] font-bold bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200 transition-colors flex items-center gap-1 disabled:opacity-50">
+                          <button onClick={() => enhanceDPPTextWithAI('justifikasiMerek', dppSpecs.justifikasiMerek)} disabled={isEnhancingDPP['justifikasiMerek'] || status === 'Final'} className="text-[9px] font-bold bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200 transition-colors flex items-center gap-1 disabled:opacity-50">
                             {isEnhancingDPP['justifikasiMerek'] ? '✨ Merapikan...' : '✨ Rapikan Bahasa (AI)'}
                           </button>
                         </div>
-                        <textarea value={dppSpecs.justifikasiMerek || ''} onChange={(e) => setDppSpecs({...dppSpecs, justifikasiMerek: e.target.value})} placeholder="Contoh: Merek ini sudah teruji kompatibilitasnya..." className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none min-h-[60px] resize-y"></textarea>
+                        <textarea disabled={status === 'Final'} value={dppSpecs.justifikasiMerek || ''} onChange={(e) => setDppSpecs({...dppSpecs, justifikasiMerek: e.target.value})} placeholder="Contoh: Merek ini sudah teruji kompatibilitasnya..." className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none min-h-[60px] resize-y disabled:bg-slate-50 disabled:text-slate-500"></textarea>
                       </div>
                     </div>
                   </div>

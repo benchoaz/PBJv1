@@ -321,7 +321,7 @@ func (h *BudgetHandler) SaveRakAccounts(w http.ResponseWriter, r *http.Request) 
 	}
 
 	debugLog := fmt.Sprintf("[%s] [SaveRakAccounts] Payload received for Satker %s, Tahun %d, Total Accounts: %d\n", time.Now().Format(time.RFC3339), satkerID, tahun, len(body.Accounts))
-	f, _ := os.OpenFile("/home/beni/PBJ/backend/api_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, _ := os.OpenFile("./api_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if f != nil {
 		f.WriteString(debugLog)
 		f.Close()
@@ -362,12 +362,13 @@ func (h *BudgetHandler) SaveRakAccounts(w http.ResponseWriter, r *http.Request) 
 			acc.CreatedAt = existing.CreatedAt
 			err = h.DB.Save(&acc).Error
 		} else {
+			acc.ID = 0 // Reset ID to let DB generate a new auto-incremented primary key
 			err = h.DB.Create(&acc).Error
 		}
-		
 		if err != nil {
-			errLog := fmt.Sprintf("[%s] Error saving account: %v\n", time.Now().Format(time.RFC3339), err)
-			f, _ := os.OpenFile("/home/beni/PBJ/backend/api_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			errLog := fmt.Sprintf("[%s] Error saving account (Kode: %s, SubKeg: %s, ID: %d): %v\n", 
+				time.Now().Format(time.RFC3339), acc.KodeRekening, acc.SubKegiatan, acc.ID, err)
+			f, _ := os.OpenFile("./api_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if f != nil {
 				f.WriteString(errLog)
 				f.Close()
@@ -420,7 +421,7 @@ func (h *BudgetHandler) GetRakAccounts(w http.ResponseWriter, r *http.Request) {
 
 	var accounts []models.BudgetAccount
 	if err := h.DB.Where("satker_id = ? AND tahun_anggaran = ?", satkerID, tahun).
-		Find(&accounts).Error; err != nil || len(accounts) == 0 {
+		Preload("Realization").Find(&accounts).Error; err != nil || len(accounts) == 0 {
 		// No active RKA — return empty
 		corsJSON(w)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -432,14 +433,46 @@ func (h *BudgetHandler) GetRakAccounts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ambil semua komitmen aktif untuk satker + tahun ini
+	var commitments []models.BudgetCommitment
+	h.DB.Where("satker_id = ? AND tahun_anggaran = ?", satkerID, tahun).Find(&commitments)
+
+	// Map commitments by BudgetAccountID
+	commitmentsMap := make(map[uint64]float64)
+	for _, c := range commitments {
+		commitmentsMap[c.BudgetAccountID] += c.NilaiKomitmen
+	}
+
+	// Bentuk response custom yang menyertakan total komitmen dan total realisasi
+	type AccountResponse struct {
+		models.BudgetAccount
+		TotalKomitmen  float64 `json:"total_komitmen"`
+		TotalRealisasi float64 `json:"total_realisasi"`
+	}
+
+	resAccounts := make([]AccountResponse, len(accounts))
+	for i, acc := range accounts {
+		// Hitung total realisasi dari realisasi bulanan
+		var totalReal float64
+		for _, r := range acc.Realization {
+			totalReal += r.NilaiRealisasi
+		}
+
+		resAccounts[i] = AccountResponse{
+			BudgetAccount:  acc,
+			TotalKomitmen:  commitmentsMap[acc.ID],
+			TotalRealisasi: totalReal,
+		}
+	}
+
 	corsJSON(w)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":  true,
 		"tahun":    tahun,
 		"has_rka":  true,
 		"rka_doc":  rkaDoc,
-		"accounts": accounts,
-		"total":    len(accounts),
+		"accounts": resAccounts,
+		"total":    len(resAccounts),
 	})
 }
 

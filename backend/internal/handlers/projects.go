@@ -265,7 +265,38 @@ func parseQueryParamFloat(r *http.Request, key string) float64 {
 	return num
 }
 
+func (h *ProjectHandler) Finalize(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid project ID")
+		return
+	}
+
+	existing, err := h.repo.GetByID(id)
+	if err != nil || existing == nil {
+		writeError(w, http.StatusNotFound, "Project not found")
+		return
+	}
+
+	userRole := r.Header.Get("X-User-Role")
+	userSatker := r.Header.Get("X-User-Satker")
+	if userRole != "" && strings.ToLower(userRole) != "admin" {
+		if !hasAccessToSatker(userRole, userSatker, existing.IdSatker) {
+			writeError(w, http.StatusForbidden, "Forbidden: Anda tidak memiliki akses untuk memfinalisasi proyek satker lain")
+			return
+		}
+	}
+
+	if err := h.repo.Finalize(id); err != nil {
+		writeError(w, http.StatusInternalServerError, "Gagal memfinalisasi anggaran: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "message": "Anggaran berhasil dikunci"})
+}
+
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
+
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

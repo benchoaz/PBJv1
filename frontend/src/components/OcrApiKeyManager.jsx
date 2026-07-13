@@ -243,57 +243,68 @@ export default function OcrApiKeyManager() {
     setTestingId(providerId);
     setTestResults(prev => ({ ...prev, [providerId]: null }));
 
-    // Simulate connection test
-    setTimeout(async () => {
-      const isFailed = keyValue.toLowerCase().includes('fail') || keyValue.toLowerCase().includes('expired') || (keyValue.length < 16 && providerId !== 'ollama' && providerId !== 'cohere');
-      
-      if (!isFailed) {
-        const newKeys = { ...apiKeys, [providerId]: keyValue };
-        
-        if (dbKey) {
-          try {
-            const res = await fetch('/api/settings', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                key: dbKey,
-                value: JSON.stringify(newKeys)
-              })
-            });
-            if (!res.ok) throw new Error('Failed to save setting to database');
-            setApiKeys(newKeys);
-            setTestResults(prev => ({
-              ...prev,
-              [providerId]: {
-                success: true,
-                message: isAdmin
-                  ? `API Key ${PROVIDERS[providerId].name} berhasil disimpan secara global di server.`
-                  : `API Key ${PROVIDERS[providerId].name} berhasil disimpan untuk Satker Anda (${user?.idSatker || 'Lokal'}).`
-              }
-            }));
-          } catch (e) {
-            console.error(e);
-            setTestResults(prev => ({
-              ...prev,
-              [providerId]: {
-                success: false,
-                message: `Gagal menyimpan ke server: ${e.message}`
-              }
-            }));
-          }
+    // Test koneksi SUNGGUHAN ke API provider
+    try {
+      let testSuccess = false;
+      let testMsg = '';
+
+      if (providerId === 'ollama') {
+        // Ollama: cek apakah server lokal aktif
+        try {
+          const res = await fetch(keyValue + '/api/tags', { signal: AbortSignal.timeout(5000) });
+          testSuccess = res.ok;
+          testMsg = testSuccess ? 'Server Ollama lokal berhasil dihubungi.' : 'Server Ollama tidak merespons.';
+        } catch {
+          testSuccess = false;
+          testMsg = 'Tidak dapat menghubungi server Ollama. Pastikan Ollama sudah berjalan.';
         }
       } else {
-        setTestResults(prev => ({
-          ...prev,
-          [providerId]: {
-            success: false,
-            message: `Koneksi Gagal: API Key ${PROVIDERS[providerId].name} tidak valid.`
-          }
-        }));
+        // Provider cloud: coba panggil refine-text dengan key ini
+        try {
+          const res = await fetch('/api/ai/refine-text', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              raw_text: 'tes koneksi api key',
+              context: 'Test Koneksi',
+              ai_provider: providerId,
+              ai_key: keyValue
+            }),
+            signal: AbortSignal.timeout(20000)
+          });
+          const data = await res.json();
+          testSuccess = data.success && !!data.refined_text;
+          testMsg = testSuccess
+            ? `Test koneksi sukses! ${PROVIDERS[providerId].name} terhubung.`
+            : `Test gagal: ${data.error || 'Respons tidak valid dari provider.'}`;
+        } catch (e) {
+          testSuccess = false;
+          testMsg = `Tidak dapat menghubungi ${PROVIDERS[providerId].name}: ${e.message}`;
+        }
       }
+
+      if (testSuccess) {
+        const newKeys = { ...apiKeys, [providerId]: keyValue };
+        if (dbKey) {
+          const res = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: dbKey, value: JSON.stringify(newKeys) })
+          });
+          if (!res.ok) throw new Error('Gagal menyimpan ke database');
+          setApiKeys(newKeys);
+        }
+        setTestResults(prev => ({ ...prev, [providerId]: { success: true, message: testMsg } }));
+      } else {
+        setTestResults(prev => ({ ...prev, [providerId]: { success: false, message: testMsg } }));
+      }
+    } catch (e) {
+      setTestResults(prev => ({ ...prev, [providerId]: { success: false, message: `Error: ${e.message}` } }));
+    } finally {
       setTestingId(null);
-    }, 1200);
+    }
   };
+
 
   const handleDeleteKey = async (providerId) => {
     if (confirm(`Hapus API Key untuk ${PROVIDERS[providerId].name}?`)) {

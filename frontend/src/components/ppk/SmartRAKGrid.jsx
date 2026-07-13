@@ -187,11 +187,13 @@ export default function SmartRAKGrid({ dpaAccounts = [], satkerId, packageMetada
       if (res.ok) {
         alert('Master Data RAK berhasil disimpan/diperbarui!');
       } else {
-        alert('Gagal menyimpan Master Data RAK');
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.error || errData.message || `HTTP ${res.status}`;
+        alert(`Gagal menyimpan Master Data RAK: ${errMsg}`);
       }
     } catch (err) {
       console.error(err);
-      alert('Terjadi kesalahan jaringan.');
+      alert(`Terjadi kesalahan: ${err.message}`);
     } finally {
       setIsSaving(false);
     }
