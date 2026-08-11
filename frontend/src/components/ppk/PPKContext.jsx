@@ -236,55 +236,55 @@ export function PPKProvider({ children }) {
   };
 
   const getPackageItems = (pack) => {
-    if (!pack) return [];
-
     const cleanCode = (str) => (str || '').toString().replace(/[^0-9]/g, '');
 
-    // 1. Direct match via linkedRekening, mak, or noSirup
-    const targetKeys = [
-      pack.linkedRekening,
-      pack.mak,
-      pack.noSirup ? `nosirup_${pack.noSirup}` : null
-    ].filter(Boolean);
+    // 1. If pack is present, check direct match via linkedRekening, mak, or noSirup
+    if (pack) {
+      const targetKeys = [
+        pack.linkedRekening,
+        pack.mak,
+        pack.noSirup ? `nosirup_${pack.noSirup}` : null
+      ].filter(Boolean);
 
-    for (const tKey of targetKeys) {
-      if (dpaRincian[tKey] && dpaRincian[tKey].length > 0) {
-        return dpaRincian[tKey].map((r, i) => ({
-          no: i + 1,
-          name: r.nama,
-          qty: r.volume,
-          unit: r.satuan,
-          price: r.harga_satuan,
-          dpa_price: r.harga_satuan,
-          paguDpa: r.harga_satuan,
-          spesifikasi: r.spesifikasi || r.specs || '',
-        }));
+      for (const tKey of targetKeys) {
+        if (dpaRincian[tKey] && dpaRincian[tKey].length > 0) {
+          return dpaRincian[tKey].map((r, i) => ({
+            no: i + 1,
+            name: r.nama,
+            qty: r.volume,
+            unit: r.satuan,
+            price: r.harga_satuan,
+            dpa_price: r.harga_satuan,
+            paguDpa: r.harga_satuan,
+            spesifikasi: r.spesifikasi || r.specs || '',
+          }));
+        }
       }
-    }
 
-    // 2. Fuzzy match via clean numeric code (e.g. 51020100100024)
-    const targetClean = cleanCode(pack.linkedRekening || pack.mak || pack.noSirup);
-    if (targetClean) {
-      for (const rKey of Object.keys(dpaRincian)) {
-        const rKeyClean = cleanCode(rKey);
-        if (rKeyClean && (targetClean.includes(rKeyClean) || rKeyClean.includes(targetClean))) {
-          if (dpaRincian[rKey] && dpaRincian[rKey].length > 0) {
-            return dpaRincian[rKey].map((r, i) => ({
-              no: i + 1,
-              name: r.nama,
-              qty: r.volume,
-              unit: r.satuan,
-              price: r.harga_satuan,
-              dpa_price: r.harga_satuan,
-              paguDpa: r.harga_satuan,
-              spesifikasi: r.spesifikasi || r.specs || '',
-            }));
+      // 2. Fuzzy match via clean numeric code (e.g. 51020100100024)
+      const targetClean = cleanCode(pack.linkedRekening || pack.mak || pack.noSirup);
+      if (targetClean) {
+        for (const rKey of Object.keys(dpaRincian)) {
+          const rKeyClean = cleanCode(rKey);
+          if (rKeyClean && (targetClean.includes(rKeyClean) || rKeyClean.includes(targetClean))) {
+            if (dpaRincian[rKey] && dpaRincian[rKey].length > 0) {
+              return dpaRincian[rKey].map((r, i) => ({
+                no: i + 1,
+                name: r.nama,
+                qty: r.volume,
+                unit: r.satuan,
+                price: r.harga_satuan,
+                dpa_price: r.harga_satuan,
+                paguDpa: r.harga_satuan,
+                spesifikasi: r.spesifikasi || r.specs || '',
+              }));
+            }
           }
         }
       }
     }
 
-    // 3. Fallback: Merge all available dpaRincian items across all keys
+    // 3. Absolute Fallback: Merge all available dpaRincian items across all keys
     const allRincianItems = [];
     Object.keys(dpaRincian).forEach(k => {
       if (Array.isArray(dpaRincian[k]) && dpaRincian[k].length > 0) {
@@ -305,17 +305,17 @@ export function PPKProvider({ children }) {
       }));
     }
 
-    // Default fallback if no DPA items uploaded yet
+    // 4. Default fallback if no DPA items uploaded yet
     return [
       {
         no: 1,
-        name: pack.packName || pack.namaPaket || 'Paket Pengadaan',
+        name: pack?.packName || pack?.namaPaket || 'Paket Pengadaan',
         qty: 1,
         unit: 'Paket',
-        price: pack.pagu || 0,
-        dpa_price: pack.pagu || 0,
-        paguDpa: pack.pagu || 0,
-        spesifikasi: pack.spesifikasi || '',
+        price: pack?.pagu || 0,
+        dpa_price: pack?.pagu || 0,
+        paguDpa: pack?.pagu || 0,
+        spesifikasi: pack?.spesifikasi || '',
       }
     ];
   };
