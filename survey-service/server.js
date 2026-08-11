@@ -238,20 +238,27 @@ function advancedCleanQuery(name) {
     cleaned += ' konsolidasi';
   }
 
-  // 2. Bersihkan istilah spesifikasi, merk, tipe, dll.
-  cleaned = cleaned.replace(/(spesifikasi|spesifikasi\s*:|merk|merk\s*:|tipe|tipe\s*:|ukuran|ukuran\s*:|warna|warna\s*:)/gi, '');
+  // 2. Jika nama barang mengandung frasa 'spesifikasi:' atau 'spesifikasi', utamakan teks sebelum kata spesifikasi
+  if (/spesifikasi\s*:/i.test(cleaned)) {
+    cleaned = cleaned.split(/spesifikasi\s*:/i)[0];
+  } else if (/\bspesifikasi\b/i.test(cleaned)) {
+    cleaned = cleaned.split(/\bspesifikasi\b/i)[0];
+  }
 
-  // 3. Bersihkan kata pembuka umum pengadaan (stopwords) di awal kalimat
+  // 3. Bersihkan istilah merk, tipe, ukuran, warna, dll.
+  cleaned = cleaned.replace(/(merk\s*:?|tipe\s*:?|type\s*:?|ukuran\s*:?|uk\s*:?|warna\s*:?|setara\s*:?|no\s*\.?\s*:?)/gi, '');
+
+  // 4. Bersihkan kata pembuka umum pengadaan (stopwords) di awal kalimat
   cleaned = cleaned.replace(/^(belanja|penyediaan|pengadaan|pembelian|jasa|pengadaan\s+barang|sewa)\s+/gi, '');
 
-  // 4. Bersihkan satuan kemasan umum di bagian akhir kalimat jika diawali kata lain
+  // 5. Bersihkan satuan kemasan umum di bagian akhir kalimat jika diawali kata lain
   const stopwordsAkhir = /\s+(rim|pak|box|pcs|lusin|buah|rol|roll|unit|meter|lembar|kodi|kg|gram|botol|pack|slop|dus|tube|set)$/i;
   cleaned = cleaned.replace(stopwordsAkhir, '');
 
-  // 5. Bersihkan karakter khusus yang tidak perlu (kecuali huruf, angka, spasi)
+  // 6. Bersihkan karakter khusus yang tidak perlu (kecuali huruf, angka, spasi)
   cleaned = cleaned.replace(/[^a-zA-Z0-9\s]/g, ' ');
 
-  // 6. Normalisasi spasi ganda
+  // 7. Normalisasi spasi ganda
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
   return cleaned;
@@ -259,33 +266,33 @@ function advancedCleanQuery(name) {
 
 /**
  * Menghasilkan beberapa alternatif query pencarian dari yang spesifik sampai yang paling sederhana.
+ * Mengikuti Arsitektur Senior: Canonical Core Query didahulukan.
  */
 function getQueryAttempts(originalName) {
-  const cleaned = advancedCleanQuery(originalName);
   const attempts = [];
-
-  if (cleaned) {
-    attempts.push(cleaned); // Attempt 1: Full Cleaned Query
+  
+  // Attempt 1: Canonical Core Query (Kata Pokok Barang sebelum Spesifikasi)
+  const canonical = advancedCleanQuery(originalName);
+  if (canonical) {
+    attempts.push(canonical);
   }
 
-  // Jaga query asli sebagai fallback jika pembersihan terlalu agresif
-  const originalWords = originalName.replace(/\([^)]*\)/g, '').replace(/[^a-zA-Z0-9\s]/g, ' ').trim().replace(/\s+/g, ' ');
-  if (originalWords && originalWords !== cleaned) {
-    attempts.push(originalWords);
-  }
-
-  // Attempt 2: Pangkas kata paling belakang jika lebih dari 3 kata
-  const words = (cleaned || originalWords).split(/\s+/);
-  if (words.length > 3) {
-    attempts.push(words.slice(0, words.length - 1).join(' '));
-  }
-
-  // Attempt 3: Core Query (Ambil 2 atau 3 kata pertama)
+  // Attempt 2: Pangkas kata paling belakang jika lebih dari 2 kata
+  const words = canonical.split(/\s+/).filter(Boolean);
   if (words.length > 2) {
     attempts.push(words.slice(0, 2).join(' '));
   }
 
-  // Pastikan unik dan hilangkan yang terlalu pendek (< 3 karakter)
+  // Attempt 3: Jika nama asli memiliki kata selain spesifikasi yang bersih, coba juga
+  const originalWords = originalName.replace(/\([^)]*\)/g, '').replace(/[^a-zA-Z0-9\s]/g, ' ').trim().replace(/\s+/g, ' ');
+  if (originalWords && originalWords !== canonical) {
+    const cleanOriginal = originalWords.replace(/(spesifikasi|merk|tipe|ukuran)/gi, '').trim().replace(/\s+/g, ' ');
+    if (cleanOriginal && cleanOriginal !== canonical) {
+      attempts.push(cleanOriginal);
+    }
+  }
+
+  // Pastikan unik dan hilangkan yang terlalu pendek (< 2 karakter)
   const uniqueAttempts = [];
   attempts.forEach(q => {
     const trimmed = q.trim();
