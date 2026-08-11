@@ -17,44 +17,50 @@ export const injectSignatureHelper = (htmlContent, name, nip, imgHtml) => {
   return htmlContent.replace(new RegExp(`NIP\\.\\s*${nip.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'), `${imgHtml}NIP. ${nip}`);
 };
 
-function terbilang(angka) {
-  if (!angka) return "Nol";
+function terbilangHelper(angka) {
+  const n = Math.floor(Math.abs(Number(angka) || 0));
+  if (n === 0) return "";
   const huruf = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
-  let n = Math.floor(Math.abs(angka));
   if (n < 12) return huruf[n];
-  if (n < 20) return terbilang(n - 10) + " Belas";
+  if (n < 20) return (terbilangHelper(n - 10) + " Belas").trim();
   if (n < 100) {
-    const puluh = terbilang(Math.floor(n / 10)) + " Puluh";
-    const sisa = terbilang(n % 10);
+    const puluh = terbilangHelper(Math.floor(n / 10)) + " Puluh";
+    const sisa = terbilangHelper(n % 10);
     return (puluh + " " + sisa).trim();
   }
   if (n < 200) {
-    return ("Seratus " + terbilang(n - 100)).trim();
+    return ("Seratus " + terbilangHelper(n - 100)).trim();
   }
   if (n < 1000) {
-    const ratus = terbilang(Math.floor(n / 100)) + " Ratus";
-    const sisa = terbilang(n % 100);
+    const ratus = terbilangHelper(Math.floor(n / 100)) + " Ratus";
+    const sisa = terbilangHelper(n % 100);
     return (ratus + " " + sisa).trim();
   }
   if (n < 2000) {
-    return ("Seribu " + terbilang(n - 1000)).trim();
+    return ("Seribu " + terbilangHelper(n - 1000)).trim();
   }
   if (n < 1000000) {
-    const ribu = terbilang(Math.floor(n / 1000)) + " Ribu";
-    const sisa = terbilang(n % 1000);
+    const ribu = terbilangHelper(Math.floor(n / 1000)) + " Ribu";
+    const sisa = terbilangHelper(n % 1000);
     return (ribu + " " + sisa).trim();
   }
   if (n < 1000000000) {
-    const juta = terbilang(Math.floor(n / 1000000)) + " Juta";
-    const sisa = terbilang(n % 1000000);
+    const juta = terbilangHelper(Math.floor(n / 1000000)) + " Juta";
+    const sisa = terbilangHelper(n % 1000000);
     return (juta + " " + sisa).trim();
   }
   if (n < 1000000000000) {
-    const milyar = terbilang(Math.floor(n / 1000000000)) + " Milyar";
-    const sisa = terbilang(n % 1000000000);
+    const milyar = terbilangHelper(Math.floor(n / 1000000000)) + " Milyar";
+    const sisa = terbilangHelper(n % 1000000000);
     return (milyar + " " + sisa).trim();
   }
   return "Angka terlalu besar";
+}
+
+function terbilang(angka) {
+  const n = Math.floor(Math.abs(Number(angka) || 0));
+  if (n === 0) return "Nol";
+  return terbilangHelper(n).replace(/\s+/g, ' ').trim();
 }
 
 const getDynamicProductLink = (vendorName, keyword) => {

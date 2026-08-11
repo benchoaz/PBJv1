@@ -70,42 +70,51 @@ const parseSmartColons = (text) => {
   return output.join('\n');
 }
 
-function terbilang(angka) {
-    const bil = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
-    const n = parseInt(angka);
-    if (isNaN(n)) return "";
-
-    if (n < 12) {
-      return bil[n];
-    } else if (n < 20) {
-      return (bil[n - 10] + " Belas").trim();
-    } else if (n < 100) {
-      const puluh = bil[Math.floor(n / 10)] + " Puluh";
-      const sisa = bil[n % 10];
-      return (puluh + " " + sisa).trim();
-    } else if (n < 200) {
-      return ("Seratus " + terbilang(n - 100)).trim();
-    } else if (n < 1000) {
-      const ratus = terbilang(Math.floor(n / 100)) + " Ratus";
-      const sisa = terbilang(n % 100);
-      return (ratus + " " + sisa).trim();
-    } else if (n < 2000) {
-      return ("Seribu " + terbilang(n - 1000)).trim();
-    } else if (n < 1000000) {
-      const ribu = terbilang(Math.floor(n / 1000)) + " Ribu";
-      const sisa = terbilang(n % 1000);
-      return (ribu + " " + sisa).trim();
-    } else if (n < 1000000000) {
-      const juta = terbilang(Math.floor(n / 1000000)) + " Juta";
-      const sisa = terbilang(n % 1000000);
-      return (juta + " " + sisa).trim();
-    } else if (n < 1000000000000) {
-      const milyar = terbilang(Math.floor(n / 1000000000)) + " Milyar";
-      const sisa = terbilang(n % 1000000000);
-      return (milyar + " " + sisa).trim();
-    }
-    return "";
+function terbilangHelper(angka) {
+  const n = Math.floor(Math.abs(Number(angka) || 0));
+  if (n === 0) return "";
+  const bil = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
+  if (n < 12) return bil[n];
+  if (n < 20) return (terbilangHelper(n - 10) + " Belas").trim();
+  if (n < 100) {
+    const puluh = bil[Math.floor(n / 10)] + " Puluh";
+    const sisa = terbilangHelper(n % 10);
+    return (puluh + " " + sisa).trim();
   }
+  if (n < 200) {
+    return ("Seratus " + terbilangHelper(n - 100)).trim();
+  }
+  if (n < 1000) {
+    const ratus = terbilangHelper(Math.floor(n / 100)) + " Ratus";
+    const sisa = terbilangHelper(n % 100);
+    return (ratus + " " + sisa).trim();
+  }
+  if (n < 2000) {
+    return ("Seribu " + terbilangHelper(n - 1000)).trim();
+  }
+  if (n < 1000000) {
+    const ribu = terbilangHelper(Math.floor(n / 1000)) + " Ribu";
+    const sisa = terbilangHelper(n % 1000);
+    return (ribu + " " + sisa).trim();
+  }
+  if (n < 1000000000) {
+    const juta = terbilangHelper(Math.floor(n / 1000000)) + " Juta";
+    const sisa = terbilangHelper(n % 1000000);
+    return (juta + " " + sisa).trim();
+  }
+  if (n < 1000000000000) {
+    const milyar = terbilangHelper(Math.floor(n / 1000000000)) + " Milyar";
+    const sisa = terbilangHelper(n % 1000000000);
+    return (milyar + " " + sisa).trim();
+  }
+  return "";
+}
+
+function terbilang(angka) {
+  const n = Math.floor(Math.abs(Number(angka) || 0));
+  if (n === 0) return "Nol";
+  return terbilangHelper(n).replace(/\s+/g, ' ').trim();
+}
 
 const getTteBadge = (name, nip) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="90" viewBox="0 0 220 90" style="border: 1px solid %23cbd5e1; border-radius: 6px; background: %23f8fafc; font-family: Arial, sans-serif; margin-top: 6px; margin-bottom: 6px; display: inline-block;">
