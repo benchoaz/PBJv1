@@ -830,9 +830,10 @@ async function searchItem(page, item, index) {
         let score = getSimilarityScore(searchTarget, cand.title);
         
         // 🛡️ LEGAL SHIELD: Boost skor jika sesuai target penyedia
-        if (isTargetMatch) {
+        // HANYA berikan bonus jika judul produk kandidat memiliki minimal kemiripan kata kunci (score > 0)
+        if (isTargetMatch && score > 0) {
           score += 10.0;
-          console.log(`    ⭐ [TARGET MATCH] Vendor ${cand.vendor} mendapat prioritas mutlak!`);
+          console.log(`    ⭐ [TARGET MATCH] Vendor ${cand.vendor} mendapat prioritas mutlak ("${cand.title}")!`);
         }
 
         cand.score = score;
