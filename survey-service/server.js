@@ -776,7 +776,12 @@ async function searchItem(page, item, index) {
               });
             }
 
-            if (!item.autoComparator || (scenario.type === 'global' && hasComparator)) {
+            // 💡 FIX: Pada pencarian toko vendor, jika 10 produk yang didapatkan TIDAK ada yang cocok kata kunci sama sekali (hanya etalase umum),
+            // JANGAN break! Lanjutkan ke query pencarian yang lebih spesifik/sederhana (misal: "Bantalan Stempel")
+            const hasAnyMatchingCandidate = candidates.some(cand => getSimilarityScore(searchTarget, cand.title) > 0);
+            if (scenario.type === 'vendor' && !hasAnyMatchingCandidate) {
+              console.log(`    ⚠️ Query vendor "${query}" hanya mengembalikan etalase umum toko tanpa produk yang cocok kata kunci ("${searchTarget}"). Lanjut ke query pencarian berikutnya...`);
+            } else if (!item.autoComparator || (scenario.type === 'global' && hasComparator)) {
               break;
             } else {
                console.log(`    ℹ️ Auto Comparator aktif (Comparator ditemukan: ${hasComparator}), lanjut mencari referensi lain...`);
