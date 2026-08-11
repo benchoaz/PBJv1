@@ -394,20 +394,55 @@ export function PPKProvider({ children }) {
       }
 
       if (parsed.namaAcara) setNamaAcara(parsed.namaAcara);
-      if (parsed.dpaAccounts) setDpaAccounts(parsed.dpaAccounts);
-      
-      if (parsed.dpaRincian) {
+      if (parsed.dpaAccounts && parsed.dpaAccounts.length > 0) {
+        setDpaAccounts(parsed.dpaAccounts);
+      }
+
+      if (parsed.dpaRincian && Object.keys(parsed.dpaRincian).length > 0) {
         setDpaRincian(parsed.dpaRincian);
-      } else if (parsed.items) {
-        const key = parsed.noSirup ? `nosirup_${parsed.noSirup}` : (parsed.mak ? `nosirup_${parsed.mak}` : 'nosirup_default');
-        const rincian = parsed.items.map(item => ({
-          nama: item.name,
-          volume: item.qty,
-          satuan: item.unit,
-          harga_satuan: item.price || item.dpa_price || item.paguDpa || 0,
-          spesifikasi: item.spesifikasi || ''
-        }));
-        setDpaRincian({ [key]: rincian });
+      } else {
+        // 💡 AUTOMATIC SATKER DPA GROUND TRUTH FALLBACK FROM POSTGRESQL DB:
+        // Jika project ini belum memiliki dpaRincian tersimpan di JSON-nya, langsung ambil DPA Ground Truth milik Satker dari DB Sentral!
+        const targetSatker = parsed.idSatker || project.id_satker || satkerId || '67081';
+        const targetTahun = new Date().getFullYear();
+        fetch(`/api/dpa/accounts/get?satker_id=${targetSatker}&tahun=${targetTahun}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data && data.success && data.accounts?.length > 0) {
+              const mappedAcc = data.accounts.map(acc => ({
+                account: acc.kode_rekening,
+                name: acc.uraian_rekening,
+                pagu: acc.pagu_dpa,
+                confidence: acc.confidence,
+                ocr_engine: acc.ocr_engine,
+                pagu_method: acc.pagu_method,
+                verified: acc.is_verified,
+                is_valid: acc.is_valid,
+                validation_reason: acc.validation_reason,
+                _from_db: true,
+              }));
+              setDpaAccounts(prev => (prev && prev.length > 0) ? prev : mappedAcc);
+
+              const dbRincian = {};
+              data.accounts.forEach(acc => {
+                if (acc.items?.length > 0) {
+                  dbRincian[acc.kode_rekening] = acc.items.map(it => ({
+                    no: it.no_urut,
+                    nama: it.nama_barang,
+                    volume: it.volume,
+                    satuan: it.satuan,
+                    harga_satuan: it.harga_satuan,
+                    harga_total: it.harga_total,
+                    spesifikasi: it.spesifikasi || ''
+                  }));
+                }
+              });
+              if (Object.keys(dbRincian).length > 0) {
+                setDpaRincian(prev => (prev && Object.keys(prev).length > 0) ? prev : dbRincian);
+              }
+            }
+          })
+          .catch(err => console.error("Error fetching Satker DPA Ground Truth fallback:", err));
       }
 
       // CRITICAL FIX: We only merge `parsed.docSettings` if the project is LOCKED.
