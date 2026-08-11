@@ -103,8 +103,14 @@ func (h *BudgetHandler) SaveDpaAccounts(w http.ResponseWriter, r *http.Request) 
 			continue
 		}
 
+		// Ensure dpaAcc.ID is populated after OnConflict upsert
+		if dpaAcc.ID == 0 {
+			h.DB.Where("satker_id = ? AND tahun_anggaran = ? AND kode_rekening = ?",
+				satkerID, tahun, acc.KodeRekening).Select("id").First(&dpaAcc)
+		}
+
 		// Save items (delete old, insert new)
-		if len(acc.Items) > 0 {
+		if len(acc.Items) > 0 && dpaAcc.ID > 0 {
 			h.DB.Where("dpa_account_id = ?", dpaAcc.ID).Delete(&models.DpaItemSaved{})
 			for i, item := range acc.Items {
 				h.DB.Create(&models.DpaItemSaved{
