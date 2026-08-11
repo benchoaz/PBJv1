@@ -51,9 +51,9 @@ func (h *RefineTextHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	prompt := fmt.Sprintf(`Anda adalah auditor dan ahli hukum pengadaan barang/jasa pemerintah (Perpres 12/2021).
-Pejabat Pengadaan (PP) sedang menulis bagian "%s" untuk dokumen pengadaan.
+Pejabat Pembuat Komitmen (PPK) / Pejabat Pengadaan (PP) sedang menulis bagian "%s" untuk Dokumen Persiapan Pengadaan (DPP) / Dokumen Pemilihan.
 
-Teks draf/mentah dari PP: "%s"
+Teks draf/mentah: "%s"
 
 Tugas Anda:
 Perbaiki teks tersebut agar baku, profesional, dan bernada hukum/resmi yang pantas masuk ke dokumen pengadaan pemerintah Indonesia.

@@ -791,9 +791,9 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{nilai_kontrak}}': '_______________________',
  '{{waktu_penyelesaian}}': packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
  '{{nomor_dpp}}': packageMetadata.nomor_dpp || '................................',
- '{{tanggal_dpp}}': formatTanggalIndo(tanggalSurat),
+ '{{tanggal_dpp}}': formatTanggalIndo(packageMetadata.tanggal_dpp || tanggalSurat),
  '{{nomor_hps}}': nomorBase.replace('{nomor}', '014/HPS'),
- '{{tanggal_hps}}': formatTanggalIndo(tanggalSurat),
+ '{{tanggal_hps}}': formatTanggalIndo(packageMetadata.tanggal_dpp || tanggalSurat),
  '{{lokasi_pekerjaan}}': packageMetadata.lokasi_pekerjaan || (docSettingsFallback ? docSettingsFallback.namaInstansi : 'Komplek Perkantoran Pemerintah Daerah'),
  '{{program}}': packageMetadata.program || 'Program Penunjang Urusan Pemerintahan Daerah',
  '{{kegiatan}}': packageMetadata.kegiatan || 'Penyelenggaraan Pemerintahan dan Pelayanan Publik',
@@ -923,9 +923,9 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{nilai_kontrak}}': '_______________________',
  '{{waktu_penyelesaian}}': packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
  '{{nomor_dpp}}': packageMetadata.nomor_dpp || '................................',
- '{{tanggal_dpp}}': formatTanggalIndo(tanggalSurat),
+ '{{tanggal_dpp}}': formatTanggalIndo(packageMetadata.tanggal_dpp || tanggalSurat),
  '{{nomor_hps}}': nomorBase.replace('{nomor}', '014/HPS'),
- '{{tanggal_hps}}': formatTanggalIndo(tanggalSurat),
+ '{{tanggal_hps}}': formatTanggalIndo(packageMetadata.tanggal_dpp || tanggalSurat),
  '{{lokasi_pekerjaan}}': packageMetadata.lokasi_pekerjaan || (docSettingsFallback ? docSettingsFallback.namaInstansi : 'Komplek Perkantoran Pemerintah Daerah'),
  '{{program}}': packageMetadata.program || 'Program Penunjang Urusan Pemerintahan Daerah',
  '{{kegiatan}}': packageMetadata.kegiatan || 'Penyelenggaraan Pemerintahan dan Pelayanan Publik',
@@ -1219,8 +1219,11 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
     </p>
 
     <div className="font-bold uppercase mt-8 mb-2 text-center">BAB V. DRAFT RANCANGAN KONTRAK (SURAT PESANAN)</div>
-    <p className="indent-8 mb-4">
+    <p className="indent-8 mb-3">
       Rancangan kontrak menggunakan format standar <strong>Surat Pesanan (SP)</strong> yang diterbitkan langsung dan diunduh dari Sistem E-Purchasing (Katalog Elektronik LKPP). Segala ketentuan mengenai hak, kewajiban, tata cara pembayaran, sanksi, dan denda tunduk pada Syarat-Syarat Umum/Khusus Kontrak e-Purchasing.
+    </p>
+    <p className="indent-8 mb-4">
+      <strong>Ketentuan Penyelesaian Pekerjaan & BAST:</strong> {dppSpecs.ketentuanBAST || 'Penyelesaian paket pengadaan dan pencairan pembayaran 100% (seratus persen) dilaksanakan setelah seluruh hasil pekerjaan diterima dengan baik serta ditandatangani Berita Acara Serah Terima (BAST) oleh Pejabat Pembuat Komitmen (PPK).'}
     </p>
   </div>
 
@@ -1327,7 +1330,11 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  {/* TTD PPK GLOBAL - Muncul di akhir semua dokumen (HPS, Nota Dinas, dan DPP setelah lampiran) */}
  <div className="flex justify-end mt-12 pt-6 border-t-2 border-slate-900" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
    <div className="w-max min-w-[14rem] px-4 text-center space-y-1">
-     <div>{(docSettings?.kotaSurat || (currentUser?.department?.toLowerCase().includes('besuk') ? 'Besuk' : (currentUser?.department || 'Probolinggo')))}, {formatTanggalIndo(tanggalSurat)}</div>
+      <div>{(docSettings?.kotaSurat || (currentUser?.department?.toLowerCase().includes('besuk') ? 'Besuk' : (currentUser?.department || 'Probolinggo')))}, {
+        activeDocPreview === 'nd'
+          ? formatTanggalIndo(packageMetadata.tanggal_nd || tanggalSurat)
+          : formatTanggalIndo(packageMetadata.tanggal_dpp || tanggalSurat)
+      }</div>
      <div className="font-bold uppercase">Pejabat Pembuat Komitmen,</div>
      {docSettings?.ttdPpk ? (
        <div className="flex justify-center">

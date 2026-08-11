@@ -178,7 +178,9 @@ export default function Step4TemplateSurat() {
     try {
       const contextLabel = field === 'spesifikasiLayanan'
         ? 'Spesifikasi Layanan Tambahan DPP'
-        : 'Justifikasi Pemilihan Merek DPP';
+        : field === 'justifikasiMerek'
+        ? 'Justifikasi Pemilihan Merek DPP'
+        : 'Ketentuan Penyelesaian Pekerjaan & BAST DPP';
 
       // Ambil SEMUA API key yang tersedia dari DB (satker-specific + global)
       const checkOrder = ['deepseek', 'cohere', 'gemini', 'groq', 'openai', 'anthropic', 'mistral'];
@@ -716,6 +718,16 @@ export default function Step4TemplateSurat() {
                         <textarea disabled={status === 'Final'} value={dppSpecs.justifikasiMerek || ''} onChange={(e) => setDppSpecs({...dppSpecs, justifikasiMerek: e.target.value})} placeholder="Contoh: Merek ini sudah teruji kompatibilitasnya..." className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none min-h-[60px] resize-y disabled:bg-slate-50 disabled:text-slate-500"></textarea>
                       </div>
                     </div>
+
+                    <div className="mb-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ketentuan Penyelesaian Pekerjaan & BAST (Syarat Pelunasan)</label>
+                        <button onClick={() => enhanceDPPTextWithAI('ketentuanBAST', dppSpecs.ketentuanBAST)} disabled={isEnhancingDPP['ketentuanBAST'] || status === 'Final'} className="text-[9px] font-bold bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200 transition-colors flex items-center gap-1 disabled:opacity-50">
+                          {isEnhancingDPP['ketentuanBAST'] ? '✨ Merapikan...' : '✨ Rapikan Bahasa (AI)'}
+                        </button>
+                      </div>
+                      <textarea disabled={status === 'Final'} value={dppSpecs.ketentuanBAST || ''} onChange={(e) => setDppSpecs({...dppSpecs, ketentuanBAST: e.target.value})} placeholder="Penyelesaian paket pengadaan dan pencairan pembayaran 100% dilaksanakan setelah seluruh hasil pekerjaan diterima dengan baik serta ditandatangani Berita Acara Serah Terima (BAST) oleh PPK." className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none min-h-[60px] resize-y disabled:bg-slate-50 disabled:text-slate-500"></textarea>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-4 pointer-events-auto">
@@ -1086,11 +1098,31 @@ export default function Step4TemplateSurat() {
  '{{nomor_sp}}': nomorBase.replace('{nomor}', '115/SP'),
  '{{alamat_penyedia}}': '_______________________',
  '{{nilai_kontrak}}': '_______________________',
- '{{waktu_penyelesaian}}': packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
- '{{nomor_dpp}}': packageMetadata.nomor_dpp || '................................',
- '{{tanggal_dpp}}': new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
- '{{nomor_hps}}': nomorBase.replace('{nomor}', '014/HPS'),
- '{{tanggal_hps}}': new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+  '{{waktu_penyelesaian}}': packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
+  '{{nomor_dpp}}': packageMetadata.nomor_dpp || '................................',
+  '{{tanggal_dpp}}': (() => {
+    const dStr = packageMetadata.tanggal_dpp;
+    if (!dStr) return new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    try {
+      const parts = dStr.split('-');
+      if (parts.length === 3) {
+        return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      }
+      return new Date(dStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch { return dStr; }
+  })(),
+  '{{nomor_hps}}': nomorBase.replace('{nomor}', '014/HPS'),
+  '{{tanggal_hps}}': (() => {
+    const dStr = packageMetadata.tanggal_hps;
+    if (!dStr) return new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    try {
+      const parts = dStr.split('-');
+      if (parts.length === 3) {
+        return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      }
+      return new Date(dStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch { return dStr; }
+  })(),
  '{{lokasi_pekerjaan}}': packageMetadata.lokasi_pekerjaan || (docSettingsFallback ? docSettingsFallback.namaInstansi : 'Komplek Perkantoran Pemerintah Daerah'),
  '{{program}}': packageMetadata.program || 'Program Penunjang Urusan Pemerintahan Daerah',
  '{{kegiatan}}': packageMetadata.kegiatan || 'Penyelenggaraan Pemerintahan dan Pelayanan Publik',
@@ -1208,9 +1240,29 @@ export default function Step4TemplateSurat() {
  '{{nilai_kontrak}}': '_______________________',
  '{{waktu_penyelesaian}}': packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
  '{{nomor_dpp}}': packageMetadata.nomor_dpp || '................................',
- '{{tanggal_dpp}}': new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+ '{{tanggal_dpp}}': (() => {
+   const dStr = packageMetadata.tanggal_dpp;
+   if (!dStr) return new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+   try {
+     const parts = dStr.split('-');
+     if (parts.length === 3) {
+       return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+     }
+     return new Date(dStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+   } catch { return dStr; }
+ })(),
  '{{nomor_hps}}': nomorBase.replace('{nomor}', '014/HPS'),
- '{{tanggal_hps}}': new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+ '{{tanggal_hps}}': (() => {
+   const dStr = packageMetadata.tanggal_hps || packageMetadata.tanggal_dpp;
+   if (!dStr) return new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+   try {
+     const parts = dStr.split('-');
+     if (parts.length === 3) {
+       return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+     }
+     return new Date(dStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+   } catch { return dStr; }
+ })(),
  '{{lokasi_pekerjaan}}': packageMetadata.lokasi_pekerjaan || (docSettingsFallback ? docSettingsFallback.namaInstansi : 'Komplek Perkantoran Pemerintah Daerah'),
  '{{program}}': packageMetadata.program || 'Program Penunjang Urusan Pemerintahan Daerah',
  '{{kegiatan}}': packageMetadata.kegiatan || 'Penyelenggaraan Pemerintahan dan Pelayanan Publik',
@@ -1508,8 +1560,11 @@ export default function Step4TemplateSurat() {
     </p>
 
     <div className="font-bold uppercase mt-8 mb-2 text-center">BAB V. DRAFT RANCANGAN KONTRAK (SURAT PESANAN)</div>
-    <p className="indent-8 mb-4">
+    <p className="indent-8 mb-3">
       Rancangan kontrak menggunakan format standar <strong>Surat Pesanan (SP)</strong> yang diterbitkan langsung dan diunduh dari Sistem E-Purchasing (Katalog Elektronik LKPP). Segala ketentuan mengenai hak, kewajiban, tata cara pembayaran, sanksi, dan denda tunduk pada Syarat-Syarat Umum/Khusus Kontrak e-Purchasing.
+    </p>
+    <p className="indent-8 mb-4">
+      <strong>Ketentuan Penyelesaian Pekerjaan & BAST:</strong> {dppSpecs.ketentuanBAST || 'Penyelesaian paket pengadaan dan pencairan pembayaran 100% (seratus persen) dilaksanakan setelah seluruh hasil pekerjaan diterima dengan baik serta ditandatangani Berita Acara Serah Terima (BAST) oleh Pejabat Pembuat Komitmen (PPK).'}
     </p>
   </div>
 

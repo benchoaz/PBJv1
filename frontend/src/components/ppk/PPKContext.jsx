@@ -52,9 +52,17 @@ export function PPKProvider({ children }) {
   const [step, setStep] = useState(() => parseInt(localStorage.getItem('pbj_step') || '1'));
   const [dpaName, setDpaName] = useState(() => localStorage.getItem('pbj_dpa_name') || null);
   
-  // Use same fallback logic as TemplateSuratManager
-  const getEffectiveSatkerId = (u) => u?.idSatker || (u?.department ? u.department.replace(/\s+/g, '_').toLowerCase() : '67081');
-  const [satkerId, setSatkerId] = useState(() => localStorage.getItem('pbj_satker_id') || getEffectiveSatkerId(currentUser));
+  // Use same fallback logic as TemplateSuratManager (auto-correct typo 67881 to 67081)
+  const getEffectiveSatkerId = (u) => {
+    let id = u?.idSatker || (u?.department ? u.department.replace(/\s+/g, '_').toLowerCase() : '67081');
+    if (id === '67881') id = '67081';
+    return id;
+  };
+  const [satkerId, setSatkerId] = useState(() => {
+    let saved = localStorage.getItem('pbj_satker_id');
+    if (saved === '67881') saved = '67081';
+    return saved || getEffectiveSatkerId(currentUser);
+  });
 
   // Auto-update satkerId when currentUser becomes available
   useEffect(() => {
@@ -75,7 +83,7 @@ export function PPKProvider({ children }) {
   const [isHpsExemptSelected, setIsHpsExemptSelected] = useState(() => localStorage.getItem('pbj_hps_exempt_selected') === 'true');
   const [hpsPrices, setHpsPrices] = useState(() => { const s = localStorage.getItem('pbj_hps_prices'); return s ? JSON.parse(s) : {}; });
   const [techSpecs, setTechSpecs] = useState(() => localStorage.getItem('pbj_tech_specs') || '');
-  const [dppSpecs, setDppSpecs] = useState(() => { const s = localStorage.getItem('pbj_dpp_specs'); return s ? JSON.parse(s) : { waktu: '1 (Satu) hari kerja', tempat: '', spesifikasiLayanan: '', justifikasiMerek: '', metodePemilihan: 'Negosiasi Harga' }; });
+  const [dppSpecs, setDppSpecs] = useState(() => { const s = localStorage.getItem('pbj_dpp_specs'); return s ? JSON.parse(s) : { waktu: '1 (Satu) hari kerja', tempat: '', spesifikasiLayanan: '', justifikasiMerek: '', metodePemilihan: 'Negosiasi Harga', ketentuanBAST: 'Penyelesaian paket pengadaan dan pencairan pembayaran 100% (seratus persen) dilaksanakan setelah seluruh hasil pekerjaan diterima dengan baik serta ditandatangani Berita Acara Serah Terima (BAST) oleh Pejabat Pembuat Komitmen (PPK).' }; });
   const [packageMetadata, setPackageMetadata] = useState(() => { const s = localStorage.getItem('pbj_package_metadata'); return s ? JSON.parse(s) : { lokasi_pekerjaan: '', waktu_penyelesaian: '14 (empat belas) hari kalender', program: '', kegiatan: '', sub_kegiatan: '', nomor_dpp: '' }; });
   const [selectedTplId, setSelectedTplId] = useState(() => localStorage.getItem('pbj_selected_tpl_id') || '');
   const [selectedNdTplId, setSelectedNdTplId] = useState(() => localStorage.getItem('pbj_selected_nd_tpl_id') || '');
@@ -230,6 +238,22 @@ export function PPKProvider({ children }) {
   const getPackageItems = (pack) => {
     if (!pack) return [];
 
+    // 1. Direct match via linkedRekening or mak
+    const targetKey = pack.linkedRekening || pack.mak;
+    if (targetKey && dpaRincian[targetKey] && dpaRincian[targetKey].length > 0) {
+      return dpaRincian[targetKey].map((r, i) => ({
+        no: i + 1,
+        name: r.nama,
+        qty: r.volume,
+        unit: r.satuan,
+        price: r.harga_satuan,
+        dpa_price: r.harga_satuan,
+        paguDpa: r.harga_satuan,
+        spesifikasi: r.spesifikasi || r.specs || '',
+      }));
+    }
+
+    // 2. Check via getMatchingDpaAccount
     const matchedAcc = getMatchingDpaAccount(pack);
     const kodeRekening = matchedAcc?.account;
 
@@ -246,9 +270,25 @@ export function PPKProvider({ children }) {
       }));
     }
 
+    // 3. Fallback: nosirup_ key
     const keyNoSirup = `nosirup_${pack.noSirup}`;
     if (dpaRincian[keyNoSirup] && dpaRincian[keyNoSirup].length > 0) {
       return dpaRincian[keyNoSirup].map((r, i) => ({
+        no: i + 1,
+        name: r.nama,
+        qty: r.volume,
+        unit: r.satuan,
+        price: r.harga_satuan,
+        dpa_price: r.harga_satuan,
+        paguDpa: r.harga_satuan,
+        spesifikasi: r.spesifikasi || r.specs || '',
+      }));
+    }
+
+    // 4. Fallback: Single account rincian fallback
+    const allRincianKeys = Object.keys(dpaRincian).filter(k => dpaRincian[k] && dpaRincian[k].length > 0);
+    if (allRincianKeys.length === 1) {
+      return dpaRincian[allRincianKeys[0]].map((r, i) => ({
         no: i + 1,
         name: r.nama,
         qty: r.volume,

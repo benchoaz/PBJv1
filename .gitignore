@@ -50,3 +50,4 @@ scratch_*.js
 take_screenshots.js
 survey_runner.js
 test_search_result.png
+*.sql

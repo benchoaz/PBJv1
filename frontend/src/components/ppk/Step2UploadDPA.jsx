@@ -187,7 +187,8 @@ export default function Step2UploadDPA() {
 
   // ── FUNGSI LOAD SIRUP TERSIMPAN DARI DB ──────────────────────────────────
   const loadSirupFromDB = async (targetSatker) => {
-    const satker = targetSatker || currentUser?.idSatker || satkerId;
+    let satker = targetSatker || currentUser?.idSatker || satkerId;
+    if (satker === '67881') satker = '67081';
     if (!satker) return;
     try {
       const res = await fetch(`/api/sirup/saved?satker_id=${satker}&tahun=${new Date().getFullYear()}`);
@@ -1231,22 +1232,28 @@ export default function Step2UploadDPA() {
                 >Batal</button>
                 <button
                   onClick={async () => {
-                    const validItems = rincianModal.items.filter(r => r.nama && r.harga_satuan > 0)
+                    const validItems = rincianModal.items.filter(r => r.nama && r.harga_satuan > 0);
+                    const totalItemsPagu = validItems.reduce((s, r) => s + (parseFloat(r.harga_total) || ((parseFloat(r.volume)||1) * (parseFloat(r.harga_satuan)||0))), 0);
+
                     const newDpaRincian = { ...dpaRincian, [rincianModal.kodeRekening]: validItems };
                     const newDpaAccounts = dpaAccounts.map(acc =>
                       acc.account === rincianModal.kodeRekening
-                        ? { ...acc, rincianCount: validItems.length, verified: true }
+                        ? { ...acc, pagu: totalItemsPagu > 0 ? totalItemsPagu : acc.pagu, rincianCount: validItems.length, verified: true }
                         : acc
                     );
                     
                     setDpaRincian(newDpaRincian);
                     setDpaAccounts(newDpaAccounts);
+
+                    if (selectedPack && (selectedPack.linkedRekening === rincianModal.kodeRekening || selectedPack.mak === rincianModal.kodeRekening)) {
+                      setSelectedPack(prev => prev ? { ...prev, pagu: totalItemsPagu > 0 ? totalItemsPagu : prev.pagu } : prev);
+                    }
                     
                     // Simpan permanen ke Database sebagai Ground Truth
                     await saveDpaAccountsToDB(newDpaAccounts, dpaName, newDpaRincian);
                     
-                    setRincianModal(null)
-                    alert(`✅ ${validItems.length} item rincian disimpan ke Ground Truth untuk rekening ${rincianModal.kodeRekening}!`)
+                    setRincianModal(null);
+                    alert(`✅ ${validItems.length} item rincian diselaraskan ke Ground Truth untuk rekening ${rincianModal.kodeRekening}!`);
                   }}
                   className="px-5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold shadow-sm flex items-center gap-1.5"
                 >
