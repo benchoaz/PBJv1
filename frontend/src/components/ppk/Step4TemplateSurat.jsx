@@ -139,13 +139,18 @@ export default function Step4TemplateSurat() {
     }
     const isLock = status !== 'Final';
     const confirmMsg = isLock
-      ? 'Apakah Anda yakin ingin memfinalisasi DPP dan mengunci komitmen anggaran untuk paket ini?\n\nAnggaran HPS paket akan dipotong dari RAK Dashboard dan pengeditan spesifikasi akan dikunci.'
+      ? 'Apakah Anda yakin ingin memfinalisasi DPP dan mengunci komitmen anggaran untuk paket ini?\n\nSeluruh Rincian DPA, Hasil Survei, dan Bukti Screenshot akan disimpan permanen ke Database Sentral. Anggaran HPS paket akan dipotong dari RAK Dashboard.'
       : 'Apakah Anda yakin ingin membuka kunci anggaran?\n\nStatus paket akan kembali menjadi Draft.';
       
     if (!confirm(confirmMsg)) return;
 
     setIsFinalizing(true);
     try {
+      // 💡 CRITICAL PERMANENCE FIX: Simpan 100% data Rincian DPA, Hasil Survei & Bukti Screenshot ke Database Server DULU sebelum mengunci!
+      if (handleSimpanPaket) {
+        await handleSimpanPaket(true);
+      }
+
       let res;
       if (isLock) {
         res = await fetch(`/api/projects/${currentProjectId}/finalize`, {

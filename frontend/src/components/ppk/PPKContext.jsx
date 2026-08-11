@@ -228,7 +228,7 @@ export function PPKProvider({ children }) {
       const accWords = (acc.name || '').toLowerCase().split(/[\s/.,()-]+/);
       const keywords = accWords.filter(w => w.length > 2 && !stopWords.includes(w));
       const packNameLower = (pack.packName || '').toLowerCase();
-      const hasKeywordMatch = keywords.some(kw => packNameLower.includes(kw));
+        const hasKeywordMatch = keywords.some(kw => packNameLower.includes(kw));
       if (hasKeywordMatch && (pack.pagu || 0) <= (acc.pagu || 0)) return true;
 
       return false;
@@ -238,10 +238,62 @@ export function PPKProvider({ children }) {
   const getPackageItems = (pack) => {
     if (!pack) return [];
 
-    // 1. Direct match via linkedRekening or mak
-    const targetKey = pack.linkedRekening || pack.mak;
-    if (targetKey && dpaRincian[targetKey] && dpaRincian[targetKey].length > 0) {
-      return dpaRincian[targetKey].map((r, i) => ({
+    const cleanCode = (str) => (str || '').toString().replace(/[^0-9]/g, '');
+
+    // 1. Direct match via linkedRekening, mak, or noSirup
+    const targetKeys = [
+      pack.linkedRekening,
+      pack.mak,
+      pack.noSirup ? `nosirup_${pack.noSirup}` : null
+    ].filter(Boolean);
+
+    for (const tKey of targetKeys) {
+      if (dpaRincian[tKey] && dpaRincian[tKey].length > 0) {
+        return dpaRincian[tKey].map((r, i) => ({
+          no: i + 1,
+          name: r.nama,
+          qty: r.volume,
+          unit: r.satuan,
+          price: r.harga_satuan,
+          dpa_price: r.harga_satuan,
+          paguDpa: r.harga_satuan,
+          spesifikasi: r.spesifikasi || r.specs || '',
+        }));
+      }
+    }
+
+    // 2. Fuzzy match via clean numeric code (e.g. 51020100100024)
+    const targetClean = cleanCode(pack.linkedRekening || pack.mak || pack.noSirup);
+    if (targetClean) {
+      for (const rKey of Object.keys(dpaRincian)) {
+        const rKeyClean = cleanCode(rKey);
+        if (rKeyClean && (targetClean.includes(rKeyClean) || rKeyClean.includes(targetClean))) {
+          if (dpaRincian[rKey] && dpaRincian[rKey].length > 0) {
+            return dpaRincian[rKey].map((r, i) => ({
+              no: i + 1,
+              name: r.nama,
+              qty: r.volume,
+              unit: r.satuan,
+              price: r.harga_satuan,
+              dpa_price: r.harga_satuan,
+              paguDpa: r.harga_satuan,
+              spesifikasi: r.spesifikasi || r.specs || '',
+            }));
+          }
+        }
+      }
+    }
+
+    // 3. Fallback: Merge all available dpaRincian items across all keys
+    const allRincianItems = [];
+    Object.keys(dpaRincian).forEach(k => {
+      if (Array.isArray(dpaRincian[k]) && dpaRincian[k].length > 0) {
+        allRincianItems.push(...dpaRincian[k]);
+      }
+    });
+
+    if (allRincianItems.length > 0) {
+      return allRincianItems.map((r, i) => ({
         no: i + 1,
         name: r.nama,
         qty: r.volume,
@@ -253,62 +305,17 @@ export function PPKProvider({ children }) {
       }));
     }
 
-    // 2. Check via getMatchingDpaAccount
-    const matchedAcc = getMatchingDpaAccount(pack);
-    const kodeRekening = matchedAcc?.account;
-
-    if (kodeRekening && dpaRincian[kodeRekening] && dpaRincian[kodeRekening].length > 0) {
-      return dpaRincian[kodeRekening].map((r, i) => ({
-        no: i + 1,
-        name: r.nama,
-        qty: r.volume,
-        unit: r.satuan,
-        price: r.harga_satuan,
-        dpa_price: r.harga_satuan,
-        paguDpa: r.harga_satuan,
-        spesifikasi: r.spesifikasi || r.specs || '',
-      }));
-    }
-
-    // 3. Fallback: nosirup_ key
-    const keyNoSirup = `nosirup_${pack.noSirup}`;
-    if (dpaRincian[keyNoSirup] && dpaRincian[keyNoSirup].length > 0) {
-      return dpaRincian[keyNoSirup].map((r, i) => ({
-        no: i + 1,
-        name: r.nama,
-        qty: r.volume,
-        unit: r.satuan,
-        price: r.harga_satuan,
-        dpa_price: r.harga_satuan,
-        paguDpa: r.harga_satuan,
-        spesifikasi: r.spesifikasi || r.specs || '',
-      }));
-    }
-
-    // 4. Fallback: Single account rincian fallback
-    const allRincianKeys = Object.keys(dpaRincian).filter(k => dpaRincian[k] && dpaRincian[k].length > 0);
-    if (allRincianKeys.length === 1) {
-      return dpaRincian[allRincianKeys[0]].map((r, i) => ({
-        no: i + 1,
-        name: r.nama,
-        qty: r.volume,
-        unit: r.satuan,
-        price: r.harga_satuan,
-        dpa_price: r.harga_satuan,
-        paguDpa: r.harga_satuan,
-        spesifikasi: r.spesifikasi || r.specs || '',
-      }));
-    }
-
+    // Default fallback if no DPA items uploaded yet
     return [
       {
         no: 1,
-        name: '⚠️ Rincian belum tersedia — klik "Edit Rincian" pada tabel DPA di atas',
+        name: pack.packName || pack.namaPaket || 'Paket Pengadaan',
         qty: 1,
         unit: 'Paket',
-        price: pack.pagu,
-        dpa_price: pack.pagu,
-        paguDpa: pack.pagu,
+        price: pack.pagu || 0,
+        dpa_price: pack.pagu || 0,
+        paguDpa: pack.pagu || 0,
+        spesifikasi: pack.spesifikasi || '',
       }
     ];
   };
@@ -529,6 +536,21 @@ export function PPKProvider({ children }) {
       if (parsed.autoComparator !== undefined) setAutoComparator(parsed.autoComparator);
       if (parsed.selectedNdTplId) setSelectedNdTplId(parsed.selectedNdTplId);
       if (parsed.selectedTplId) setSelectedTplId(parsed.selectedTplId);
+
+      // 💡 RE-HYDRATION RESTORATION: Jika browser history / localStorage terhapus, pulihkan kembali dari DB Sentral PostgreSQL
+      try {
+        if (parsed.dpaRincian) localStorage.setItem('pbj_dpa_rincian', JSON.stringify(parsed.dpaRincian));
+        if (parsed.surveyData) localStorage.setItem('pbj_survey_data', JSON.stringify(parsed.surveyData));
+        if (parsed.hpsPrices) localStorage.setItem('pbj_hps_prices', JSON.stringify(parsed.hpsPrices));
+        if (parsed.packageMetadata) localStorage.setItem('pbj_package_metadata', JSON.stringify(parsed.packageMetadata));
+        if (parsed.dppSpecs) localStorage.setItem('pbj_dpp_specs', JSON.stringify(parsed.dppSpecs));
+        if (parsed.comparisons) localStorage.setItem('pbj_comparisons', JSON.stringify(parsed.comparisons));
+        if (parsed.justifications) localStorage.setItem('pbj_justifications', JSON.stringify(parsed.justifications));
+        if (parsed.dpaAccounts) localStorage.setItem('pbj_dpa_accounts', JSON.stringify(parsed.dpaAccounts));
+        if (id) localStorage.setItem('pbj_current_project_id', id.toString());
+      } catch (hydrationErr) {
+        console.warn('Re-hydration storage warning:', hydrationErr);
+      }
     } catch(e) {
       console.error('Failed to load project data:', e);
     }
