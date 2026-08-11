@@ -70,20 +70,47 @@ function ProcurementPreparationContent() {
     <div id="pbk-persiapan-root" className="animate-fade-in pb-12">
       {/* LOCK ALERT OVERLAY FOR READ-ONLY MODE */}
       {status !== 'Draft' && (
-        <div className="bg-amber-50 border-l-4 border-amber-500 p-6 mb-8 rounded-r-xl shadow-sm pointer-events-auto relative z-10 animate-fade-in">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <span className="text-2xl">🔒</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-bold text-amber-800">
+        <div className="bg-amber-50 border-l-4 border-amber-500 p-6 mb-8 rounded-r-xl shadow-md pointer-events-auto relative z-20 animate-fade-in flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 text-3xl">🔒</div>
+            <div>
+              <h3 className="text-lg font-extrabold text-amber-900">
                 Dokumen Terkunci (Status: {status})
               </h3>
-              <p className="text-amber-700 mt-1">
-                Paket pengadaan ini sudah diproses ke tahap lanjut. Sistem secara otomatis <b>menggembok</b> seluruh isian agar tidak terjadi perubahan data secara sepihak. Anda masih bisa melihat rincian, mengunduh PDF, atau melakukan tanda tangan digital (jika diperlukan).
+              <p className="text-amber-800 mt-1 text-xs leading-relaxed max-w-2xl">
+                Paket pengadaan ini sedang dalam status terkunci. Klik tombol <b>"Buka Kunci Anggaran"</b> di samping jika Anda ingin menambah/mengambil screenshot baru atau menyunting rincian survei HPS.
               </p>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={async () => {
+              const targetId = currentProjectId || paketId;
+              if (!targetId) {
+                alert('ID Paket tidak ditemukan.');
+                return;
+              }
+              if (!window.confirm('Apakah Anda yakin ingin membuka kunci anggaran?\n\nStatus paket akan kembali menjadi Draft agar Anda dapat mengambil screenshot & menyunting survei.')) return;
+              try {
+                const res = await fetch(`/api/projects/${targetId}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ status: 'Draft' })
+                });
+                if (res.ok) {
+                  alert('🔓 Kunci anggaran berhasil dibuka! Paket kembali menjadi Draft.');
+                  if (loadProjectData) await loadProjectData(targetId);
+                } else {
+                  alert('Gagal membuka kunci anggaran. Periksa koneksi server.');
+                }
+              } catch (e) {
+                alert('Error: ' + e.message);
+              }
+            }}
+            className="shrink-0 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs px-6 py-3.5 rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-95 cursor-pointer flex items-center gap-2"
+          >
+            <span>🔓 Buka Kunci Anggaran Sekarang</span>
+          </button>
         </div>
       )}
 

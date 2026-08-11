@@ -664,7 +664,7 @@ export default function Step4TemplateSurat() {
                   </div>
 
                   {/* Status Komitmen Anggaran */}
-                  <div className={`mb-6 p-4 border rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${status === 'Final' ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                  <div className={`mb-6 p-4 border rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pointer-events-auto relative z-20 ${status === 'Final' ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${status === 'Final' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
                         {status === 'Final' ? <ShieldCheck className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
