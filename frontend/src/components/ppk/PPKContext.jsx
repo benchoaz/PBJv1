@@ -370,9 +370,21 @@ export function PPKProvider({ children }) {
     silentReset();
   };
 
-  const loadProjectData = (project) => {
+  const loadProjectData = async (projectInput) => {
     try {
-      const parsed = JSON.parse(project.description || '{}');
+      if (!projectInput) return;
+      let project = projectInput;
+      if (typeof projectInput === 'string' || typeof projectInput === 'number') {
+        const res = await fetch(`/api/projects/${projectInput}`);
+        if (res.ok) {
+          project = await res.json();
+        } else {
+          console.error('Failed to fetch project by ID:', projectInput);
+          return;
+        }
+      }
+
+      const parsed = typeof project.description === 'string' ? JSON.parse(project.description || '{}') : (project.description || {});
       setCurrentProjectId(project.id.toString());
       setStatus(project.status || 'Draft');
       
