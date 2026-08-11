@@ -125,7 +125,7 @@ export default function Step4TemplateSurat() {
     surveyData, hpsPrices, getPackageItems,
     selectedTplId, setSelectedTplId, autoComparator,
     selectedNdTplId, setSelectedNdTplId,
-    comparisons, currentProjectId, status, loadProjectData
+    comparisons, currentProjectId, status, loadProjectData, handleSimpanPaket
   } = usePPK();
 
   const [activeDocPreview, setActiveDocPreview] = useState(null);
@@ -133,7 +133,10 @@ export default function Step4TemplateSurat() {
   const [isFinalizing, setIsFinalizing] = useState(false);
 
   const handleFinalizeBudget = async () => {
-    if (!currentProjectId) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetId = currentProjectId || selectedPack?.id || urlParams.get('paketId');
+
+    if (!targetId) {
       alert('Simpan draft terlebih dahulu sebelum memfinalisasi.');
       return;
     }
@@ -147,18 +150,18 @@ export default function Step4TemplateSurat() {
     setIsFinalizing(true);
     try {
       // 💡 CRITICAL PERMANENCE FIX: Simpan 100% data Rincian DPA, Hasil Survei & Bukti Screenshot ke Database Server DULU sebelum mengunci!
-      if (handleSimpanPaket) {
+      if (isLock && handleSimpanPaket) {
         await handleSimpanPaket(true);
       }
 
       let res;
       if (isLock) {
-        res = await fetch(`/api/projects/${currentProjectId}/finalize`, {
+        res = await fetch(`/api/projects/${targetId}/finalize`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
       } else {
-        res = await fetch(`/api/projects/${currentProjectId}`, {
+        res = await fetch(`/api/projects/${targetId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: 'Draft' })
@@ -170,13 +173,13 @@ export default function Step4TemplateSurat() {
         throw new Error(errData.error || `HTTP ${res.status}`);
       }
 
-      alert(isLock ? '🔒 Anggaran berhasil dikunci!' : '🔓 Kunci anggaran dibuka kembali.');
+      alert(isLock ? '🔒 Anggaran berhasil dikunci!' : '🔓 Kunci anggaran dibuka kembali. Paket kembali menjadi Draft.');
       if (loadProjectData) {
-        await loadProjectData(currentProjectId);
+        await loadProjectData(targetId);
       }
     } catch (err) {
-      console.error(err);
-      alert('Gagal mengubah status anggaran: ' + err.message);
+      console.error('Error finalizing/unlocking budget:', err);
+      alert('Gagal memproses kunci anggaran: ' + err.message);
     } finally {
       setIsFinalizing(false);
     }
@@ -676,11 +679,12 @@ export default function Step4TemplateSurat() {
                       </div>
                     </div>
                     <button
+                      type="button"
                       onClick={handleFinalizeBudget}
-                      disabled={isFinalizing || !currentProjectId}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm hover:scale-102 shrink-0 ${
+                      disabled={isFinalizing}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm hover:scale-105 active:scale-95 shrink-0 cursor-pointer ${
                         status === 'Final' 
-                          ? 'bg-rose-100 hover:bg-rose-200 text-rose-700 border border-rose-200' 
+                          ? 'bg-rose-500 hover:bg-rose-600 text-white border border-rose-600 shadow-md' 
                           : 'bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50'
                       }`}
                     >
