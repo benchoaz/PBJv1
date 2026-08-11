@@ -1242,18 +1242,31 @@ export default function Step2UploadDPA() {
                         : acc
                     );
                     
+                    // 💡 AUTO-LINK & DUAL KEY SYNCHRONIZATION:
+                    // Pastikan rincian tersimpan di bawah kodeRekening DAN di bawah nosirup_ (bila ada)
+                    // serta hubungkan selectedPack secara eksplisit agar Step 3 Survei 100% langsung menampilkan item
+                    if (selectedPack?.noSirup) {
+                      newDpaRincian[`nosirup_${selectedPack.noSirup}`] = validItems;
+                    }
+
                     setDpaRincian(newDpaRincian);
                     setDpaAccounts(newDpaAccounts);
 
-                    if (selectedPack && (selectedPack.linkedRekening === rincianModal.kodeRekening || selectedPack.mak === rincianModal.kodeRekening)) {
-                      setSelectedPack(prev => prev ? { ...prev, pagu: totalItemsPagu > 0 ? totalItemsPagu : prev.pagu } : prev);
-                    }
+                    setSelectedPack(prev => {
+                      if (!prev) return prev;
+                      return {
+                        ...prev,
+                        linkedRekening: rincianModal.kodeRekening,
+                        mak: rincianModal.kodeRekening,
+                        pagu: totalItemsPagu > 0 ? totalItemsPagu : prev.pagu
+                      };
+                    });
                     
                     // Simpan permanen ke Database sebagai Ground Truth
                     await saveDpaAccountsToDB(newDpaAccounts, dpaName, newDpaRincian);
                     
                     setRincianModal(null);
-                    alert(`✅ ${validItems.length} item rincian diselaraskan ke Ground Truth untuk rekening ${rincianModal.kodeRekening}!`);
+                    alert(`✅ ${validItems.length} item rincian diselaraskan & disinkronkan ke Step 3 Survei HPS untuk rekening ${rincianModal.kodeRekening}!`);
                   }}
                   className="px-5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold shadow-sm flex items-center gap-1.5"
                 >
