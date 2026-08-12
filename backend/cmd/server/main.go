@@ -191,6 +191,10 @@ func main() {
 	mux.HandleFunc("OPTIONS /api/dpa/accounts", budgetHandler.Options)
 	mux.HandleFunc("OPTIONS /api/dpa/accounts/save", budgetHandler.Options)
 
+	// ── INAPROC Tax Assistant Calculator Route ───────────────────────────────
+	mux.HandleFunc("GET /api/tax/calculate", budgetHandler.CalculateInaprocTax)
+	mux.HandleFunc("OPTIONS /api/tax/calculate", budgetHandler.Options)
+
 	// ── Budget Integration: SIRUP saved to DB ────────────────────────────────
 	mux.HandleFunc("POST /api/sirup/save", budgetHandler.SaveSirupPackages)
 	mux.HandleFunc("GET /api/sirup/saved", budgetHandler.GetSirupPackagesSaved)

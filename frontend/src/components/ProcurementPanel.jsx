@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import BahpDocument from './pp/BahpDocument'
 import { BAHP_TEMPLATE_TYPES, VALIDASI_CONFIG } from './pp/BahpTemplates'
 import { dialog } from '../utils/dialog'
+import InaprocTaxHelper from './common/InaprocTaxHelper'
 
 export default function ProcurementPanel() {
   const { user } = useAuth()
@@ -864,6 +865,7 @@ export default function ProcurementPanel() {
   })
 
   // Negotiation Table States
+  const [expandedTaxRows, setExpandedTaxRows] = useState({});
   const [negotiatedItems, setNegotiatedItems] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('pbj_negotiated_items')) || {};
@@ -1818,6 +1820,17 @@ export default function ProcurementPanel() {
                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                             <span>{expandedSearchRows[item.no] ? 'Tutup Pencarian ▲' : 'Cari Produk ▼'}</span>
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedTaxRows(prev => ({ ...prev, [item.no]: !prev[item.no] }))}
+                            className={`mt-1.5 text-[10.5px] font-extrabold flex items-center gap-1 px-2.5 py-1.5 rounded-lg border transition-all w-full justify-center ${
+                              expandedTaxRows[item.no]
+                                ? 'bg-emerald-700 border-emerald-700 text-white shadow-md'
+                                : 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-600 hover:text-white'
+                            }`}
+                          >
+                            <span>🧮 {expandedTaxRows[item.no] ? 'Tutup Tax Guide ▲' : 'Hitung Tax INAPROC ▼'}</span>
+                          </button>
                         </td>
                         <td className="p-4 text-center font-semibold text-slate-700">
                           {item.qty} <span className="text-[10px] text-slate-400 font-normal uppercase">{item.unit}</span>
@@ -2256,6 +2269,23 @@ export default function ProcurementPanel() {
                           </td>
                         </tr>
                       )}
+                      {/* ── EXPANDED INAPROC TAX CALCULATOR ROW ── */}
+                       {expandedTaxRows[item.no] && (
+                         <tr className="bg-slate-50 border-b border-indigo-100">
+                           <td colSpan="10" className="p-3 sm:p-4">
+                             <InaprocTaxHelper
+                               dpaPrice={paguSatuan}
+                               qty={item.qty}
+                               unit={item.unit}
+                               itemName={item.name}
+                               onApplyPrice={(dpp, totalSatuan) => {
+                                 handleNegotiationChange(item.no, 'price', totalSatuan);
+                                 alert(`✅ Nilai DPP Rp ${dpp.toLocaleString('id-ID')} (${totalSatuan.toLocaleString('id-ID')} setelah PPN) berhasil diterapkan ke kolom Harga Nego!`);
+                               }}
+                             />
+                           </td>
+                         </tr>
+                       )}
                       </React.Fragment>
                     )
                   })}

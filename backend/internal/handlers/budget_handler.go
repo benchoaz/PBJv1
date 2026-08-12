@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -665,5 +666,73 @@ func (h *BudgetHandler) GetRakParseStatus(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
 	w.Write(respBody)
+}
+
+// CalculateInaprocTax provides server-side calculation for INAPROC negotiation tax DPP & PPN
+// GET /api/tax/calculate?dpa_price=543700&tax_rate=12&qty=4
+func (h *BudgetHandler) CalculateInaprocTax(w http.ResponseWriter, r *http.Request) {
+	corsJSON(w)
+	dpaPriceStr := r.URL.Query().Get("dpa_price")
+	taxRateStr := r.URL.Query().Get("tax_rate")
+	qtyStr := r.URL.Query().Get("qty")
+
+	dpaPrice, _ := strconv.ParseFloat(dpaPriceStr, 64)
+	if dpaPrice <= 0 {
+		dpaPrice = 543700 // default fallback sample
+	}
+
+	taxRate, _ := strconv.ParseFloat(taxRateStr, 64)
+	if taxRate <= 0 {
+		taxRate = 12.0 // default per UU HPP (12%)
+	}
+
+	qty, _ := strconv.ParseFloat(qtyStr, 64)
+	if qty <= 0 {
+		qty = 1.0
+	}
+
+	multiplier := 1.0 + (taxRate / 100.0)
+	dppInput := math.Floor(dpaPrice / multiplier)
+	ppnAmount := dppInput * (taxRate / 100.0)
+	totalSatuan := dppInput + ppnAmount
+	totalGrand := totalSatuan * qty
+	dpaMaxGrand := dpaPrice * qty
+
+	// Scenarios
+	dpp2pct := math.Floor((dpaPrice * 0.98) / multiplier)
+	dpp5pct := math.Floor((dpaPrice * 0.95) / multiplier)
+
+	res := map[string]interface{}{
+		"success":                true,
+		"dpa_price_net":          dpaPrice,
+		"tax_rate_percent":       taxRate,
+		"inaproc_input_dpp":      int64(dppInput),
+		"ppn_amount":             ppnAmount,
+		"calculated_total_net":   totalSatuan,
+		"total_qty":              qty,
+		"calculated_total_grand": totalGrand,
+		"dpa_max_grand":          dpaMaxGrand,
+		"is_safe_audit":          totalGrand <= dpaMaxGrand,
+		"copy_string":            strconv.FormatInt(int64(dppInput), 10),
+		"scenarios": map[string]interface{}{
+			"max_dpa": map[string]interface{}{
+				"dpp":          int64(dppInput),
+				"total_satuan": totalSatuan,
+				"copy_string":  strconv.FormatInt(int64(dppInput), 10),
+			},
+			"save_2_percent": map[string]interface{}{
+				"dpp":          int64(dpp2pct),
+				"total_satuan": dpp2pct * multiplier,
+				"copy_string":  strconv.FormatInt(int64(dpp2pct), 10),
+			},
+			"save_5_percent": map[string]interface{}{
+				"dpp":          int64(dpp5pct),
+				"total_satuan": dpp5pct * multiplier,
+				"copy_string":  strconv.FormatInt(int64(dpp5pct), 10),
+			},
+		},
+	}
+
+	json.NewEncoder(w).Encode(res)
 }
 
