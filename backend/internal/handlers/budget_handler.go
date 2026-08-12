@@ -673,27 +673,34 @@ func (h *BudgetHandler) GetRakParseStatus(w http.ResponseWriter, r *http.Request
 func (h *BudgetHandler) CalculateInaprocTax(w http.ResponseWriter, r *http.Request) {
 	corsJSON(w)
 	dpaPriceStr := r.URL.Query().Get("dpa_price")
-	taxRateStr := r.URL.Query().Get("tax_rate")
-	qtyStr := r.URL.Query().Get("qty")
-
 	dpaPrice, _ := strconv.ParseFloat(dpaPriceStr, 64)
 	if dpaPrice <= 0 {
 		dpaPrice = 543700 // default fallback sample
 	}
 
-	taxRate, _ := strconv.ParseFloat(taxRateStr, 64)
-	if taxRate <= 0 {
-		taxRate = 12.0 // default per UU HPP (12%)
-	}
-
+	qtyStr := r.URL.Query().Get("qty")
 	qty, _ := strconv.ParseFloat(qtyStr, 64)
 	if qty <= 0 {
 		qty = 1.0
 	}
 
-	multiplier := 1.0 + (taxRate / 100.0)
+	taxMode := r.URL.Query().Get("tax_mode")
+	if taxMode == "" {
+		taxMode = "inaproc_12" // default official INAPROC mode
+	}
+
+	effectiveRate := 11.0
+	if taxMode == "pure_12" {
+		effectiveRate = 12.0
+	} else if taxMode == "pure_11" {
+		effectiveRate = 11.0
+	} else if taxMode == "non_pkp" {
+		effectiveRate = 0.0
+	}
+
+	multiplier := 1.0 + (effectiveRate / 100.0)
 	dppInput := math.Floor(dpaPrice / multiplier)
-	ppnAmount := dppInput * (taxRate / 100.0)
+	ppnAmount := dppInput * (effectiveRate / 100.0)
 	totalSatuan := dppInput + ppnAmount
 	totalGrand := totalSatuan * qty
 	dpaMaxGrand := dpaPrice * qty
@@ -705,7 +712,9 @@ func (h *BudgetHandler) CalculateInaprocTax(w http.ResponseWriter, r *http.Reque
 	res := map[string]interface{}{
 		"success":                true,
 		"dpa_price_net":          dpaPrice,
-		"tax_rate_percent":       taxRate,
+		"tax_mode":               taxMode,
+		"effective_tax_percent":  effectiveRate,
+		"inaproc_formula":        "(11/12 x DPP) x 12% = 11% Efektif",
 		"inaproc_input_dpp":      int64(dppInput),
 		"ppn_amount":             ppnAmount,
 		"calculated_total_net":   totalSatuan,

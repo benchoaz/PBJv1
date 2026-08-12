@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Check, Calculator, ShieldCheck, AlertTriangle, Sparkles } from 'lucide-react';
+import { Copy, Check, Calculator, ShieldCheck, AlertTriangle, Sparkles, Info } from 'lucide-react';
 
 export default function InaprocTaxHelper({
-  dpaPrice = 543700,
+  dpaPrice = 15900,
   qty = 1,
-  unit = 'Unit',
+  unit = 'Biji',
   itemName = '',
   onApplyPrice = null,
   compact = false
 }) {
-  const [taxRate, setTaxRate] = useState(12); // Default 12%
+  // Mode PPN INAPROC:
+  // 'inaproc_12': Golongan PPN 12% Resmi INAPROC (11/12 x DPP x 12% = 11% Efektif)
+  // 'pure_12': PPN 12% Murni (12% Efektif)
+  // 'pure_11': PPN 11% Murni (11% Efektif)
+  // 'non_pkp': Non-PKP (0%)
+  const [taxMode, setTaxMode] = useState('inaproc_12');
   const [customDpaPrice, setCustomDpaPrice] = useState(dpaPrice);
   const [copiedKey, setCopiedKey] = useState(null);
 
@@ -20,14 +25,32 @@ export default function InaprocTaxHelper({
   const priceNum = parseFloat(customDpaPrice) || 0;
   const qtyNum = parseFloat(qty) || 1;
 
-  const multiplier = 1 + (taxRate / 100);
+  // Hitung multiplier & PPN berdasarkan taxMode
+  let effectiveRate = 11;
+  let labelFormula = '(11/12 x DPP) x 12% = 11% Efektif';
+
+  if (taxMode === 'inaproc_12') {
+    effectiveRate = 11;
+    labelFormula = 'Golongan PPN 12% INAPROC (DPP Lain: 11/12 x 12% = 11% Efektif)';
+  } else if (taxMode === 'pure_12') {
+    effectiveRate = 12;
+    labelFormula = 'PPN 12% Murni (12% Efektif)';
+  } else if (taxMode === 'pure_11') {
+    effectiveRate = 11;
+    labelFormula = 'PPN 11% Murni (11% Efektif)';
+  } else if (taxMode === 'non_pkp') {
+    effectiveRate = 0;
+    labelFormula = 'Non-PKP / Bebas Pajak (0%)';
+  }
+
+  const multiplier = 1 + (effectiveRate / 100);
   const maxDpp = Math.floor(priceNum / multiplier);
-  const maxPpn = maxDpp * (taxRate / 100);
+  const maxPpn = maxDpp * (effectiveRate / 100);
   const maxTotalSatuan = maxDpp + maxPpn;
   const maxGrandTotal = maxTotalSatuan * qtyNum;
   const dpaGrandTotal = priceNum * qtyNum;
 
-  // Skenario penawaran
+  // Skenario penawaran hemat
   const dpp2pct = Math.floor((priceNum * 0.98) / multiplier);
   const total2pctSatuan = dpp2pct * multiplier;
 
@@ -48,25 +71,21 @@ export default function InaprocTaxHelper({
             <Calculator className="w-3.5 h-3.5 text-indigo-400" />
             <span>Kalkulator INAPROC</span>
           </div>
-          <div className="flex gap-1">
-            {[12, 11, 0].map(rate => (
-              <button
-                key={rate}
-                type="button"
-                onClick={() => setTaxRate(rate)}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                  taxRate === rate ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                }`}
-              >
-                {rate === 0 ? '0%' : `${rate}%`}
-              </button>
-            ))}
-          </div>
+          <select
+            value={taxMode}
+            onChange={(e) => setTaxMode(e.target.value)}
+            className="bg-slate-800 text-[10px] font-bold text-slate-200 border border-slate-700 rounded px-1.5 py-0.5"
+          >
+            <option value="inaproc_12">INAPROC 12% (11/12)</option>
+            <option value="pure_12">PPN 12% Murni</option>
+            <option value="pure_11">PPN 11%</option>
+            <option value="non_pkp">Non-PKP (0%)</option>
+          </select>
         </div>
 
         <div className="flex items-center justify-between bg-slate-800/80 p-2 rounded-lg border border-slate-700">
           <div>
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Ketik di Kolom INAPROC:</div>
+            <div className="text-[10px] text-slate-400 uppercase font-semibold">Ketik di INAPROC:</div>
             <div className="text-sm font-mono font-black text-emerald-400">
               Rp {maxDpp.toLocaleString('id-ID')}
             </div>
@@ -74,7 +93,7 @@ export default function InaprocTaxHelper({
           <button
             type="button"
             onClick={() => handleCopy(maxDpp, 'compact_dpp')}
-            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-[11px] flex items-center gap-1 shadow transition-all active:scale-95"
+            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-[11px] flex items-center gap-1 shadow transition-all active:scale-95 cursor-pointer"
           >
             {copiedKey === 'compact_dpp' ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3 text-white" />}
             <span>{copiedKey === 'compact_dpp' ? 'Tersalin!' : 'Salin Angka'}</span>
@@ -82,7 +101,7 @@ export default function InaprocTaxHelper({
         </div>
 
         <div className="text-[10px] text-slate-400 flex justify-between font-mono pt-0.5">
-          <span>PPN ({taxRate}%): Rp {Math.round(maxPpn).toLocaleString('id-ID')}</span>
+          <span>PPN INAPROC: Rp {Math.round(maxPpn).toLocaleString('id-ID')}</span>
           <span className="text-emerald-400 font-bold">Total Akhir: Rp {Math.round(maxTotalSatuan).toLocaleString('id-ID')}</span>
         </div>
       </div>
@@ -112,18 +131,19 @@ export default function InaprocTaxHelper({
 
         {/* Jenis Pajak Selector */}
         <div className="flex items-center gap-1.5 bg-slate-800/90 p-1.5 rounded-xl border border-slate-700 shrink-0 self-start sm:self-center">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">Jenis PPN:</span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">Metode Pajak:</span>
           {[
-            { label: 'PPN 12% (PKP)', value: 12 },
-            { label: 'PPN 11%', value: 11 },
-            { label: 'Non-PKP (0%)', value: 0 }
+            { id: 'inaproc_12', label: 'Golongan PPN 12% INAPROC (Resmi)' },
+            { id: 'pure_12', label: 'PPN 12% Murni' },
+            { id: 'pure_11', label: 'PPN 11%' },
+            { id: 'non_pkp', label: 'Non-PKP (0%)' }
           ].map(item => (
             <button
-              key={item.value}
+              key={item.id}
               type="button"
-              onClick={() => setTaxRate(item.value)}
+              onClick={() => setTaxMode(item.id)}
               className={`px-2.5 py-1 rounded-lg text-xs font-extrabold transition-all ${
-                taxRate === item.value
+                taxMode === item.id
                   ? 'bg-indigo-600 text-white shadow-sm scale-102'
                   : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
               }`}
@@ -132,6 +152,12 @@ export default function InaprocTaxHelper({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Formula Info Banner */}
+      <div className="bg-indigo-900/90 text-indigo-100 text-[11px] px-4 py-2 flex items-center gap-2 border-b border-indigo-800">
+        <Info className="w-4 h-4 text-indigo-300 shrink-0" />
+        <span>Formula Resmi Portal INAPROC: <strong className="font-mono text-emerald-300">{labelFormula}</strong></span>
       </div>
 
       {/* Body Content */}
@@ -193,7 +219,7 @@ export default function InaprocTaxHelper({
                 <strong className="text-emerald-700">Rp {maxDpp.toLocaleString('id-ID')}</strong>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>PPN ({taxRate}%):</span>
+                <span>PPN INAPROC:</span>
                 <strong className="text-slate-700">Rp {Math.round(maxPpn).toLocaleString('id-ID')}</strong>
               </div>
               <div className="border-t border-dashed border-slate-200 pt-1.5 flex justify-between font-bold text-slate-900">
