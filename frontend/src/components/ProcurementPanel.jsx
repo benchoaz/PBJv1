@@ -1797,7 +1797,15 @@ export default function ProcurementPanel() {
                     const hpsSatuan = item.price || 0;
                     const negoVal = parseFloat(negoPrice) || 0;
                     const ongkirVal = parseFloat(ongkir) || 0;
-                    const totalAkhir = (negoVal * item.qty) + ongkirVal;
+                    
+                    // 💡 Auto-Detect DPP vs Nett (+PAJAK):
+                    // Jika negoVal bernilai DPP sebelum pajak (misal 13.900), hitung Nett + Pajak (x 1,11)
+                    let negoNettSatuan = negoVal;
+                    if (negoVal > 0 && negoVal < (paguSatuan * 0.95) / 1.11) {
+                      negoNettSatuan = Math.round(negoVal * 1.11);
+                    }
+                    
+                    const totalAkhir = (negoNettSatuan * item.qty) + ongkirVal;
                     const totalHps = hpsSatuan * item.qty;
                     const isOverbudget = totalAkhir > totalHps;
                     

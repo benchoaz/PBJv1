@@ -54,7 +54,6 @@ export default function InaprocTaxHelper({
   const vendorDpp = tayangNum > 0 ? Math.floor(tayangNum / multiplier) : 0;
   
   let maxDpp = Math.floor(ceilingNett / multiplier);
-  // Jika tayang vendor lebih kecil dan maxDpp >= vendorDpp, kurangi 1 rupiah agar Nego DPP < DPP Vendor!
   const isConstrainedByVendor = vendorDpp > 0 && maxDpp >= vendorDpp;
   if (isConstrainedByVendor) {
     maxDpp = Math.max(0, vendorDpp - 1);
@@ -100,10 +99,11 @@ export default function InaprocTaxHelper({
 
         <div className="flex items-center justify-between bg-slate-800/80 p-2 rounded-lg border border-slate-700">
           <div>
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Ketik di INAPROC:</div>
+            <div className="text-[10px] text-slate-400 uppercase font-semibold">DPP Diketik di INAPROC:</div>
             <div className="text-sm font-mono font-black text-emerald-400">
               Rp {maxDpp.toLocaleString('id-ID')}
             </div>
+            <div className="text-[9px] text-slate-300 mt-0.5">Total Satuan (+Pajak): Rp {Math.round(maxTotalSatuan).toLocaleString('id-ID')}</div>
           </div>
           <button
             type="button"
@@ -111,13 +111,8 @@ export default function InaprocTaxHelper({
             className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-[11px] flex items-center gap-1 shadow transition-all active:scale-95 cursor-pointer"
           >
             {copiedKey === 'compact_dpp' ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3 text-white" />}
-            <span>{copiedKey === 'compact_dpp' ? 'Tersalin!' : 'Salin Angka'}</span>
+            <span>{copiedKey === 'compact_dpp' ? 'Tersalin!' : 'Salin DPP'}</span>
           </button>
-        </div>
-
-        <div className="text-[10px] text-slate-400 flex justify-between font-mono pt-0.5">
-          <span>PPN INAPROC: Rp {Math.round(maxPpn).toLocaleString('id-ID')}</span>
-          <span className="text-emerald-400 font-bold">Total Akhir: Rp {Math.round(maxTotalSatuan).toLocaleString('id-ID')}</span>
         </div>
       </div>
     );
@@ -178,7 +173,7 @@ export default function InaprocTaxHelper({
         {isConstrainedByVendor && (
           <div className="flex items-center gap-1 bg-amber-400/20 text-amber-300 text-[10px] font-extrabold px-2 py-0.5 rounded border border-amber-400/30">
             <TrendingDown className="w-3 h-3 text-amber-300 shrink-0" />
-            <span>Terikat Syarat INAPROC: Nego DPP &lt; DPP Awal Vendor (Rp {vendorDpp.toLocaleString('id-ID')})</span>
+            <span>Syarat INAPROC: Nego DPP &lt; DPP Awal Vendor (Rp {vendorDpp.toLocaleString('id-ID')})</span>
           </div>
         )}
       </div>
@@ -191,21 +186,19 @@ export default function InaprocTaxHelper({
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
               <span className="text-xs font-black text-emerald-900 uppercase tracking-wider">
-                ANGKA EKSAT HARUS DIKETIK DI INAPROC (SEBELUM PAJAK / DPP)
+                ANGKA EKSAT DIKETIK DI INAPROC (SEBELUM PAJAK / DPP)
               </span>
             </div>
             <div className="text-2xl font-black font-mono text-emerald-700 flex items-baseline gap-2">
               <span>Rp {maxDpp.toLocaleString('id-ID')}</span>
-              <span className="text-xs font-sans font-bold text-slate-500">/ {unit}</span>
+              <span className="text-xs font-sans font-bold text-slate-500">/ {unit} (Sebelum Pajak)</span>
             </div>
-            <p className="text-[11px] text-emerald-800 font-medium leading-relaxed">
-              Ketik angka <strong className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-300">{maxDpp}</strong> pada kolom <em>"Nego Harga Sebelum Pajak"</em> di portal INAPROC.
-              {isConstrainedByVendor && (
-                <span className="block text-[10px] font-bold text-amber-700 mt-1">
-                  💡 Angka ini dijamin diterima INAPROC karena bernilai tepat 1 rupiah di bawah DPP Awal Vendor (Rp {vendorDpp.toLocaleString('id-ID')}).
-                </span>
-              )}
-            </p>
+            <div className="text-xs font-bold text-indigo-900 mt-1 font-mono">
+              Hasil Akhir + Pajak (Nett): <span className="bg-indigo-100 text-indigo-900 px-2 py-0.5 rounded border border-indigo-200">Rp {Math.round(maxTotalSatuan).toLocaleString('id-ID')} / {unit}</span>
+              <span className="text-emerald-700 text-[10px] ml-2 font-sans font-bold">
+                (Aman: {maxTotalSatuan <= priceNum ? `Hemat Rp ${Math.round(priceNum - maxTotalSatuan).toLocaleString('id-ID')} dari DPA` : 'Pas DPA'})
+              </span>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto shrink-0">
@@ -215,16 +208,16 @@ export default function InaprocTaxHelper({
               className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
             >
               {copiedKey === 'main_dpp' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              <span>{copiedKey === 'main_dpp' ? 'Tersalin ke Clipboard!' : 'Salin Angka DPP'}</span>
+              <span>{copiedKey === 'main_dpp' ? 'Tersalin!' : 'Salin Angka DPP'}</span>
             </button>
             {onApplyPrice && (
               <button
                 type="button"
-                onClick={() => onApplyPrice(maxDpp, maxTotalSatuan)}
+                onClick={() => onApplyPrice(maxDpp, Math.round(maxTotalSatuan))}
                 className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>Gunakan di Form</span>
+                <span>Gunakan di Form PBJ</span>
               </button>
             )}
           </div>
@@ -235,34 +228,38 @@ export default function InaprocTaxHelper({
           {/* Kolom Kiri: Breakdown Pajak */}
           <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2.5 shadow-sm">
             <h5 className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider border-b border-slate-100 pb-2">
-              Breakdown Komponen Pajak INAPROC
+              Breakdown Komponen Pajak (+ Pajak vs DPA)
             </h5>
             <div className="space-y-1.5 text-xs font-mono">
               <div className="flex justify-between text-slate-600">
-                <span>Harga Batas DPA (Nett):</span>
+                <span>Batas DPA (+Pajak):</span>
                 <strong className="text-slate-800">Rp {priceNum.toLocaleString('id-ID')}</strong>
               </div>
               {tayangNum > 0 && (
                 <div className="flex justify-between text-slate-600">
-                  <span>Harga Tayang Vendor (DPP {vendorDpp.toLocaleString('id-ID')}):</span>
+                  <span>Tayang Vendor (+Pajak):</span>
                   <strong className="text-indigo-700">Rp {tayangNum.toLocaleString('id-ID')}</strong>
                 </div>
               )}
               <div className="flex justify-between text-slate-600">
-                <span>Nego DPP Sebelum Pajak:</span>
+                <span>Nego DPP INAPROC (Sebelum Pajak):</span>
                 <strong className="text-emerald-700">Rp {maxDpp.toLocaleString('id-ID')}</strong>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>PPN INAPROC:</span>
+                <span>PPN INAPROC ({effectiveRate}%):</span>
                 <strong className="text-slate-700">Rp {Math.round(maxPpn).toLocaleString('id-ID')}</strong>
               </div>
               <div className="border-t border-dashed border-slate-200 pt-1.5 flex justify-between font-bold text-slate-900">
-                <span>Total Satuan Setelah Pajak:</span>
+                <span>Total Satuan NETT (+PAJAK):</span>
                 <span className="text-indigo-950 font-black">Rp {Math.round(maxTotalSatuan).toLocaleString('id-ID')}</span>
               </div>
               <div className="flex justify-between text-[11px] text-slate-500 pt-1">
-                <span>Total Grand ({qtyNum} {unit}):</span>
+                <span>Total Grand ({qtyNum} {unit} + Pajak):</span>
                 <strong className="text-slate-900 font-mono">Rp {Math.round(maxGrandTotal).toLocaleString('id-ID')}</strong>
+              </div>
+              <div className="flex justify-between text-[11px] text-rose-600 font-bold">
+                <span>Pagu DPA Grand ({qtyNum} {unit} + Pajak):</span>
+                <strong className="font-mono">Rp {Math.round(dpaGrandTotal).toLocaleString('id-ID')}</strong>
               </div>
             </div>
             <div className="pt-1">
@@ -270,7 +267,7 @@ export default function InaprocTaxHelper({
                 maxGrandTotal <= dpaGrandTotal ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
               }`}>
                 {maxGrandTotal <= dpaGrandTotal ? <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> : <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />}
-                <span>{maxGrandTotal <= dpaGrandTotal ? '✅ 100% Sesuai DPA & Lolos Validasi INAPROC' : '⚠️ Melebihi Pagu DPA'}</span>
+                <span>{maxGrandTotal <= dpaGrandTotal ? `✅ AMAN HEMAT (+PAJAK): Rp ${Math.round(dpaGrandTotal - maxGrandTotal).toLocaleString('id-ID')} DI BAWAH DPA` : '⚠️ Melebihi Pagu DPA'}</span>
               </span>
             </div>
           </div>
@@ -278,7 +275,7 @@ export default function InaprocTaxHelper({
           {/* Kolom Kanan: Skenario Penawaran Hemat */}
           <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2.5 shadow-sm">
             <h5 className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider border-b border-slate-100 pb-2">
-              Pilihan Skenario Penawaran Tambahan
+              Pilihan Skenario Penawaran Tambahan (+Pajak)
             </h5>
 
             <div className="space-y-2">
@@ -286,7 +283,7 @@ export default function InaprocTaxHelper({
               <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs">
                 <div>
                   <span className="font-bold text-slate-800 block">1. Pas Batas Maksimal INAPROC</span>
-                  <span className="text-[10px] text-slate-500 font-mono">DPP: Rp {maxDpp.toLocaleString('id-ID')}</span>
+                  <span className="text-[10px] text-slate-500 font-mono">DPP: Rp {maxDpp.toLocaleString('id-ID')} | Hasil +Pajak: Rp {Math.round(maxTotalSatuan).toLocaleString('id-ID')}</span>
                 </div>
                 <button
                   type="button"
@@ -302,7 +299,7 @@ export default function InaprocTaxHelper({
               <div className="flex items-center justify-between bg-indigo-50/60 p-2.5 rounded-lg border border-indigo-100 text-xs">
                 <div>
                   <span className="font-bold text-indigo-950 block">2. Target Nego Hemat 2%</span>
-                  <span className="text-[10px] text-slate-500 font-mono">DPP: Rp {dpp2pct.toLocaleString('id-ID')} (Hasil: Rp {Math.round(total2pctSatuan).toLocaleString('id-ID')})</span>
+                  <span className="text-[10px] text-slate-500 font-mono">DPP: Rp {dpp2pct.toLocaleString('id-ID')} | Hasil +Pajak: Rp {Math.round(total2pctSatuan).toLocaleString('id-ID')}</span>
                 </div>
                 <button
                   type="button"
@@ -318,7 +315,7 @@ export default function InaprocTaxHelper({
               <div className="flex items-center justify-between bg-emerald-50/60 p-2.5 rounded-lg border border-emerald-100 text-xs">
                 <div>
                   <span className="font-bold text-emerald-950 block">3. Target Nego Hemat 5%</span>
-                  <span className="text-[10px] text-slate-500 font-mono">DPP: Rp {dpp5pct.toLocaleString('id-ID')} (Hasil: Rp {Math.round(total5pctSatuan).toLocaleString('id-ID')})</span>
+                  <span className="text-[10px] text-slate-500 font-mono">DPP: Rp {dpp5pct.toLocaleString('id-ID')} | Hasil +Pajak: Rp {Math.round(total5pctSatuan).toLocaleString('id-ID')}</span>
                 </div>
                 <button
                   type="button"
