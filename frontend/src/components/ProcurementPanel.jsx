@@ -2275,6 +2275,7 @@ export default function ProcurementPanel() {
                            <td colSpan="10" className="p-3 sm:p-4">
                              <InaprocTaxHelper
                                dpaPrice={paguSatuan}
+                               tayangPrice={tayang}
                                qty={item.qty}
                                unit={item.unit}
                                itemName={item.name}
