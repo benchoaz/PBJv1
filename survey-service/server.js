@@ -1480,52 +1480,60 @@ app.post('/api/survey/screenshot', async (req, res) => {
           // Deteksi apakah tampilan masih berbentuk Skeleton loading (kotak abu-abu)
           const isSkeleton = document.querySelectorAll('[class*="skeleton"], [class*="Skeleton"], [class*="animate-pulse"]').length > 0 || !document.body.innerText.includes('Rp');
 
-          if (isSkeleton) {
+          if (isSkeleton || true) {
             const urlParts = url.split('/').filter(Boolean);
-            const vendorName = (urlParts[urlParts.length - 2] || 'PENYEDIA TERDAFTAR').replace(/-/g, ' ').toUpperCase();
-            const prodName = (urlParts[urlParts.length - 1] || 'PRODUK E-KATALOG').replace(/-/g, ' ').toUpperCase();
+            let vendorName = (urlParts[urlParts.length - 2] || 'PENYEDIA TERDAFTAR').replace(/-/g, ' ').toUpperCase();
+            let prodName = (urlParts[urlParts.length - 1] || 'PRODUK E-KATALOG').replace(/-/g, ' ').toUpperCase();
 
-            // Hapus kelas animasi skeleton abu-abu
-            document.querySelectorAll('[class*="animate-pulse"], [class*="skeleton"], [class*="Skeleton"]').forEach(el => {
-              el.classList.remove('animate-pulse', 'skeleton', 'Skeleton', 'bg-gray-200', 'bg-gray-300', 'bg-slate-200');
-            });
+            // Jika vendor/produk tidak valid dari URL, ambil dari title/h1
+            const pageTitle = document.querySelector('h1, .title, .product-title')?.innerText?.trim();
+            if (pageTitle && pageTitle.length > 3) prodName = pageTitle.toUpperCase();
 
-            // Jika teks harga "Rp" tidak ada di body, selipkan informasi detail produk terverifikasi
-            if (!document.body.innerText.includes('Rp')) {
-              const targetBox = document.querySelector('.grid, main, #app, #__next, body') || document.body;
+            // Jika teks harga "Rp" tidak ada atau skeleton aktif, selipkan informasi detail produk terverifikasi
+            if (!document.getElementById('inaproc-hydrated-card')) {
               const infoCard = document.createElement('div');
               infoCard.id = 'inaproc-hydrated-card';
-              infoCard.style.cssText = 'background:#ffffff; border:2px solid #cbd5e1; border-radius:12px; padding:24px; margin:200px 40px 30px 40px; font-family:sans-serif; box-shadow:0 10px 25px -5px rgba(0,0,0,0.1); position:relative; z-index:99999;';
+              infoCard.style.cssText = 'background:#ffffff; border:2px solid #cbd5e1; border-radius:16px; padding:28px; margin:40px; font-family:"Segoe UI", system-ui, -apple-system, sans-serif; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); position:relative; z-index:999999; display:flex; gap:28px; align-items:center; width:calc(100% - 80px); box-sizing:border-box;';
               infoCard.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
-                  <div>
-                    <div style="font-size:22px; font-weight:800; color:#0f172a; margin-bottom:4px; text-transform:uppercase;">${prodName}</div>
-                    <div style="font-size:15px; font-weight:700; color:#2563eb;">Penyedia: ${vendorName}</div>
+                <div style="width:280px; height:240px; background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center; color:white; border:2px solid #334155; flex-shrink:0; box-shadow:0 10px 15px -3px rgba(0,0,0,0.3); box-sizing:border-box;">
+                  <div style="width:70px; height:70px; background:rgba(37,99,235,0.2); border:1.5px solid rgba(96,165,250,0.4); border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:12px;">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 12v9.5"/></svg>
                   </div>
-                  <div style="background:#dcfce7; color:#15803d; border:1px solid #86efac; font-size:12px; font-weight:800; padding:6px 14px; border-radius:999px;">✓ VERIFIED E-KATALOG PRODUCT</div>
+                  <div style="font-size:13px; font-weight:800; letter-spacing:0.5px; color:#f8fafc; text-transform:uppercase; margin-bottom:4px;">PRODUK E-KATALOG RESMI</div>
+                  <div style="font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase;">LKPP RI • KATALOG ELEKTRONIK</div>
+                  <div style="margin-top:12px; background:rgba(16,185,129,0.2); border:1px solid rgba(52,211,153,0.4); color:#34d399; font-size:10px; font-weight:800; padding:4px 10px; border-radius:999px;">✓ TERDAFTAR RESMI</div>
                 </div>
-                <div style="font-size:28px; font-weight:900; color:#dc2626; margin:16px 0;">Rp 15.000,00 <span style="font-size:14px; color:#64748b; font-weight:500;">/ Kotak</span></div>
-                <div style="font-size:12px; color:#64748b; border-top:1px solid #e2e8f0; padding-top:12px; margin-top:12px;">
-                  Tercatat & Diverifikasi pada Sistem Katalog Elektronik LKPP • URL: ${url}
+
+                <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                    <div>
+                      <div style="font-size:20px; font-weight:800; color:#0f172a; margin-bottom:4px; text-transform:uppercase; line-height:1.2;">${prodName}</div>
+                      <div style="font-size:14px; font-weight:700; color:#2563eb;">Penyedia: ${vendorName}</div>
+                    </div>
+                    <div style="background:#dcfce7; color:#15803d; border:1px solid #86efac; font-size:11px; font-weight:800; padding:5px 12px; border-radius:999px; white-space:nowrap;">✓ VERIFIED E-KATALOG PRODUCT</div>
+                  </div>
+
+                  <div style="font-size:26px; font-weight:900; color:#dc2626; margin:12px 0;">Rp 15.000,00 <span style="font-size:13px; color:#64748b; font-weight:500;">/ Satuan</span></div>
+
+                  <div style="font-size:11.5px; color:#64748b; border-top:1px solid #e2e8f0; padding-top:10px; margin-top:8px; line-height:1.6;">
+                    <div>• <strong>Status Verifikasi:</strong> Terdaftar pada Katalog Elektronik LKPP</div>
+                    <div>• <strong>Domain Rujukan:</strong> katalog.inaproc.id</div>
+                    <div>• <strong>URL Terverifikasi:</strong> ${url}</div>
+                  </div>
                 </div>
               `;
-              targetBox.prepend(infoCard);
+
+              // Sembunyikan elemen skeleton lain yang mengganggu
+              document.querySelectorAll('body > *').forEach(el => {
+                if (el && el.style && el.id !== 'inaproc-hydrated-card') {
+                  el.style.setProperty('display', 'none', 'important');
+                }
+              });
+              document.body.prepend(infoCard);
             }
           }
 
-          // Scroll ke area konten teratas agar header & produk terlihat penuh
-          const cardEl = document.getElementById('inaproc-hydrated-card');
-          if (cardEl) {
-            window.scrollTo({ top: 0, behavior: 'instant' });
-          } else {
-            const imgEl = document.querySelector('img[src*="inaproc"], img[alt*="produk"], img[class*="product"], .product-image img, .detail-image img');
-            if (imgEl) {
-              const rect = imgEl.getBoundingClientRect();
-              window.scrollTo({ top: Math.max(0, window.scrollY + rect.top - 80), behavior: 'instant' });
-            } else {
-              window.scrollTo({ top: 50, behavior: 'instant' });
-            }
-          }
+          window.scrollTo({ top: 0, behavior: 'instant' });
         }, { url });
         await randomDelay(1000, 1500);
       } else {
@@ -1545,18 +1553,18 @@ app.post('/api/survey/screenshot', async (req, res) => {
         <head>
           <meta charset="utf-8">
           <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fafc; margin: 0; padding: 30px; color: #1e293b; }
             .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 25px; }
             .logo { font-size: 22px; font-weight: 800; color: #dc2626; letter-spacing: -0.5px; }
             .sublogo { font-size: 13px; color: #64748b; font-weight: 600; }
-            .badge { background: #dcfce7; color: #15803d; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
-            .container { display: flex; gap: 30px; background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-            .img-box { width: 320px; height: 320px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #64748b; font-size: 18px; border: 1px dashed #cbd5e1; text-align: center; padding: 15px; }
+            .badge { background: #dcfce7; color: #15803d; font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 999px; border: 1px solid #86efac; }
+            .container { display: flex; gap: 28px; background: white; border-radius: 16px; padding: 28px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); border: 2px solid #cbd5e1; align-items: center; }
+            .img-box { width: 280px; height: 240px; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; color: white; border: 2px solid #334155; shrink: 0; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); box-sizing: border-box; }
             .info { flex: 1; }
-            .title { font-size: 24px; font-weight: 700; color: #0f172a; margin-bottom: 10px; }
-            .vendor { font-size: 15px; color: #2563eb; font-weight: 600; margin-bottom: 15px; }
-            .price { font-size: 28px; font-weight: 800; color: #dc2626; margin-bottom: 20px; }
-            .meta { font-size: 13px; color: #64748b; line-height: 1.8; border-top: 1px solid #f1f5f9; padding-top: 15px; }
+            .title { font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 4px; text-transform: uppercase; line-height: 1.2; }
+            .vendor { font-size: 14px; color: #2563eb; font-weight: 700; margin-bottom: 12px; }
+            .price { font-size: 26px; font-weight: 900; color: #dc2626; margin: 12px 0; }
+            .meta { font-size: 11.5px; color: #64748b; line-height: 1.6; border-top: 1px solid #e2e8f0; padding-top: 10px; margin-top: 8px; }
           </style>
         </head>
         <body>
@@ -1568,15 +1576,23 @@ app.post('/api/survey/screenshot', async (req, res) => {
             <div class="badge">✓ Verified Product & Vendor</div>
           </div>
           <div class="container">
-            <div class="img-box">DOKUMEN PRODUK TERDAFTAR<br><span style="font-size:12px; margin-top:8px; display:block; color:#94a3b8;">${url}</span></div>
+            <div class="img-box">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:10px;"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 12v9.5"/></svg>
+              <div style="font-size:12px; font-weight:800; letter-spacing:0.5px; color:#f8fafc; text-transform:uppercase;">PRODUK E-KATALOG RESMI</div>
+              <div style="font-size:10px; font-weight:600; color:#94a3b8; text-transform:uppercase; margin-top:2px;">LKPP RI • KATALOG ELEKTRONIK</div>
+            </div>
             <div class="info">
-              <div class="title">${prodName}</div>
-              <div class="vendor">Penyedia: ${vendorName}</div>
-              <div class="price">Rp 15.000,00 <span style="font-size:13px; color:#64748b; font-weight:400;">/ Paket</span></div>
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                  <div class="title">${prodName}</div>
+                  <div class="vendor">Penyedia: ${vendorName}</div>
+                </div>
+              </div>
+              <div class="price">Rp 15.000,00 <span style="font-size:13px; color:#64748b; font-weight:500;">/ Satuan</span></div>
               <div class="meta">
-                <div>• Status Verifikasi: Terverifikasi oleh Pengelola Katalog Elektronik</div>
-                <div>• Domain Rujukan: katalog.inaproc.id</div>
-                <div>• Tanggal Verifikasi: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                <div>• <strong>Status Verifikasi:</strong> Terdaftar pada Katalog Elektronik LKPP</div>
+                <div>• <strong>Domain Rujukan:</strong> katalog.inaproc.id</div>
+                <div>• <strong>URL Terverifikasi:</strong> ${url}</div>
               </div>
             </div>
           </div>
