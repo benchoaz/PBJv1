@@ -1606,10 +1606,17 @@ app.post('/api/survey/screenshot', async (req, res) => {
     await injectWatermark(page);
 
     const screenshotPath = path.join(screenshotDir, `manual_${jobId}.png`);
-    await page.screenshot({ path: screenshotPath, fullPage: false });
+
+    // 💡 AUTO-CROP: Tangkap screenshot hanya pada elemen kartu produk agar TIDAK ada area putih kosong di bawahnya
+    const targetElement = await page.$('#inaproc-hydrated-card') || await page.$('.container') || await page.$('main');
+    if (targetElement) {
+      await targetElement.screenshot({ path: screenshotPath });
+    } else {
+      await page.screenshot({ path: screenshotPath, fullPage: false });
+    }
 
     await browser.close();
-    console.log(`[Screenshot] Berhasil disimpan: manual_${jobId}.png`);
+    console.log(`[Screenshot] Berhasil disimpan & cropped: manual_${jobId}.png`);
 
     res.json({ success: true, img: `/screenshots/manual_${jobId}.png` });
   } catch (err) {
