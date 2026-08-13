@@ -1258,7 +1258,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
             const comp2 = comparisons && comparisons[compKey + '-2'];
             let imgSrc = p.img || p.searchImg;
             if (imgSrc && imgSrc.startsWith('/screenshots/')) {
-              imgSrc = window.location.origin + imgSrc;
+              imgSrc = window.location.origin + imgSrc + '?t=' + Date.now();
             }
             const linkHref = p.link ? p.link : getDynamicProductLink(p.vendor, p.name);
             return (
@@ -1271,7 +1271,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
                        { vendor: p.vendor, price: p.price, link: linkHref, img: imgSrc },
                        ...(p.comparators || []).map(c => {
                          let cImg = c.img;
-                         if (cImg && cImg.startsWith('/screenshots/')) cImg = window.location.origin + cImg;
+                         if (cImg && cImg.startsWith('/screenshots/')) cImg = window.location.origin + cImg + '?t=' + Date.now();
                          return { vendor: c.vendor, price: c.price, link: c.link, img: cImg };
                        })
                      ];
