@@ -715,12 +715,17 @@ async function searchItem(page, item, index) {
             }
 
             let vendor = defaultVendor;
-            if (type !== 'vendor') {
+            if (type === 'vendor') {
+               // Ambil nama vendor dari h1/header toko jika ada, atau fallback ke defaultVendor (misal MUSAROPA)
+               const storeNameEl = document.querySelector('h1, h2, .store-name, .profile-name');
+               if (storeNameEl && storeNameEl.innerText.trim()) {
+                 vendor = storeNameEl.innerText.trim().toUpperCase();
+               }
+            } else {
                // Pada halaman pencarian global LKPP, URL bisa jadi /vendor-slug/product-slug
                // Tapi bisa juga /produk/id/slug, jika /produk/ maka kita harus mengekstrak vendor dari elemen card jika ada
                const vendorSlug = segments[0];
                if (vendorSlug.toLowerCase() === 'produk' || vendorSlug.toLowerCase() === 'product') {
-                  // Coba cari elemen vendor di dalam card, biasanya ada di elemen div atau text biasa
                   const vendorLine = lines.find(l => !l.includes('Rp') && !l.includes('Kab.') && !l.includes('Kota') && !l.includes('Prov.') && l.length > 5 && l !== title);
                   vendor = vendorLine ? vendorLine.trim().toUpperCase() : 'PENYEDIA INAPROC';
                } else {
