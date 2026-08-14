@@ -436,7 +436,14 @@ async function searchItem(page, item, index) {
   console.log(`\n[${index + 1}] Memproses: "${item.name}"`);
 
   try {
-    const searchTarget = item.query && item.query.trim() ? item.query.trim() : item.name;
+    let searchTarget = item.query && item.query.trim() ? item.query.trim() : item.name;
+
+    // 💡 AUTO-DETECT URL: Jika pengguna memasukkan URL produk langsung pada kolom query atau targetVendor
+    if (!item.targetUrl && (searchTarget.startsWith('http://') || searchTarget.startsWith('https://'))) {
+      item.targetUrl = searchTarget;
+    } else if (!item.targetUrl && item.targetVendor && (item.targetVendor.trim().startsWith('http://') || item.targetVendor.trim().startsWith('https://'))) {
+      item.targetUrl = item.targetVendor.trim();
+    }
 
     // --- BYPASS: URL Spesifik ---
     if (item.targetUrl && item.targetUrl.startsWith('http')) {
