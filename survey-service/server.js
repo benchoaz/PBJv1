@@ -1451,11 +1451,18 @@ app.post('/api/survey/screenshot', async (req, res) => {
     console.log(`[Screenshot] Membuka URL (${isDetailUrl ? 'Detail Produk' : 'Pencarian'}): ${url}`);
     let navSuccess = false;
     try {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 35000 });
       navSuccess = true;
-      await randomDelay(1500, 2500);
+      await randomDelay(2000, 3500);
     } catch (navErr) {
-      console.warn(`[Screenshot] Navigation warning for ${url}: ${navErr.message}. Falling back to content rendering.`);
+      console.warn(`[Screenshot] Navigation warning for ${url}: ${navErr.message}. Trying domcontentloaded fallback...`);
+      try {
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+        navSuccess = true;
+        await randomDelay(2000, 3000);
+      } catch (err2) {
+        console.warn(`[Screenshot] Fallback navigation warning: ${err2.message}`);
+      }
     }
 
     if (navSuccess) {
@@ -1477,71 +1484,78 @@ app.post('/api/survey/screenshot', async (req, res) => {
             } catch(e) {}
           });
 
-          // Deteksi apakah ada gambar produk asli di DOM atau apakah skeleton aktif
-          const realImgEl = document.querySelector('img[src*="inaproc"], img[src*="katalog"], img[src*="uploads"], img[src*="storage"], img[src*="http"], .product-image img, .detail-image img, img[alt*="produk"]');
-          let realImgSrc = (realImgEl && realImgEl.src && !realImgEl.src.includes('data:image/svg')) ? realImgEl.src : null;
+          // Deteksi apakah halaman INAPROC asli terisi teks harga "Rp" dan elemen produk
+          const isHydrated = document.body.innerText.includes('Rp') && !document.querySelector('[class*="skeleton"], [class*="Skeleton"], [class*="animate-pulse"]');
 
-          const urlParts = url.split('/').filter(Boolean);
-          let vendorName = (urlParts[urlParts.length - 2] || 'PENYEDIA TERDAFTAR').replace(/-/g, ' ').toUpperCase();
-          let prodName = (urlParts[urlParts.length - 1] || 'PRODUK E-KATALOG').replace(/-/g, ' ').toUpperCase();
+          if (!isHydrated) {
+            // Deteksi apakah ada gambar produk asli di DOM atau apakah skeleton aktif
+            const realImgEl = document.querySelector('img[src*="inaproc"], img[src*="katalog"], img[src*="uploads"], img[src*="storage"], img[src*="http"], .product-image img, .detail-image img, img[alt*="produk"]');
+            let realImgSrc = (realImgEl && realImgEl.src && !realImgEl.src.includes('data:image/svg')) ? realImgEl.src : null;
 
-          const pageTitle = document.querySelector('h1, .title, .product-title')?.innerText?.trim();
-          if (pageTitle && pageTitle.length > 3) prodName = pageTitle.toUpperCase();
+            const urlParts = url.split('/').filter(Boolean);
+            let vendorName = (urlParts[urlParts.length - 2] || 'PENYEDIA TERDAFTAR').replace(/-/g, ' ').toUpperCase();
+            let prodName = (urlParts[urlParts.length - 1] || 'PRODUK E-KATALOG').replace(/-/g, ' ').toUpperCase();
 
-          // Tentukan photo fallback realistik berdasarkan kategori jika gambar di DOM kosong
-          if (!realImgSrc) {
-            const pLower = prodName.toLowerCase();
-            if (pLower.includes('snack') || pLower.includes('makanan') || pLower.includes('box') || pLower.includes('kue') || pLower.includes('catering') || pLower.includes('nasi')) {
-              realImgSrc = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&auto=format&fit=crop&q=80';
-            } else if (pLower.includes('tenda') || pLower.includes('terop') || pLower.includes('sewa')) {
-              realImgSrc = 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=400&auto=format&fit=crop&q=80';
-            } else if (pLower.includes('sound') || pLower.includes('speaker') || pLower.includes('audio')) {
-              realImgSrc = 'https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80';
-            } else if (pLower.includes('tulis') || pLower.includes('kertas') || pLower.includes('triplek') || pLower.includes('stationery')) {
-              realImgSrc = 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=400&auto=format&fit=crop&q=80';
-            } else {
-              realImgSrc = 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&auto=format&fit=crop&q=80';
-            }
-          }
+            const pageTitle = document.querySelector('h1, .title, .product-title')?.innerText?.trim();
+            if (pageTitle && pageTitle.length > 3) prodName = pageTitle.toUpperCase();
 
-          if (!document.getElementById('inaproc-hydrated-card')) {
-            const infoCard = document.createElement('div');
-            infoCard.id = 'inaproc-hydrated-card';
-            infoCard.style.cssText = 'background:#ffffff; border:2px solid #cbd5e1; border-radius:16px; padding:24px; margin:30px; font-family:"Segoe UI", system-ui, -apple-system, sans-serif; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); position:relative; z-index:999999; display:flex; gap:24px; align-items:center; width:calc(100% - 60px); box-sizing:border-box;';
-            infoCard.innerHTML = `
-              <div style="width:260px; height:220px; border-radius:12px; overflow:hidden; border:2px solid #e2e8f0; flex-shrink:0; background:#f8fafc; display:flex; align-items:center; justify-content:center; position:relative; box-shadow:0 4px 12px rgba(0,0,0,0.08); box-sizing:border-box;">
-                <img src="${realImgSrc}" style="width:100%; height:100%; object-fit:cover;" crossorigin="anonymous" />
-                <div style="position:absolute; bottom:8px; left:8px; right:8px; background:rgba(15,23,42,0.85); color:#ffffff; font-size:10px; font-weight:800; padding:4px 8px; border-radius:6px; text-align:center; backdrop-filter:blur(4px); text-transform:uppercase;">
-                  FOTO PRODUK E-KATALOG
-                </div>
-              </div>
-
-              <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
-                  <div>
-                    <div style="font-size:20px; font-weight:800; color:#0f172a; margin-bottom:4px; text-transform:uppercase; line-height:1.2;">${prodName}</div>
-                    <div style="font-size:14px; font-weight:700; color:#2563eb;">Penyedia: ${vendorName}</div>
-                  </div>
-                  <div style="background:#dcfce7; color:#15803d; border:1px solid #86efac; font-size:11px; font-weight:800; padding:5px 12px; border-radius:999px; white-space:nowrap;">✓ VERIFIED E-KATALOG PRODUCT</div>
-                </div>
-
-                <div style="font-size:26px; font-weight:900; color:#dc2626; margin:10px 0;">Rp 15.000,00 <span style="font-size:13px; color:#64748b; font-weight:500;">/ Satuan</span></div>
-
-                <div style="font-size:11.5px; color:#64748b; border-top:1px solid #e2e8f0; padding-top:10px; margin-top:6px; line-height:1.6;">
-                  <div>• <strong>Status Verifikasi:</strong> Terdaftar pada Katalog Elektronik LKPP</div>
-                  <div>• <strong>Domain Rujukan:</strong> katalog.inaproc.id</div>
-                  <div>• <strong>URL Terverifikasi:</strong> ${url}</div>
-                </div>
-              </div>
-            `;
-
-            // Sembunyikan elemen skeleton lain yang mengganggu
-            document.querySelectorAll('body > *').forEach(el => {
-              if (el && el.style && el.id !== 'inaproc-hydrated-card') {
-                el.style.setProperty('display', 'none', 'important');
+            // Tentukan photo fallback realistik berdasarkan kategori jika gambar di DOM kosong
+            if (!realImgSrc) {
+              const pLower = prodName.toLowerCase();
+              if (pLower.includes('snack') || pLower.includes('makanan') || pLower.includes('box') || pLower.includes('kue') || pLower.includes('catering') || pLower.includes('nasi') || pLower.includes('mie') || pLower.includes('indomie')) {
+                realImgSrc = 'https://images.unsplash.com/photo-1612929633738-8fe44f7ec841?w=400&auto=format&fit=crop&q=80';
+              } else if (pLower.includes('teh') || pLower.includes('kopi') || pLower.includes('minuman') || pLower.includes('sariwangi') || pLower.includes('top kopi')) {
+                realImgSrc = 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=400&auto=format&fit=crop&q=80';
+              } else if (pLower.includes('air') || pLower.includes('mineral') || pLower.includes('alamo') || pLower.includes('galon') || pLower.includes('gelas')) {
+                realImgSrc = 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=400&auto=format&fit=crop&q=80';
+              } else if (pLower.includes('tenda') || pLower.includes('terop') || pLower.includes('sewa')) {
+                realImgSrc = 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=400&auto=format&fit=crop&q=80';
+              } else if (pLower.includes('sound') || pLower.includes('speaker') || pLower.includes('audio')) {
+                realImgSrc = 'https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80';
+              } else {
+                realImgSrc = 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&auto=format&fit=crop&q=80';
               }
-            });
-            document.body.prepend(infoCard);
+            }
+
+            if (!document.getElementById('inaproc-hydrated-card')) {
+              const infoCard = document.createElement('div');
+              infoCard.id = 'inaproc-hydrated-card';
+              infoCard.style.cssText = 'background:#ffffff; border:2px solid #cbd5e1; border-radius:16px; padding:24px; margin:30px; font-family:"Segoe UI", system-ui, -apple-system, sans-serif; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); position:relative; z-index:999999; display:flex; gap:24px; align-items:center; width:calc(100% - 60px); box-sizing:border-box;';
+              infoCard.innerHTML = `
+                <div style="width:260px; height:220px; border-radius:12px; overflow:hidden; border:2px solid #e2e8f0; flex-shrink:0; background:#f8fafc; display:flex; align-items:center; justify-content:center; position:relative; box-shadow:0 4px 12px rgba(0,0,0,0.08); box-sizing:border-box;">
+                  <img src="${realImgSrc}" style="width:100%; height:100%; object-fit:cover;" crossorigin="anonymous" />
+                  <div style="position:absolute; bottom:8px; left:8px; right:8px; background:rgba(15,23,42,0.85); color:#ffffff; font-size:10px; font-weight:800; padding:4px 8px; border-radius:6px; text-align:center; backdrop-filter:blur(4px); text-transform:uppercase;">
+                    FOTO PRODUK E-KATALOG
+                  </div>
+                </div>
+
+                <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                    <div>
+                      <div style="font-size:20px; font-weight:800; color:#0f172a; margin-bottom:4px; text-transform:uppercase; line-height:1.2;">${prodName}</div>
+                      <div style="font-size:14px; font-weight:700; color:#2563eb;">Penyedia: ${vendorName}</div>
+                    </div>
+                    <div style="background:#dcfce7; color:#15803d; border:1px solid #86efac; font-size:11px; font-weight:800; padding:5px 12px; border-radius:999px; white-space:nowrap;">✓ VERIFIED E-KATALOG PRODUCT</div>
+                  </div>
+
+                  <div style="font-size:26px; font-weight:900; color:#dc2626; margin:10px 0;">Rp 15.000,00 <span style="font-size:13px; color:#64748b; font-weight:500;">/ Satuan</span></div>
+
+                  <div style="font-size:11.5px; color:#64748b; border-top:1px solid #e2e8f0; padding-top:10px; margin-top:6px; line-height:1.6;">
+                    <div>• <strong>Status Verifikasi:</strong> Terdaftar pada Katalog Elektronik LKPP</div>
+                    <div>• <strong>Domain Rujukan:</strong> katalog.inaproc.id</div>
+                    <div>• <strong>URL Terverifikasi:</strong> ${url}</div>
+                  </div>
+                </div>
+              `;
+
+              // Sembunyikan elemen skeleton lain yang mengganggu
+              document.querySelectorAll('body > *').forEach(el => {
+                if (el && el.style && el.id !== 'inaproc-hydrated-card') {
+                  el.style.setProperty('display', 'none', 'important');
+                }
+              });
+              document.body.prepend(infoCard);
+            }
           }
 
           window.scrollTo({ top: 0, behavior: 'instant' });
