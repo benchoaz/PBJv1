@@ -478,18 +478,19 @@ async function searchItem(page, item, index) {
             return { price, vendor };
           });
 
-          // Validasi harga
-          const { minPrice: bpMin, maxPrice: bpMax } = resolvePriceRange(item);
+          // Validasi harga: Hanya tolak harga murah jika user secara EKSPLISIT mengisi batas bawah
+          const { minPrice: bpMin, maxPrice: bpMax, isExplicit: bpIsExplicit } = resolvePriceRange(item);
           const bpPrice = detailData.price || item.fallbackPrice;
-          if (bpMin !== null && bpMin !== undefined && bpPrice < bpMin) {
-            console.log(`  ⚠️ [BYPASS] Harga Rp ${bpPrice} di bawah min (Rp ${bpMin}). Lanjut pencarian manual...`);
-          } else if (bpMax !== null && bpMax !== undefined && bpPrice > bpMax) {
+          if (bpMin !== null && bpMin !== undefined && bpPrice < bpMin && bpIsExplicit) {
+            console.log(`  ⚠️ [BYPASS] Harga Rp ${bpPrice} di bawah batas minimal eksplisit (Rp ${bpMin}). Lanjut pencarian manual...`);
+          } else if (bpMax !== null && bpMax !== undefined && bpPrice > bpMax && !item.ignorePriceLimit) {
             console.log(`  ⚠️ [BYPASS] Harga Rp ${bpPrice} melampaui max (Rp ${bpMax}). Lanjut pencarian manual...`);
           } else {
+            console.log(`  ✅ [BYPASS SUKSES] Produk langsung diterima: "${item.name}" (Rp ${bpPrice}) dari ${detailData.vendor || 'MUSAROPA'}`);
             return {
               name: item.name,
               query: searchTarget,
-              vendor: detailData.vendor ? detailData.vendor : (item.targetVendor ? item.targetVendor.toUpperCase() : 'PENYEDIA TARGET'),
+              vendor: detailData.vendor ? detailData.vendor.toUpperCase() : (item.targetVendor ? item.targetVendor.toUpperCase() : 'PENYEDIA TARGET'),
               price: bpPrice,
               link: item.targetUrl,
               img: null,
@@ -837,8 +838,9 @@ async function searchItem(page, item, index) {
         if (!item.ignorePriceLimit) {
           const { minPrice, maxPrice, isExplicit } = resolvePriceRange(item);
           
-          if (minPrice !== undefined && minPrice !== null && cand.price < minPrice) {
-            console.log(`    🚫 [TOLAK] Harga Rp ${cand.price} terlalu murah (di bawah batas Rp ${minPrice}): ${cand.title}`);
+          // HANYA tolak harga terlalu murah jika user secara EKSPLISIT mengisi batas bawah di form
+          if (isExplicit && minPrice !== undefined && minPrice !== null && cand.price < minPrice) {
+            console.log(`    🚫 [TOLAK] Harga Rp ${cand.price} terlalu murah (di bawah batas eksplisit Rp ${minPrice}): ${cand.title}`);
             return;
           }
           if (maxPrice !== undefined && maxPrice !== null && cand.price > maxPrice) {
