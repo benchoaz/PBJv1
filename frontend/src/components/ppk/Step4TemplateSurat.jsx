@@ -64,32 +64,31 @@ function terbilang(angka) {
 }
 
 const getDynamicProductLink = (vendorName, keyword) => {
-  if (!vendorName || vendorName === 'TIDAK DITEMUKAN' || vendorName === 'PENYEDIA INAPROC') {
-    return `https://katalog.inaproc.id/search?keyword=${encodeURIComponent(keyword || '')}`;
-  }
+  if (!vendorName) return '';
   const cleanVendor = vendorName.trim();
-  let vendorSlug = '';
   
   if (cleanVendor.includes('katalog.inaproc.id/')) {
     try {
       const fullUrl = cleanVendor.startsWith('http') ? cleanVendor : 'https://' + cleanVendor;
       const urlObj = new URL(fullUrl);
       const pathSegments = urlObj.pathname.split('/').filter(Boolean);
-      vendorSlug = pathSegments[0] ? pathSegments[0].toLowerCase() : '';
+      // Jika memiliki 2 segmen atau lebih (contoh: /musaropa/gulaku-gula) dan bukan /search, kembalikan URL produk langsung!
+      if (pathSegments.length >= 2 && !urlObj.pathname.startsWith('/search') && !urlObj.search.includes('catalogueSearch')) {
+        return fullUrl;
+      }
+      const vendorSlug = pathSegments[0] ? pathSegments[0].toLowerCase() : '';
+      const q = keyword || '';
+      return `https://katalog.inaproc.id/${vendorSlug}?catalogueSearch=${encodeURIComponent(q)}`;
     } catch (e) {
       // ignore
     }
   }
   
-  if (!vendorSlug) {
-    if (cleanVendor.includes('katalog.inaproc.id/')) {
-      const match = cleanVendor.match(/katalog\.inaproc\.id\/([^/?&#]+)/);
-      vendorSlug = match ? match[1].toLowerCase() : cleanVendor.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    } else if (/^[a-z0-9][a-z0-9-]*[a-z0-9]$/i.test(cleanVendor) && cleanVendor.includes('-')) {
-      vendorSlug = cleanVendor.toLowerCase();
-    } else {
-      vendorSlug = cleanVendor.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-    }
+  let vendorSlug = '';
+  if (/^[a-z0-9][a-z0-9-]*[a-z0-9]$/i.test(cleanVendor) && cleanVendor.includes('-')) {
+    vendorSlug = cleanVendor.toLowerCase();
+  } else {
+    vendorSlug = cleanVendor.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   }
   
   const q = keyword || '';
