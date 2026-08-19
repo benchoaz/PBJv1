@@ -465,7 +465,7 @@ async function searchItem(page, item, index) {
           // [SCREENSHOT ON-DEMAND] Tidak ada screenshot di sini. Gambar diambil oleh user via tombol di frontend.
           
           const detailData = await page.evaluate(() => {
-            let price = null, vendor = null;
+            let price = null, vendor = null, location = null;
             const allText = document.body.innerText || '';
             const rpMatch = allText.match(/Rp\s*([\d.,]+)/);
             if (rpMatch) {
@@ -473,10 +473,46 @@ async function searchItem(page, item, index) {
               const parsed = parseInt(priceStr);
               if (parsed >= 100) price = parsed;
             }
-            const vEl = document.querySelector('.penyedia-name') || document.querySelector('.card-body strong');
-            if (vEl) vendor = vEl.innerText.trim();
-            return { price, vendor };
+
+            // Deteksi Nama Penyedia / Toko di INAPROC v6 (Kotak Toko / UMKM / Kunjungi Toko)
+            const storeBtn = Array.from(document.querySelectorAll('a, button')).find(el => el.innerText && el.innerText.includes('Kunjungi Toko'));
+            if (storeBtn) {
+              const storeContainer = storeBtn.closest('div[class*="card"], div[class*="border"], div') || storeBtn.parentElement;
+              if (storeContainer) {
+                const lines = storeContainer.innerText.split('\n').map(l => l.trim()).filter(Boolean);
+                const vLine = lines.find(l => !l.includes('UMKM') && !l.includes('Kunjungi') && !l.includes('Toko') && !l.includes('Kab.') && !l.includes('Kota') && !l.includes('Prov.'));
+                if (vLine) vendor = vLine.trim().toUpperCase();
+                const locLine = lines.find(l => l.includes('Kab.') || l.includes('Kota') || l.includes('Prov.'));
+                if (locLine) location = locLine.trim();
+              }
+            }
+
+            if (!vendor) {
+              const vEl = document.querySelector('.penyedia-name, .store-name, .shop-name, .merchant-name');
+              if (vEl) vendor = vEl.innerText.trim().toUpperCase();
+            }
+
+            return { price, vendor, location };
           });
+
+          // Tentukan nama penyedia yang bersih (TIDAK BOLEH berupa link URL)
+          let cleanVendorName = detailData.vendor;
+          if (!cleanVendorName || cleanVendorName.includes('http') || cleanVendorName.includes('inaproc')) {
+            try {
+              const u = new URL(item.targetUrl);
+              const segs = u.pathname.split('/').filter(Boolean);
+              if (segs.length > 0 && !['search', 'produk', 'product'].includes(segs[0].toLowerCase())) {
+                cleanVendorName = segs[0].replace(/-/g, ' ').toUpperCase();
+              }
+            } catch(e) {}
+          }
+          if (!cleanVendorName || cleanVendorName.includes('http') || cleanVendorName.includes('inaproc')) {
+            if (item.targetVendor && !item.targetVendor.startsWith('http')) {
+              cleanVendorName = item.targetVendor.toUpperCase();
+            } else {
+              cleanVendorName = 'MUSAROPA';
+            }
+          }
 
           // Validasi harga: Hanya tolak harga murah jika user secara EKSPLISIT mengisi batas bawah
           const { minPrice: bpMin, maxPrice: bpMax, isExplicit: bpIsExplicit } = resolvePriceRange(item);
@@ -486,13 +522,14 @@ async function searchItem(page, item, index) {
           } else if (bpMax !== null && bpMax !== undefined && bpPrice > bpMax && !item.ignorePriceLimit) {
             console.log(`  ⚠️ [BYPASS] Harga Rp ${bpPrice} melampaui max (Rp ${bpMax}). Lanjut pencarian manual...`);
           } else {
-            console.log(`  ✅ [BYPASS SUKSES] Produk langsung diterima: "${item.name}" (Rp ${bpPrice}) dari ${detailData.vendor || 'MUSAROPA'}`);
+            console.log(`  ✅ [BYPASS SUKSES] Produk langsung diterima: "${item.name}" (Rp ${bpPrice}) dari ${cleanVendorName}`);
             return {
               name: item.name,
               query: searchTarget,
-              vendor: detailData.vendor ? detailData.vendor.toUpperCase() : (item.targetVendor ? item.targetVendor.toUpperCase() : 'PENYEDIA TARGET'),
+              vendor: cleanVendorName,
               price: bpPrice,
               link: item.targetUrl,
+              location: detailData.location || 'Kab. Probolinggo',
               img: null,
               searchImg: null,
               success: true

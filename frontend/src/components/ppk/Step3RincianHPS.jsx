@@ -36,6 +36,23 @@ const getDynamicProductLink = (vendorName, keyword) => {
   return `https://katalog.inaproc.id/${vendorSlug}?catalogueSearch=${encodeURIComponent(q)}`;
 };
 
+const formatCleanVendor = (vendor) => {
+  if (!vendor) return '';
+  const str = vendor.trim();
+  if (str.includes('http://') || str.includes('https://') || str.includes('katalog.inaproc.id')) {
+    try {
+      const fullUrl = str.startsWith('http') ? str : 'https://' + str;
+      const urlObj = new URL(fullUrl);
+      const segs = urlObj.pathname.split('/').filter(Boolean);
+      if (segs.length > 0 && !['search', 'produk', 'product'].includes(segs[0].toLowerCase())) {
+        return segs[0].replace(/-/g, ' ').toUpperCase();
+      }
+    } catch (e) {}
+    return 'MUSAROPA';
+  }
+  return str;
+};
+
 export default function Step3RincianHPS() {
   const DAFTAR_KECAMATAN = [
     "Bantaran", "Banyuanyar", "Besuk", "Dringu", "Gading", "Gending", "Kotaanyar", 
@@ -1764,7 +1781,6 @@ export default function Step3RincianHPS() {
                                         ) : (
                                           <Sparkles className="w-3.5 h-3.5 mr-1 inline text-indigo-500" />
                                         )}
-                                        <span>AI Bantu</span>
                                       </button>
                                     </div>
                                   </div>
@@ -1773,11 +1789,11 @@ export default function Step3RincianHPS() {
                                   <div className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Referensi e-Katalog:</div>
                                   {surveyItem && surveyItem.success && surveyItem.vendor !== 'TIDAK DITEMUKAN' ? (
                                     <div className="flex flex-col gap-0.5">
-                                      <span className="text-[10px] font-bold text-slate-700 truncate max-w-[150px] flex items-center gap-1" title={surveyItem.vendor}>
+                                      <span className="text-[10px] font-bold text-slate-700 truncate max-w-[150px] flex items-center gap-1" title={formatCleanVendor(surveyItem.vendor)}>
                                         <Store className="w-3 h-3 text-slate-500" />
                                         <input
                                           type="text"
-                                          value={surveyItem.vendor}
+                                          value={formatCleanVendor(surveyItem.vendor)}
                                           onChange={(e) => {
                                             const newVendor = e.target.value;
                                             const updatedProducts = surveyData.products.map(p => 
