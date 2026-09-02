@@ -153,11 +153,20 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
     justifications
   } = usePPK();
 
-  const formatTanggalIndo = (tglStr) => {
-    if (!tglStr) return '';
+  const formatTanggalIndo = (tglStr, fallbackDateStr) => {
+    const dStr = tglStr || fallbackDateStr;
+    if (!dStr) return new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
     try {
-      return new Date(tglStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    } catch { return tglStr; }
+      const str = String(dStr).trim();
+      const parts = str.split('-');
+      if (parts.length === 3 && parts[0].length === 4) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        return new Date(year, month, day).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      }
+      return new Date(str).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch { return String(dStr); }
   };
 
   const getActiveSurveyData = () => {

@@ -95,6 +95,22 @@ const getDynamicProductLink = (vendorName, keyword) => {
   return `https://katalog.inaproc.id/${vendorSlug}?catalogueSearch=${encodeURIComponent(q)}`;
 };
 
+const formatTanggalIndo = (tglStr, fallbackDateStr) => {
+  const dStr = tglStr || fallbackDateStr;
+  if (!dStr) return new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  try {
+    const str = String(dStr).trim();
+    const parts = str.split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      return new Date(year, month, day).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+    return new Date(str).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch { return String(dStr); }
+};
+
 const getTteBadge = (name, nip) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="90" viewBox="0 0 220 90" style="border: 1px solid %23cbd5e1; border-radius: 6px; background: %23f8fafc; font-family: Arial, sans-serif; margin-top: 6px; margin-bottom: 6px; display: inline-block;">
     <rect x="0" y="0" width="220" height="90" fill="%23f8fafc" rx="6" />
@@ -1112,31 +1128,11 @@ export default function Step4TemplateSurat() {
  '{{nomor_sp}}': nomorBase.replace('{nomor}', '115/SP'),
  '{{alamat_penyedia}}': '_______________________',
  '{{nilai_kontrak}}': '_______________________',
-  '{{waktu_penyelesaian}}': packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
-  '{{nomor_dpp}}': packageMetadata.nomor_dpp || '................................',
-  '{{tanggal_dpp}}': (() => {
-    const dStr = packageMetadata.tanggal_dpp;
-    if (!dStr) return new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    try {
-      const parts = dStr.split('-');
-      if (parts.length === 3) {
-        return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-      }
-      return new Date(dStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    } catch { return dStr; }
-  })(),
-  '{{nomor_hps}}': nomorBase.replace('{nomor}', '014/HPS'),
-  '{{tanggal_hps}}': (() => {
-    const dStr = packageMetadata.tanggal_hps;
-    if (!dStr) return new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    try {
-      const parts = dStr.split('-');
-      if (parts.length === 3) {
-        return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-      }
-      return new Date(dStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    } catch { return dStr; }
-  })(),
+ '{{waktu_penyelesaian}}': packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
+ '{{nomor_dpp}}': packageMetadata.nomor_dpp || '................................',
+ '{{tanggal_dpp}}': formatTanggalIndo(packageMetadata.tanggal_dpp, tanggalSurat),
+ '{{nomor_hps}}': nomorBase.replace('{nomor}', '014/HPS'),
+ '{{tanggal_hps}}': formatTanggalIndo(packageMetadata.tanggal_hps || packageMetadata.tanggal_dpp, tanggalSurat),
  '{{lokasi_pekerjaan}}': packageMetadata.lokasi_pekerjaan || (docSettingsFallback ? docSettingsFallback.namaInstansi : 'Komplek Perkantoran Pemerintah Daerah'),
  '{{program}}': packageMetadata.program || 'Program Penunjang Urusan Pemerintahan Daerah',
  '{{kegiatan}}': packageMetadata.kegiatan || 'Penyelenggaraan Pemerintahan dan Pelayanan Publik',
@@ -1254,29 +1250,9 @@ export default function Step4TemplateSurat() {
  '{{nilai_kontrak}}': '_______________________',
  '{{waktu_penyelesaian}}': packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
  '{{nomor_dpp}}': packageMetadata.nomor_dpp || '................................',
- '{{tanggal_dpp}}': (() => {
-   const dStr = packageMetadata.tanggal_dpp;
-   if (!dStr) return new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-   try {
-     const parts = dStr.split('-');
-     if (parts.length === 3) {
-       return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-     }
-     return new Date(dStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-   } catch { return dStr; }
- })(),
+ '{{tanggal_dpp}}': formatTanggalIndo(packageMetadata.tanggal_dpp, tanggalSurat),
  '{{nomor_hps}}': nomorBase.replace('{nomor}', '014/HPS'),
- '{{tanggal_hps}}': (() => {
-   const dStr = packageMetadata.tanggal_hps || packageMetadata.tanggal_dpp;
-   if (!dStr) return new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-   try {
-     const parts = dStr.split('-');
-     if (parts.length === 3) {
-       return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-     }
-     return new Date(dStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-   } catch { return dStr; }
- })(),
+ '{{tanggal_hps}}': formatTanggalIndo(packageMetadata.tanggal_hps || packageMetadata.tanggal_dpp, tanggalSurat),
  '{{lokasi_pekerjaan}}': packageMetadata.lokasi_pekerjaan || (docSettingsFallback ? docSettingsFallback.namaInstansi : 'Komplek Perkantoran Pemerintah Daerah'),
  '{{program}}': packageMetadata.program || 'Program Penunjang Urusan Pemerintahan Daerah',
  '{{kegiatan}}': packageMetadata.kegiatan || 'Penyelenggaraan Pemerintahan dan Pelayanan Publik',
@@ -1679,8 +1655,14 @@ export default function Step4TemplateSurat() {
  {/* Kosong untuk memberikan ruang tanda tangan di kanan */}
  </div>
  <div className="w-max min-w-[14rem] px-4 text-center space-y-2">
-  <div >
-  {currentUser?.department?.toLowerCase().includes('besuk') ? 'Besuk' : (currentUser?.department || 'Probolinggo')}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+  <div>
+    {(docSettings?.kotaSurat || (currentUser?.department?.toLowerCase().includes('besuk') ? 'Besuk' : (currentUser?.department || 'Probolinggo')))}, {
+     activeTplTab === 'nd'
+       ? formatTanggalIndo(packageMetadata.tanggal_nd, tanggalSurat)
+       : (activeTplTab === 'hps'
+           ? formatTanggalIndo(packageMetadata.tanggal_hps || packageMetadata.tanggal_dpp, tanggalSurat)
+           : formatTanggalIndo(packageMetadata.tanggal_dpp, tanggalSurat))
+   }
   </div>
  <div className=" font-bold uppercase">
  Pejabat Pembuat Komitmen (PPK)
