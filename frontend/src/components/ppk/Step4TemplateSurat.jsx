@@ -138,6 +138,7 @@ export default function Step4TemplateSurat() {
     aiError, setAiError,
     hpsValue, isHpsExemptSelected,
     surveyData, hpsPrices, getPackageItems,
+    tanggalSurat, setTanggalSurat,
     selectedTplId, setSelectedTplId, autoComparator,
     selectedNdTplId, setSelectedNdTplId,
     comparisons, currentProjectId, status, loadProjectData, handleSimpanPaket
