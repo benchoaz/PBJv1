@@ -1658,9 +1658,9 @@ export default function Step4TemplateSurat() {
  <div className="w-max min-w-[14rem] px-4 text-center space-y-2">
   <div>
     {(docSettings?.kotaSurat || (currentUser?.department?.toLowerCase().includes('besuk') ? 'Besuk' : (currentUser?.department || 'Probolinggo')))}, {
-     activeTplTab === 'nd'
+     activeDocPreview === 'nd'
        ? formatTanggalIndo(packageMetadata.tanggal_nd, tanggalSurat)
-       : (activeTplTab === 'hps'
+       : (activeDocPreview === 'hps'
            ? formatTanggalIndo(packageMetadata.tanggal_hps || packageMetadata.tanggal_dpp, tanggalSurat)
            : formatTanggalIndo(packageMetadata.tanggal_dpp, tanggalSurat))
    }
