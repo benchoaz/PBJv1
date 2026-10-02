@@ -83,7 +83,28 @@ export function PPKProvider({ children }) {
   const [isHpsExemptSelected, setIsHpsExemptSelected] = useState(() => localStorage.getItem('pbj_hps_exempt_selected') === 'true');
   const [hpsPrices, setHpsPrices] = useState(() => { const s = localStorage.getItem('pbj_hps_prices'); return s ? JSON.parse(s) : {}; });
   const [techSpecs, setTechSpecs] = useState(() => localStorage.getItem('pbj_tech_specs') || '');
-  const [dppSpecs, setDppSpecs] = useState(() => { const s = localStorage.getItem('pbj_dpp_specs'); return s ? JSON.parse(s) : { waktu: '1 (Satu) hari kerja', tempat: '', spesifikasiLayanan: '', justifikasiMerek: '', metodePemilihan: 'Negosiasi Harga', ketentuanBAST: 'Penyelesaian paket pengadaan dan pencairan pembayaran 100% (seratus persen) dilaksanakan setelah seluruh hasil pekerjaan diterima dengan baik serta ditandatangani Berita Acara Serah Terima (BAST) oleh Pejabat Pembuat Komitmen (PPK).' }; });
+  const [dppSpecs, setDppSpecs] = useState(() => {
+    const s = localStorage.getItem('pbj_dpp_specs');
+    const base = {
+      waktu: '1 (Satu) hari kerja',
+      tempat: '',
+      spesifikasiLayanan: '',
+      justifikasiMerek: '',
+      metodePemilihan: 'Negosiasi Harga',
+      ketentuanBAST: 'Penyelesaian paket pengadaan dan pencairan pembayaran 100% (seratus persen) dilaksanakan setelah seluruh hasil pekerjaan diterima dengan baik serta ditandatangani Berita Acara Serah Terima (BAST) oleh Pejabat Pembuat Komitmen (PPK).',
+      jenisPemeliharaan: 'kendaraan',
+      maintenanceObjects: [],
+      maintenanceParams: {},
+      maintenanceHpsItems: []
+    };
+    if (!s) return base;
+    try {
+      const parsed = JSON.parse(s);
+      return { ...base, ...parsed, jenisPemeliharaan: parsed.jenisPemeliharaan || 'kendaraan' };
+    } catch (e) {
+      return base;
+    }
+  });
   const [packageMetadata, setPackageMetadata] = useState(() => { const s = localStorage.getItem('pbj_package_metadata'); return s ? JSON.parse(s) : { lokasi_pekerjaan: '', waktu_penyelesaian: '14 (empat belas) hari kalender', program: '', kegiatan: '', sub_kegiatan: '', nomor_dpp: '' }; });
   const [selectedTplId, setSelectedTplId] = useState(() => localStorage.getItem('pbj_selected_tpl_id') || '');
   const [selectedNdTplId, setSelectedNdTplId] = useState(() => localStorage.getItem('pbj_selected_nd_tpl_id') || '');
@@ -495,7 +516,16 @@ export function PPKProvider({ children }) {
 
       if (parsed.hpsValue) setHpsValue(parsed.hpsValue);
       if (parsed.isHpsExemptSelected !== undefined) setIsHpsExemptSelected(parsed.isHpsExemptSelected);
-      if (parsed.dppSpecs) setDppSpecs(parsed.dppSpecs);
+      if (parsed.dppSpecs) {
+        setDppSpecs(prev => ({
+          ...prev,
+          ...parsed.dppSpecs,
+          jenisPemeliharaan: parsed.dppSpecs.jenisPemeliharaan || 'lainnya',
+          maintenanceObjects: parsed.dppSpecs.maintenanceObjects || [],
+          maintenanceParams: parsed.dppSpecs.maintenanceParams || {},
+          maintenanceHpsItems: parsed.dppSpecs.maintenanceHpsItems || []
+        }));
+      }
       
       if (parsed.packageMetadata) {
         let md = parsed.packageMetadata;

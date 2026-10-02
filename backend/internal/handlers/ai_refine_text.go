@@ -9,10 +9,11 @@ import (
 )
 
 type AIRefineTextRequest struct {
-	RawText    string `json:"raw_text"`
-	Context    string `json:"context"` // e.g., "Catatan Hasil Negosiasi", "Evaluasi Kinerja Penyedia"
-	AIProvider string `json:"ai_provider"`
-	AIKey      string `json:"ai_key"`
+	RawText         string `json:"raw_text"`
+	Context         string `json:"context"`          // e.g., "Spesifikasi Layanan Tambahan DPP", "Justifikasi Standar Suku Cadang & Oli"
+	MaintenanceType string `json:"maintenance_type"` // e.g., "kendaraan", "gedung", "lainnya"
+	AIProvider      string `json:"ai_provider"`
+	AIKey           string `json:"ai_key"`
 }
 
 type AIRefineTextResponse struct {
@@ -50,20 +51,34 @@ func (h *RefineTextHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prompt := fmt.Sprintf(`Anda adalah auditor dan ahli hukum pengadaan barang/jasa pemerintah (Perpres 12/2021).
-Pejabat Pembuat Komitmen (PPK) / Pejabat Pengadaan (PP) sedang menulis bagian "%s" untuk Dokumen Persiapan Pengadaan (DPP) / Dokumen Pemilihan.
+	maintenanceGuideline := ""
+	if req.MaintenanceType == "kendaraan" {
+		maintenanceGuideline = `KONTEKS KHUSUS: Pemeliharaan Kendaraan Dinas Bermotor (Roda 2 / Roda 4).
+Pastikan istilah teknis otomotif (servis berkala, tune-up, oli mesin, pelumas, suku cadang OEM/genuine, garansi pekerjaan/jarak tempuh, SLA pengerjaan, work order) digunakan secara tepat, akurat, dan formal.`
+	} else if req.MaintenanceType == "gedung" {
+		maintenanceGuideline = `KONTEKS KHUSUS: Pemeliharaan Fisik Gedung/Bangunan Kantor Pemerintah.
+Pastikan istilah pemeliharaan bangunan (pengecatan, atap/plafon, sanitasi, standar material SNI/setara, opname fisik, K3 kerja, kebersihan puing) digunakan secara tepat dan terbedakan dari pekerjaan konstruksi baru.`
+	}
 
-Teks draf/mentah: "%s"
+	prompt := fmt.Sprintf(`Anda adalah auditor dan ahli hukum pengadaan barang/jasa pemerintah (Peraturan Presiden tentang Pengadaan Barang/Jasa Pemerintah).
+Pejabat Pembuat Komitmen (PPK) / Pejabat Pengadaan (PP) sedang menyusun bagian "%s" untuk Dokumen Persiapan Pengadaan (DPP) / Dokumen Pemilihan.
 
-Tugas Anda:
-Perbaiki teks tersebut agar baku, profesional, dan bernada hukum/resmi yang pantas masuk ke dokumen pengadaan pemerintah Indonesia.
-Pertahankan makna dan informasi aslinya, hanya perbaiki gaya bahasa, tata kalimat, dan keformalan.
+%s
+
+Teks draf/mentah yang diinput pengguna:
+"%s"
+
+TUGAS & ATURAN WAJIB:
+1. Rapikan tata bahasa menjadi bahasa Indonesia baku yang profesional, lugas, dan bernada hukum administrasi pemerintahan resmi.
+2. JANGAN menambah fakta, angka, durasi, merk, atau nominal baru yang TIDAK ADA pada teks input mentah.
+3. Pertahankan seluruh makna, maksud teknis, dan informasi aslinya tanpa mengubah substansi.
+4. Jangan menambahkan pembuka/penutup basa-basi atau judul tambahan dalam refined_text.
 
 Hasilkan JSON persis seperti ini:
 {
   "refined_text": "Teks yang sudah disempurnakan"
 }
-Output HANYA JSON murni tanpa blok markdown.`, req.Context, req.RawText)
+Output HANYA JSON murni tanpa blok markdown.`, req.Context, maintenanceGuideline, req.RawText)
 
 	aiResponse, err := callAIWithFallback(h.db, req.AIProvider, req.AIKey, prompt)
 	if err != nil {

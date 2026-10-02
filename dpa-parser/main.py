@@ -79,9 +79,11 @@ def normalize_satuan(sat: str) -> str:
         return "Buah"
     s = sat.lower().strip()
     s = re.sub(r'[^a-z0-9/]', '', s)
+    if s.startswith('per') and len(s) > 3:
+        s = s[3:]
     
     # Mapping koreksi typo OCR umum
-    if s in ['rim', 'r1m', 'r!m', 'rm']:
+    if s in ['rim', 'r1m', 'r!m', 'rm', 'per']:
         return "Rim"
     if s in ['buah', 'bua1h', 'bu4h', 'bua', 'bh', 'b.h']:
         return "Buah"
@@ -344,12 +346,12 @@ def extract_rincian_from_block(block_text: str) -> List[RincianItem]:
 
             # Jika tidak ketemu satuan standar, cari pola alternatif volume (misal: "Volume: 120 Rim")
             if not satuan:
-                alt_match = re.search(r'(?:volume:?\s*)?(\d+[\.,]?\d*)\s*([a-zA-Z]{2,12})\b', line, re.IGNORECASE)
+                alt_match = re.search(r'(?:volume:?\s*)?(\d+[\.,]?\d*)\s*(?:per\s*)?([a-zA-Z]{2,12})\b', line, re.IGNORECASE)
                 if alt_match:
                     vol_str = alt_match.group(1)
                     sat_candidate = alt_match.group(2)
                     # Pastikan bukan kata kunci terlarang
-                    if sat_candidate.lower() not in ['volume', 'rupiah', 'harga', 'total', 'dpa', 'pagu', 'dan', 'atau']:
+                    if sat_candidate.lower() not in ['volume', 'rupiah', 'harga', 'total', 'dpa', 'pagu', 'dan', 'atau', 'per']:
                         satuan = sat_candidate
 
         # Ekstrak nama/uraian barang

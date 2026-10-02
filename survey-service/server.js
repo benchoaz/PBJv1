@@ -413,7 +413,7 @@ async function injectWatermark(page) {
       wm.style.border = '2px solid rgba(255,255,255,0.2)';
       
       const now = new Date();
-      wm.innerText = '🔒 BUKTI SURVEI E-KATALOG\\n' + now.toLocaleString('id-ID');
+      wm.innerHTML = '🔒 BUKTI SURVEI E-KATALOG<br/>' + now.toLocaleString('id-ID');
       
       document.body.appendChild(wm);
 
