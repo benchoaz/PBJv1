@@ -75,6 +75,7 @@ export default function Step3RincianHPS() {
     hpsValue, setHpsValue,
     isHpsExemptSelected, setIsHpsExemptSelected,
     hpsPrices, setHpsPrices,
+    negotiatedPrices, setNegotiatedPrices,
     techSpecs, setTechSpecs,
     packageMetadata, setPackageMetadata,
     selectedTplId, setSelectedTplId,
@@ -1727,8 +1728,9 @@ export default function Step3RincianHPS() {
                           <th className="py-2.5 px-2">Referensi e-Katalog</th>
                           <th className="py-2.5 px-2 text-center w-12">Qty</th>
                           <th className="py-2.5 px-2 text-right">Pagu DPA (Rp)</th>
-                          <th className="py-2.5 px-4 text-right w-44">Harga Tayang E-Katalog (Rp)</th>
-                          <th className="py-2.5 px-3 text-right rounded-r-xl">Total Tayang E-Katalog (Rp)</th>
+                          <th className="py-2.5 px-3 text-right w-36">Harga Tayang E-Katalog (Rp)</th>
+                          <th className="py-2.5 px-3 text-right w-36 text-indigo-700 bg-indigo-50/60">Harga Negosiasi (Rp)</th>
+                          <th className="py-2.5 px-3 text-right rounded-r-xl">Total Kesepakatan (Rp)</th>
                         </tr>
                       </thead>
                       <tbody className="block md:table-row-group">
@@ -1740,7 +1742,11 @@ export default function Step3RincianHPS() {
                             const unitHpsPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
                             const qtyNum = item.qty === '' ? 0 : (item.qty || 0);
                             const totalHpsItem = qtyNum * unitHpsPrice;
+                            const unitNegoPrice = negotiatedPrices[item.name] !== undefined ? negotiatedPrices[item.name] : unitHpsPrice;
+                            const totalNegoItem = qtyNum * unitNegoPrice;
                             const isOverbudget = totalHpsItem > (qtyNum * item.price);
+                            const isNegoSaving = unitNegoPrice < unitHpsPrice;
+                            const isNegoOverHps = unitNegoPrice > unitHpsPrice;
                             const surveyItem = activeData?.products?.find(p => p.name === item.name);
                             const isRowExpanded = expandedSurveyRows[idx];
                             
@@ -1957,10 +1963,10 @@ export default function Step3RincianHPS() {
                                     <span>Rp&nbsp;{(item.price || 0).toLocaleString()}</span>
                                   </div>
                                 </td>
-                                <td className="block md:table-cell py-2 md:py-3 px-0 md:px-4 text-right mt-2 md:mt-0">
-                                  <div className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-left">Harga Tayang Survei:</div>
+                                <td className="block md:table-cell py-2 md:py-3 px-0 md:px-2 text-right mt-2 md:mt-0">
+                                  <div className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-left">Harga Tayang:</div>
                                   <div className="relative inline-block w-full">
-                                    <span className={`absolute left-3 top-1/2 -translate-y-1/2 font-bold text-[10px] ${isOverbudget ? 'text-rose-500' : (unitHpsPrice < item.price ? 'text-emerald-500' : 'text-slate-400')}`}>Rp</span>
+                                    <span className={`absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] ${isOverbudget ? 'text-rose-500' : (unitHpsPrice < item.price ? 'text-emerald-500' : 'text-slate-400')}`}>Rp</span>
                                     <input
                                       type="number"
                                       value={unitHpsPrice}
@@ -1973,15 +1979,47 @@ export default function Step3RincianHPS() {
                                         setIsSigned(false);
                                         if (step === 4) setStep(3);
                                       }}
-                                      className={`w-full bg-slate-50 border rounded-xl py-1.5 pl-8 pr-3 text-xs font-mono font-bold text-right focus:ring-2 outline-none transition-all ${isOverbudget ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200 text-rose-700 bg-rose-50/50' : (unitHpsPrice < item.price ? 'border-emerald-200 focus:border-emerald-400 focus:ring-emerald-100 text-emerald-700 bg-emerald-50/40' : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-150 text-slate-800')}`}
+                                      className={`w-full bg-slate-50 border rounded-xl py-1.5 pl-7 pr-2 text-xs font-mono font-bold text-right focus:ring-2 outline-none transition-all ${isOverbudget ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200 text-rose-700 bg-rose-50/50' : (unitHpsPrice < item.price ? 'border-emerald-200 focus:border-emerald-400 focus:ring-emerald-100 text-emerald-700 bg-emerald-50/40' : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-150 text-slate-800')}`}
+                                      title="Harga tayang resmi e-Katalog LKPP"
                                     />
                                   </div>
                                   {isOverbudget && <div className="text-[9px] font-bold text-rose-500 text-right mt-1 animate-pulse">⚠️ Melebihi Pagu</div>}
                                 </td>
-                                <td className={`block md:table-cell py-2 md:py-3 px-0 md:px-3 text-right font-mono font-bold transition-colors ${isOverbudget ? 'text-rose-600' : (unitHpsPrice < item.price ? 'text-emerald-600' : 'text-indigo-650')}`}>
+                                <td className="block md:table-cell py-2 md:py-3 px-0 md:px-2 text-right mt-2 md:mt-0 bg-indigo-50/20 md:bg-indigo-50/30">
+                                  <div className="md:hidden text-[9px] font-bold text-indigo-700 uppercase tracking-wider mb-1.5 text-left">Harga Negosiasi:</div>
+                                  <div className="relative inline-block w-full">
+                                    <span className={`absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] ${isNegoOverHps ? 'text-rose-500' : (isNegoSaving ? 'text-emerald-600' : 'text-indigo-400')}`}>Rp</span>
+                                    <input
+                                      type="number"
+                                      value={unitNegoPrice}
+                                      onChange={(e) => {
+                                        const newPrice = parseFloat(e.target.value) || 0;
+                                        setNegotiatedPrices(prev => ({
+                                          ...prev,
+                                          [item.name]: newPrice
+                                        }));
+                                        setIsSigned(false);
+                                        if (step === 4) setStep(3);
+                                      }}
+                                      className={`w-full bg-white border rounded-xl py-1.5 pl-7 pr-2 text-xs font-mono font-bold text-right focus:ring-2 outline-none transition-all ${isNegoOverHps ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200 text-rose-700 bg-rose-50/50' : (isNegoSaving ? 'border-emerald-300 focus:border-emerald-500 focus:ring-emerald-200 text-emerald-700 bg-emerald-50/50' : 'border-indigo-200 focus:border-indigo-500 focus:ring-indigo-200 text-slate-900')}`}
+                                      title="Harga hasil negosiasi dengan penyedia (diisi sesuai kesepakatan e-Purchasing)"
+                                    />
+                                  </div>
+                                  {isNegoSaving && (
+                                    <div className="text-[9px] font-bold text-emerald-600 text-right mt-0.5 flex items-center justify-end gap-0.5">
+                                      <span>↓ Hemat Rp {(unitHpsPrice - unitNegoPrice).toLocaleString()}</span>
+                                    </div>
+                                  )}
+                                  {isNegoOverHps && (
+                                    <div className="text-[9px] font-bold text-rose-500 text-right mt-0.5">
+                                      ⚠️ Melebihi HPS
+                                    </div>
+                                  )}
+                                </td>
+                                <td className={`block md:table-cell py-2 md:py-3 px-0 md:px-3 text-right font-mono font-bold transition-colors ${isNegoSaving ? 'text-emerald-700' : (isOverbudget ? 'text-rose-600' : 'text-indigo-650')}`}>
                                   <div className="flex md:block items-center justify-between mt-2 md:mt-0 pt-2 md:pt-0 border-t border-dashed border-slate-200 md:border-0">
-                                    <span className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider font-sans">Total Tayang:</span>
-                                    <span className="text-sm md:text-xs">Rp&nbsp;{totalHpsItem.toLocaleString()}</span>
+                                    <span className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider font-sans">Total Kesepakatan:</span>
+                                    <span className="text-sm md:text-xs">Rp&nbsp;{totalNegoItem.toLocaleString()}</span>
                                   </div>
                                 </td>
                               </tr>
@@ -1989,7 +2027,7 @@ export default function Step3RincianHPS() {
                               {/* EXPANDED ACCORDION ROW */}
                               {isRowExpanded && surveyItem && (
                                 <tr className="block md:table-row">
-                                  <td colSpan="7" className="block md:table-cell p-0 border-b border-slate-100 md:mt-0">
+                                  <td colSpan="8" className="block md:table-cell p-0 border-b border-slate-100 md:mt-0">
                                     <div className="bg-slate-50/80 p-4 border-l-4 border-l-indigo-400 shadow-inner">
                                       <div className="flex flex-col lg:flex-row gap-6">
                                         
@@ -2351,35 +2389,56 @@ export default function Step3RincianHPS() {
                   </div>
 
                   {(() => {
-                    const items = getPackageItems(selectedPack)
+                    const items = getPackageItems(selectedPack);
                     const totalHps = items.reduce((sum, item) => {
-                      const price = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price
-                      return sum + (item.qty * price)
-                    }, 0)
+                      const price = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
+                      const qty = item.qty === '' ? 0 : (item.qty || 0);
+                      return sum + (qty * price);
+                    }, 0);
+                    const totalNego = items.reduce((sum, item) => {
+                      const hpsP = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
+                      const negoP = negotiatedPrices[item.name] !== undefined ? negotiatedPrices[item.name] : hpsP;
+                      const qty = item.qty === '' ? 0 : (item.qty || 0);
+                      return sum + (qty * negoP);
+                    }, 0);
                     const totalPagu = selectedPack?.pagu || 0;
+                    const totalSavings = totalHps - totalNego;
+                    const savingPct = totalHps > 0 ? ((totalSavings / totalHps) * 100).toFixed(1) : 0;
+
                     return (
-                      <div className="flex flex-col sm:flex-row gap-3 justify-between items-center pt-4 border-t border-slate-200 text-xs">
-                        <div className="text-slate-500 font-medium flex flex-col sm:flex-row gap-3">
-                          <span>Total Pagu Tahunan: <span className="font-bold font-mono text-slate-850 bg-slate-100 px-2 py-1 rounded-lg">Rp&nbsp;{totalPagu.toLocaleString()}</span></span>
-                          <span>Anggaran Tersedia: <span className="font-bold font-mono text-indigo-700 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100 shadow-sm">Rp&nbsp;{anggaranTersedia.toLocaleString()}</span></span>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-end gap-3.5">
-                          <span className="text-slate-600 font-semibold">Hasil Kalkulasi HPS:</span>
-                          <span className="text-sm font-bold font-mono text-slate-900 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">Rp&nbsp;{totalHps.toLocaleString()}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setHpsValue(totalHps.toString())
-                              dialog.success(`Nilai HPS Resmi telah disetujui:\n\nRp ${totalHps.toLocaleString('id-ID')}\n\nBerdasarkan hasil kalkulasi survei pasar e-Katalog.`, 'HPS Disetujui')
-                            }}
-                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-semibold px-4 py-2 rounded-xl transition-all text-[11px] active:scale-95 flex items-center gap-1.5 shadow-sm"
-                          >
-                            <Check className="w-4 h-4 text-slate-600" />
-                            <span>Gunakan Sebagai HPS Resmi</span>
-                          </button>
+                      <div className="flex flex-col gap-3 pt-4 border-t border-slate-200 text-xs">
+                        <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
+                          <div className="text-slate-500 font-medium flex flex-wrap gap-2.5 items-center">
+                            <span>Pagu Tahunan: <span className="font-bold font-mono text-slate-800 bg-slate-100 px-2 py-0.5 rounded">Rp&nbsp;{totalPagu.toLocaleString()}</span></span>
+                            <span>Kas Tersedia: <span className="font-bold font-mono text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">Rp&nbsp;{anggaranTersedia.toLocaleString()}</span></span>
+                            <span>HPS (Tayang): <span className="font-bold font-mono text-slate-700 bg-slate-100 px-2 py-0.5 rounded">Rp&nbsp;{totalHps.toLocaleString()}</span></span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-end gap-2.5 w-full sm:w-auto">
+                            <span className="text-slate-700 font-bold">Total Negosiasi:</span>
+                            <span className={`text-sm font-bold font-mono px-2.5 py-1 rounded-lg border shadow-sm ${totalSavings > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
+                              Rp&nbsp;{totalNego.toLocaleString()}
+                            </span>
+                            {totalSavings > 0 && (
+                              <span className="bg-emerald-100/70 text-emerald-800 font-bold text-[10px] px-2 py-1 rounded-md border border-emerald-200 flex items-center gap-1">
+                                <span>🎉 Efisiensi: Rp {totalSavings.toLocaleString()} ({savingPct}%)</span>
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setHpsValue(totalHps.toString());
+                                dialog.success(`Nilai HPS Resmi telah disetujui:\n\nRp ${totalHps.toLocaleString('id-ID')}\n\nTotal Kesepakatan Negosiasi:\nRp ${totalNego.toLocaleString('id-ID')}${totalSavings > 0 ? `\n\n(Hemat: Rp ${totalSavings.toLocaleString('id-ID')} / ${savingPct}%)` : ''}`, 'HPS Disetujui');
+                              }}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3 py-1.5 rounded-xl transition-all text-[11px] active:scale-95 flex items-center gap-1.5 shadow-sm"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Setujui HPS & Negosiasi</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    )
+                    );
                   })()}
                 </div>
               )}

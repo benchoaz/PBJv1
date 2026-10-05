@@ -83,6 +83,7 @@ export function PPKProvider({ children }) {
   const [hpsValue, setHpsValue] = useState(() => localStorage.getItem('pbj_hps_value') || '');
   const [isHpsExemptSelected, setIsHpsExemptSelected] = useState(() => localStorage.getItem('pbj_hps_exempt_selected') === 'true');
   const [hpsPrices, setHpsPrices] = useState(() => { const s = localStorage.getItem('pbj_hps_prices'); return s ? JSON.parse(s) : {}; });
+  const [negotiatedPrices, setNegotiatedPrices] = useState(() => { const s = localStorage.getItem('pbj_negotiated_prices'); return s ? JSON.parse(s) : {}; });
   const [techSpecs, setTechSpecs] = useState(() => localStorage.getItem('pbj_tech_specs') || '');
   const [dppSpecs, setDppSpecs] = useState(() => {
     const s = localStorage.getItem('pbj_dpp_specs');
@@ -202,6 +203,7 @@ export function PPKProvider({ children }) {
   useEffect(() => { localStorage.setItem('pbj_selected_tpl_id', selectedTplId); }, [selectedTplId]);
   useEffect(() => { localStorage.setItem('pbj_selected_nd_tpl_id', selectedNdTplId); }, [selectedNdTplId]);
   useEffect(() => { localStorage.setItem('pbj_hps_prices', JSON.stringify(hpsPrices)); }, [hpsPrices]);
+  useEffect(() => { localStorage.setItem('pbj_negotiated_prices', JSON.stringify(negotiatedPrices)); }, [negotiatedPrices]);
   useEffect(() => { localStorage.setItem('pbj_hps_value', hpsValue); }, [hpsValue]);
   useEffect(() => { localStorage.setItem('pbj_tech_specs', techSpecs); }, [techSpecs]);
   useEffect(() => { localStorage.setItem('pbj_dpp_specs', JSON.stringify(dppSpecs)); }, [dppSpecs]);
@@ -620,6 +622,10 @@ export function PPKProvider({ children }) {
         setHpsPrices(prices);
       }
 
+      if (parsed.negotiatedPrices) {
+        setNegotiatedPrices(parsed.negotiatedPrices);
+      }
+
       if (parsed.tanggalSurat) setTanggalSurat(parsed.tanggalSurat);
       if (parsed.comparisons) setComparisons(parsed.comparisons);
       if (parsed.justifications) setJustifications(parsed.justifications);
@@ -632,6 +638,7 @@ export function PPKProvider({ children }) {
         if (parsed.dpaRincian) localStorage.setItem('pbj_dpa_rincian', JSON.stringify(parsed.dpaRincian));
         if (parsed.surveyData) localStorage.setItem('pbj_survey_data', JSON.stringify(parsed.surveyData));
         if (parsed.hpsPrices) localStorage.setItem('pbj_hps_prices', JSON.stringify(parsed.hpsPrices));
+        if (parsed.negotiatedPrices) localStorage.setItem('pbj_negotiated_prices', JSON.stringify(parsed.negotiatedPrices));
         if (parsed.packageMetadata) localStorage.setItem('pbj_package_metadata', JSON.stringify(parsed.packageMetadata));
         if (parsed.dppSpecs) localStorage.setItem('pbj_dpp_specs', JSON.stringify(parsed.dppSpecs));
         if (parsed.comparisons) localStorage.setItem('pbj_comparisons', JSON.stringify(parsed.comparisons));
@@ -691,6 +698,7 @@ export function PPKProvider({ children }) {
           dppSpecs,
           techSpecs,
           hpsPrices,
+          negotiatedPrices,
           tanggalSurat,
           selectedTplId,
           selectedNdTplId,
@@ -754,7 +762,7 @@ export function PPKProvider({ children }) {
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [step, surveyData, dpaRincian, hpsPrices, dppSpecs, isHpsExemptSelected, comparisons, justifications, autoComparator, status]);
+  }, [step, surveyData, dpaRincian, hpsPrices, negotiatedPrices, dppSpecs, isHpsExemptSelected, comparisons, justifications, autoComparator, status]);
 
   const value = {
     comparisons, setComparisons,
@@ -771,6 +779,7 @@ export function PPKProvider({ children }) {
     hpsValue, setHpsValue,
     isHpsExemptSelected, setIsHpsExemptSelected,
     hpsPrices, setHpsPrices,
+    negotiatedPrices, setNegotiatedPrices,
     techSpecs, setTechSpecs,
     dppSpecs, setDppSpecs,
     packageMetadata, setPackageMetadata,

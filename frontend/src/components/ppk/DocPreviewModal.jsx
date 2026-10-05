@@ -144,7 +144,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
   const {
     activeDocPreview, setActiveDocPreview,
     selectedPack,
-    hpsValue, hpsPrices,
+    hpsValue, hpsPrices, negotiatedPrices,
     currentUser,
     docSettings,
     dppSpecs,
@@ -780,7 +780,10 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
       const items = getPackageItems(selectedPack);
       items.forEach((item, idx) => {
         const matchedProd = sProducts.find(p => p.id === item.id || p.name === item.name) || sProducts[idx] || {};
-        const price = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : (matchedProd.price || item.price);
+        const tayangPrice = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : (matchedProd.price || item.price);
+        const negoPrice = (negotiatedPrices && negotiatedPrices[item.name] !== undefined)
+          ? negotiatedPrices[item.name]
+          : tayangPrice;
         
         let sImg = matchedProd.img || matchedProd.searchImg || item.img || null;
         if (sImg && typeof sImg === 'string' && sImg.startsWith('/screenshots/')) {
@@ -808,8 +811,8 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
         const prodLink = matchedProd.link || item.link || 'https://e-katalog.lkpp.go.id';
 
         map[item.no] = {
-          price: price,
-          tayang: matchedProd.price || item.price,
+          price: negoPrice,
+          tayang: tayangPrice,
           vendor: vendorName,
           linkSelected: prodLink,
           screenshotUrl: sImg,
