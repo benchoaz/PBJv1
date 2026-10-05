@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { getDefaultWaktuForPackage } from '../../config/procurementTimeConfig';
 
 const PPKContext = createContext();
 
@@ -517,14 +518,26 @@ export function PPKProvider({ children }) {
       if (parsed.hpsValue) setHpsValue(parsed.hpsValue);
       if (parsed.isHpsExemptSelected !== undefined) setIsHpsExemptSelected(parsed.isHpsExemptSelected);
       if (parsed.dppSpecs) {
-        setDppSpecs(prev => ({
-          ...prev,
-          ...parsed.dppSpecs,
-          jenisPemeliharaan: parsed.dppSpecs.jenisPemeliharaan || 'lainnya',
-          maintenanceObjects: parsed.dppSpecs.maintenanceObjects || [],
-          maintenanceParams: parsed.dppSpecs.maintenanceParams || {},
-          maintenanceHpsItems: parsed.dppSpecs.maintenanceHpsItems || []
-        }));
+        setDppSpecs(prev => {
+          const loadedWaktu = parsed.dppSpecs.waktu;
+          const isGeneric = !loadedWaktu || 
+            loadedWaktu === '1 (Satu) hari kerja' || 
+            loadedWaktu === '14 (Empat Belas) hari kalender' ||
+            loadedWaktu === '14 (empat belas) hari kalender';
+          
+          const defaultForPack = getDefaultWaktuForPackage(parsed.selectedPack || parsed, parsed.selectedTplId, parsed.dppSpecs);
+          const effectiveWaktu = isGeneric ? defaultForPack : loadedWaktu;
+
+          return {
+            ...prev,
+            ...parsed.dppSpecs,
+            waktu: effectiveWaktu,
+            jenisPemeliharaan: parsed.dppSpecs.jenisPemeliharaan || 'lainnya',
+            maintenanceObjects: parsed.dppSpecs.maintenanceObjects || [],
+            maintenanceParams: parsed.dppSpecs.maintenanceParams || {},
+            maintenanceHpsItems: parsed.dppSpecs.maintenanceHpsItems || []
+          };
+        });
       }
       
       if (parsed.packageMetadata) {

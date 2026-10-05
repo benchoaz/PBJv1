@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom';
 import { usePPK } from './PPKContext';
 import { 
   Settings, Printer, Download, ClipboardList, Wand2, ShieldCheck, AlertTriangle, Loader2,
-  Car, Building2, Wrench, Plus, Trash2, RotateCcw, PlusCircle, CheckCircle2, FileSpreadsheet, Info
+  Car, Building2, Wrench, Plus, Trash2, RotateCcw, PlusCircle, CheckCircle2, FileSpreadsheet, Info, Clock
 } from 'lucide-react';
 import { DEFAULT_TEMPLATES } from '../TemplateSuratManager';
+import BahpDocument from '../pp/BahpDocument';
 import {
   MAINTENANCE_TYPES,
   getMaintenanceConfig,
@@ -14,6 +15,7 @@ import {
   formatSatuanClean,
   formatTitleCase
 } from '../../config/maintenanceConfig';
+import { getTimeConfigForPackage, getDefaultWaktuForPackage } from '../../config/procurementTimeConfig';
 
 export const injectSignatureHelper = (htmlContent, name, nip, imgHtml) => {
   if (!nip) return htmlContent;
@@ -1043,7 +1045,7 @@ export default function Step4TemplateSurat() {
                         <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">
                           Parameter Pelaksanaan, SLA & Legalitas Penyedia
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                           {dppSpecs.jenisPemeliharaan === 'kendaraan' && (
                             <div>
                               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -1058,16 +1060,68 @@ export default function Step4TemplateSurat() {
                                     ...dppSpecs,
                                     maintenanceParams: { ...dppSpecs.maintenanceParams, jarakMaksimalBengkelKm: Number(e.target.value) }
                                   })}
-                                  className="w-24 text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none"
+                                  className="w-20 text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none"
                                 />
-                                <span className="text-xs text-slate-500">km dari Kantor Kecamatan Besuk</span>
+                                <span className="text-[11px] text-slate-500">km dari Besuk</span>
                               </div>
                             </div>
                           )}
 
                           <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                Waktu Pelaksanaan
+                              </label>
+                              <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200">
+                                {dppSpecs.jenisPemeliharaan === 'gedung' ? 'Gedung' : 'Kendaraan'}
+                              </span>
+                            </div>
+                            <input
+                              type="text"
+                              disabled={status === 'Final'}
+                              value={dppSpecs.waktu || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setDppSpecs({ ...dppSpecs, waktu: val });
+                                setPackageMetadata(prev => ({ ...prev, waktu_penyelesaian: val }));
+                              }}
+                              placeholder={dppSpecs.jenisPemeliharaan === 'gedung' ? '30 (tiga puluh) hari kalender' : '7 (tujuh) hari kalender'}
+                              className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none"
+                            />
+                            {/* Preset chips */}
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(dppSpecs.jenisPemeliharaan === 'gedung' 
+                                ? ['14 Hari', '30 Hari (1 Bulan)', '45 Hari']
+                                : ['3 Hari', '7 Hari', '14 Hari']
+                              ).map((lbl, idx) => {
+                                const fullVal = dppSpecs.jenisPemeliharaan === 'gedung'
+                                  ? (lbl === '14 Hari' ? '14 (empat belas) hari kalender' : lbl === '45 Hari' ? '45 (empat puluh lima) hari kalender' : '30 (tiga puluh) hari kalender')
+                                  : (lbl === '3 Hari' ? '3 (tiga) hari kalender' : lbl === '14 Hari' ? '14 (empat belas) hari kalender' : '7 (tujuh) hari kalender');
+                                return (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    disabled={status === 'Final'}
+                                    onClick={() => {
+                                      setDppSpecs({ ...dppSpecs, waktu: fullVal });
+                                      setPackageMetadata(prev => ({ ...prev, waktu_penyelesaian: fullVal }));
+                                    }}
+                                    className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                                      (dppSpecs.waktu || '').includes(lbl.split(' ')[0])
+                                        ? 'bg-indigo-600 text-white border-indigo-700 font-bold'
+                                        : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+                                    }`}
+                                  >
+                                    {lbl}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div>
                             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                              Masa Garansi / Pemeliharaan
+                              Masa Garansi / Servis
                             </label>
                             <input
                               type="text"
@@ -1087,7 +1141,7 @@ export default function Step4TemplateSurat() {
 
                           <div>
                             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                              Metode Pemilihan Penyedia
+                              Metode Pemilihan
                             </label>
                             <select
                               disabled={status === 'Final'}
@@ -1095,7 +1149,7 @@ export default function Step4TemplateSurat() {
                               onChange={(e) => setDppSpecs({ ...dppSpecs, metodePemilihan: e.target.value })}
                               className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none bg-white"
                             >
-                              <option value="E-Purchasing">E-Purchasing (Katalog Elektronik)</option>
+                              <option value="E-Purchasing">E-Purchasing (Katalog)</option>
                               <option value="Pengadaan Langsung">Pengadaan Langsung</option>
                               <option value="Negosiasi Harga">Negosiasi Harga</option>
                             </select>
@@ -1406,6 +1460,86 @@ export default function Step4TemplateSurat() {
                         <span>Pengaturan Spesifik DPP & Refinement AI</span>
                       </div>
 
+                      {(() => {
+                        const timeConfig = getTimeConfigForPackage(selectedPack, selectedTplId, dppSpecs);
+                        return (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 bg-white/70 p-3 rounded-xl border border-indigo-100">
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                                  <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                                  <span>Spesifikasi Waktu Pelaksanaan</span>
+                                </label>
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${timeConfig.badgeColor}`}>
+                                  {timeConfig.label}
+                                </span>
+                              </div>
+                              <input
+                                type="text"
+                                disabled={status === 'Final'}
+                                value={dppSpecs.waktu || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setDppSpecs({ ...dppSpecs, waktu: val });
+                                  setPackageMetadata(prev => ({ ...prev, waktu_penyelesaian: val }));
+                                }}
+                                placeholder={timeConfig.defaultWaktu}
+                                className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none font-semibold bg-white"
+                              />
+                              {timeConfig.presets && (
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                  {timeConfig.presets.map((ps, idx) => (
+                                    <button
+                                      key={idx}
+                                      type="button"
+                                      disabled={status === 'Final'}
+                                      onClick={() => {
+                                        setDppSpecs({ ...dppSpecs, waktu: ps.value });
+                                        setPackageMetadata(prev => ({ ...prev, waktu_penyelesaian: ps.value }));
+                                      }}
+                                      className={`text-[9px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                                        (dppSpecs.waktu || '').trim() === ps.value.trim()
+                                          ? 'bg-indigo-600 text-white border-indigo-700 font-bold'
+                                          : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                                      }`}
+                                    >
+                                      {ps.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                                  Tempat Tujuan Akhir Pengiriman
+                                </label>
+                                <button
+                                  type="button"
+                                  disabled={status === 'Final'}
+                                  onClick={() => setDppSpecs({ ...dppSpecs, tempat: `Kantor ${currentUser?.department || 'Kecamatan Besuk'}` })}
+                                  className="text-[9px] font-semibold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                                >
+                                  Reset Satker
+                                </button>
+                              </div>
+                              <input
+                                type="text"
+                                disabled={status === 'Final'}
+                                value={dppSpecs.tempat || ''}
+                                onChange={(e) => setDppSpecs({ ...dppSpecs, tempat: e.target.value })}
+                                onBlur={(e) => {
+                                  if (e.target.value) setDppSpecs({ ...dppSpecs, tempat: formatTitleCase(e.target.value) });
+                                }}
+                                placeholder={`Kantor ${currentUser?.department || 'Kecamatan Besuk'}`}
+                                className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none font-semibold bg-white"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                           <div className="flex justify-between items-center mb-1">
@@ -1457,9 +1591,15 @@ export default function Step4TemplateSurat() {
                     </button>
                     <button
                       onClick={() => setActiveDocPreview('dpp')}
-                      className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 px-5 py-3 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all"
+                      className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 px-5 py-3 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-sm"
                     >
                       Lihat Dokumen DPP PPK
+                    </button>
+                    <button
+                      onClick={() => setActiveDocPreview('bahp')}
+                      className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 hover:border-indigo-300 px-5 py-3 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
+                    >
+                      📜 Lihat & Download BAHP (Hasil Pemilihan)
                     </button>
                   </div>
                   
@@ -1576,7 +1716,7 @@ export default function Step4TemplateSurat() {
           <div className="fixed top-4 left-4 right-4 flex justify-between items-center z-50 bg-white/95 border border-slate-200/90 px-6 py-3.5 rounded-2xl shadow-2xl backdrop-blur-md max-w-7xl mx-auto print:hidden transition-all duration-300">
             <div className="text-slate-800 text-[11px] font-bold uppercase tracking-wider flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-slate-800 animate-pulse"></span>
-              Pratinjau Dokumen Resmi {activeDocPreview === 'hps' ? 'Surat Penetapan HPS' : activeDocPreview === 'nd' ? 'Nota Dinas Usulan' : 'Dokumen Persiapan Pengadaan (DPP)'}
+              Pratinjau Dokumen Resmi {activeDocPreview === 'hps' ? 'Surat Penetapan HPS' : activeDocPreview === 'nd' ? 'Nota Dinas Usulan' : activeDocPreview === 'bahp' ? 'Berita Acara Hasil Pemilihan (BAHP)' : 'Dokumen Persiapan Pengadaan (DPP)'}
             </div>
             <div className="flex items-center gap-3">
               <button 
@@ -1745,7 +1885,39 @@ export default function Step4TemplateSurat() {
  </p>
  </div>
  </div>
- ) : activeDocPreview === 'nd' ? (
+ ) : activeDocPreview === 'bahp' ? (
+  // BERITA ACARA HASIL PEMILIHAN (BAHP E-PURCHASING)
+  <BahpDocument
+    templateId={(() => {
+      const name = (selectedPack?.packName || '').toLowerCase();
+      if (name.includes('pemeliharaan') || name.includes('servis')) return 'pemeliharaan';
+      if (name.includes('mamin') || name.includes('snack') || name.includes('makan')) return 'mamin';
+      if (name.includes('laptop') || name.includes('printer') || name.includes('komputer') || name.includes('mesin') || name.includes('modal')) return 'modal';
+      if (name.includes('jasa') || name.includes('konstruksi')) return 'jasa';
+      if (name.includes('seragam') || name.includes('konsolidasi')) return 'seragam';
+      return 'atk';
+    })()}
+    submittedPack={selectedPack}
+    negotiatedItems={(() => {
+      const map = {};
+      const items = getPackageItems(selectedPack);
+      items.forEach(item => {
+        const price = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
+        map[item.no] = { price, note: 'Sesuai Hasil survei & negosiasi E-Purchasing' };
+      });
+      return map;
+    })()}
+    checkedItems={(() => {
+      const map = {};
+      const items = getPackageItems(selectedPack);
+      items.forEach(item => { map[item.no] = true; });
+      return map;
+    })()}
+    docSettings={docSettings || {}}
+    user={currentUser}
+    getPackageItems={getPackageItems}
+  />
+  ) : activeDocPreview === 'nd' ? (
  // NOTA DINAS USULAN PENGADAAN
  <div className="space-y-4 relative">
  {(() => {
@@ -1808,7 +1980,7 @@ export default function Step4TemplateSurat() {
  '{{nomor_sp}}': nomorBase.replace('{nomor}', '115/SP'),
  '{{alamat_penyedia}}': '_______________________',
  '{{nilai_kontrak}}': '_______________________',
- '{{waktu_penyelesaian}}': packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
+ '{{waktu_penyelesaian}}': dppSpecs.waktu || packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
  '{{nomor_dpp}}': packageMetadata.nomor_dpp || '................................',
  '{{tanggal_dpp}}': formatTanggalIndo(packageMetadata.tanggal_dpp, tanggalSurat),
  '{{nomor_hps}}': nomorBase.replace('{nomor}', '014/HPS'),
@@ -1929,7 +2101,7 @@ export default function Step4TemplateSurat() {
  '{{nomor_sp}}': nomorBase.replace('{nomor}', '115/SP'),
  '{{alamat_penyedia}}': '_______________________',
  '{{nilai_kontrak}}': '_______________________',
- '{{waktu_penyelesaian}}': packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
+ '{{waktu_penyelesaian}}': dppSpecs.waktu || packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
  '{{nomor_dpp}}': packageMetadata.nomor_dpp || '................................',
  '{{tanggal_dpp}}': formatTanggalIndo(packageMetadata.tanggal_dpp, tanggalSurat),
  '{{nomor_hps}}': nomorBase.replace('{nomor}', '014/HPS'),
@@ -2534,6 +2706,7 @@ export default function Step4TemplateSurat() {
  )}
 
  {/* SIGNATURE SECTION (FOOTER) */}
+ {activeDocPreview !== 'bahp' && (
  <div className="flex justify-between items-end mt-12 pt-6 border-t border-slate-200 signature-section" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
  <div className="flex-1">
  {/* Kosong untuk memberikan ruang tanda tangan di kanan */}
@@ -2570,6 +2743,7 @@ export default function Step4TemplateSurat() {
  </div>
  </div>
  </div>
+ )}
  </div>
  </div>
  </div>,

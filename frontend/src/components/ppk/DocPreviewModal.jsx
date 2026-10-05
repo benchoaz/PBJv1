@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Settings, Printer, FileDown } from 'lucide-react';
 import { usePPK } from './PPKContext';
 import { DEFAULT_TEMPLATES } from '../../utils/defaultTemplates';
+import BahpDocument from '../pp/BahpDocument';
 import {
   MAINTENANCE_TYPES,
   getMaintenanceConfig,
@@ -583,7 +584,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
           <div className="fixed top-4 left-4 right-4 flex justify-between items-center z-50 bg-white/95 border border-slate-200/90 px-6 py-3.5 rounded-2xl shadow-2xl backdrop-blur-md max-w-7xl mx-auto print:hidden transition-all duration-300">
             <div className="text-slate-800 text-[11px] font-bold uppercase tracking-wider flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-slate-800 animate-pulse"></span>
-              Pratinjau Dokumen Resmi {activeDocPreview === 'hps' ? 'Surat Penetapan HPS' : activeDocPreview === 'nd' ? 'Nota Dinas Usulan' : 'Dokumen Persiapan Pengadaan (DPP)'}
+              Pratinjau Dokumen Resmi {activeDocPreview === 'hps' ? 'Surat Penetapan HPS' : activeDocPreview === 'nd' ? 'Nota Dinas Usulan' : activeDocPreview === 'bahp' ? 'Berita Acara Hasil Pemilihan (BAHP)' : 'Dokumen Persiapan Pengadaan (DPP)'}
             </div>
             <div className="flex items-center gap-3">
               <button 
@@ -753,7 +754,39 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  </p>
  </div>
  </div>
- ) : activeDocPreview === 'nd' ? (
+ ) : activeDocPreview === 'bahp' ? (
+  // BERITA ACARA HASIL PEMILIHAN (BAHP E-PURCHASING)
+  <BahpDocument
+    templateId={(() => {
+      const cat = getPacketCategory(selectedPack?.packName || '');
+      if (cat === 'Pemeliharaan') return 'pemeliharaan';
+      if (cat.startsWith('Mamin')) return 'mamin';
+      if (cat === 'Modal') return 'modal';
+      if (cat === 'Jasa' || cat === 'Konstruksi') return 'jasa';
+      if (cat === 'Konsolidasi') return 'seragam';
+      return 'atk';
+    })()}
+    submittedPack={selectedPack}
+    negotiatedItems={(() => {
+      const map = {};
+      const items = getPackageItems(selectedPack);
+      items.forEach(item => {
+        const price = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
+        map[item.no] = { price, note: 'Sesuai Hasil survei & negosiasi E-Purchasing' };
+      });
+      return map;
+    })()}
+    checkedItems={(() => {
+      const map = {};
+      const items = getPackageItems(selectedPack);
+      items.forEach(item => { map[item.no] = true; });
+      return map;
+    })()}
+    docSettings={docSettings || {}}
+    user={currentUser}
+    getPackageItems={getPackageItems}
+  />
+  ) : activeDocPreview === 'nd' ? (
  // NOTA DINAS USULAN PENGADAAN
  <div className="space-y-4 relative">
  {(() => {
@@ -814,7 +847,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{nomor_sp}}': nomorBase.replace('{nomor}', '115/SP'),
  '{{alamat_penyedia}}': '_______________________',
  '{{nilai_kontrak}}': '_______________________',
- '{{waktu_penyelesaian}}': packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
+ '{{waktu_penyelesaian}}': dppSpecs.waktu || packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
  '{{nomor_dpp}}': packageMetadata.nomor_dpp || '................................',
  '{{tanggal_dpp}}': formatTanggalIndo(packageMetadata.tanggal_dpp || tanggalSurat),
  '{{nomor_hps}}': nomorBase.replace('{nomor}', '014/HPS'),
@@ -966,7 +999,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{nomor_sp}}': nomorBase.replace('{nomor}', '115/SP'),
  '{{alamat_penyedia}}': '_______________________',
  '{{nilai_kontrak}}': '_______________________',
- '{{waktu_penyelesaian}}': packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
+ '{{waktu_penyelesaian}}': dppSpecs.waktu || packageMetadata.waktu_penyelesaian || '14 (empat belas) hari kalender',
  '{{nomor_dpp}}': packageMetadata.nomor_dpp || '................................',
  '{{tanggal_dpp}}': formatTanggalIndo(packageMetadata.tanggal_dpp || tanggalSurat),
  '{{nomor_hps}}': nomorBase.replace('{nomor}', '014/HPS'),
@@ -1576,10 +1609,8 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
   </div>
   );
   })()}
- </div>
- )}
-
- {/* TTD PPK GLOBAL - Muncul di akhir semua dokumen (HPS, Nota Dinas, dan DPP setelah lampiran) */}
+   {/* TTD PPK GLOBAL - Muncul di akhir semua dokumen (HPS, Nota Dinas, dan DPP setelah lampiran) */}
+  {activeDocPreview !== 'bahp' && (
  <div className="flex justify-end mt-12 pt-6 border-t-2 border-slate-900" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
    <div className="w-max min-w-[14rem] px-4 text-center space-y-1">
       <div>{(docSettings?.kotaSurat || (currentUser?.department?.toLowerCase().includes('besuk') ? 'Besuk' : (currentUser?.department || 'Probolinggo')))}, {
@@ -1598,6 +1629,8 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
      <div className="font-bold uppercase underline">{currentUser?.name}</div>
      <div className="font-mono">NIP. {currentUser?.nip}</div>
    </div>
+ </div>
+  )}
  </div>
 
  </div>

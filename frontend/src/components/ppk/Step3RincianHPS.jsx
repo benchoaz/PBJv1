@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { usePPK } from './PPKContext';
 import { DEFAULT_TEMPLATES } from '../../utils/defaultTemplates';
-import { Save, Search, RefreshCw, Camera, Sparkles, CheckCircle2, XCircle, AlertTriangle, Loader2, Check, FileText, ClipboardList, Edit3, Store, Globe, LayoutGrid } from 'lucide-react';
+import { Save, Search, RefreshCw, Camera, Sparkles, CheckCircle2, XCircle, AlertTriangle, Loader2, Check, FileText, ClipboardList, Edit3, Store, Globe, LayoutGrid, Clock } from 'lucide-react';
 import { dialog } from '../../utils/dialog';
+import { getTimeConfigForPackage, getDefaultWaktuForPackage } from '../../config/procurementTimeConfig';
+import { formatTitleCase } from '../../config/maintenanceConfig';
 
 const getDynamicProductLink = (vendorName, keyword) => {
   if (!vendorName) return '';
@@ -429,13 +431,24 @@ export default function Step3RincianHPS() {
       defSpek = "Penyedia wajib mengirimkan barang dalam kondisi baru, tidak cacat fisik, dan bersegel asli pabrik. Apabila saat serah terima ditemukan barang rusak atau tidak sesuai pesanan, penyedia wajib menukarnya maksimal dalam waktu 2x24 jam.";
     }
 
-    setDppSpecs(prev => ({
-      ...prev,
-      justifikasiMerek: defMerek,
-      metodePemilihan: defMetode,
-      spesifikasiLayanan: defSpek
-    }));
-  }, [selectedTplId]); 
+    const timeCfg = getTimeConfigForPackage(selectedPack, selectedTplId, dppSpecs);
+    setDppSpecs(prev => {
+      const isGenericDefault = !prev.waktu || 
+        prev.waktu === '1 (Satu) hari kerja' || 
+        prev.waktu === '14 (Empat Belas) hari kalender' ||
+        prev.waktu === '14 (empat belas) hari kalender';
+      
+      const newWaktu = isGenericDefault ? timeCfg.defaultWaktu : prev.waktu;
+      
+      return {
+        ...prev,
+        waktu: newWaktu,
+        justifikasiMerek: defMerek,
+        metodePemilihan: defMetode,
+        spesifikasiLayanan: defSpek
+      };
+    });
+  }, [selectedTplId, selectedPack]); 
 
   // Auto-fill MAK and Tahun Anggaran from selectedPack if they are empty
   useEffect(() => {
@@ -2818,30 +2831,150 @@ export default function Step3RincianHPS() {
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 md:p-7 shadow-sm">
                 <div className="font-bold text-slate-800 text-sm mb-4 border-b border-slate-200 pb-2">Pengaturan Dokumen Persiapan (Dinamis)</div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Spesifikasi Waktu Pelaksanaan</label>
-                    <input
-                      type="text"
-                      className="glass-input text-xs font-semibold"
-                      value={dppSpecs.waktu}
-                      onChange={(e) => setDppSpecs({...dppSpecs, waktu: e.target.value})}
-                      placeholder="14 (Empat Belas) hari kalender"
-                      disabled={isSigned}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Tempat Tujuan Akhir Pengiriman</label>
-                    <input
-                      type="text"
-                      className="glass-input text-xs font-semibold"
-                      value={dppSpecs.tempat}
-                      onChange={(e) => setDppSpecs({...dppSpecs, tempat: e.target.value})}
-                      placeholder={`Kantor ${currentUser?.department || 'Kecamatan'}`}
-                      disabled={isSigned}
-                    />
-                  </div>
-                </div>
+                {(() => {
+                  const timeConfig = getTimeConfigForPackage(selectedPack, selectedTplId, dppSpecs);
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">
+                      {/* Spesifikasi Waktu Pelaksanaan Dinamis & Editable */}
+                      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2">
+                            <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Spesifikasi Waktu Pelaksanaan</span>
+                            </label>
+                            {timeConfig && (
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${timeConfig.badgeColor}`}>
+                                {timeConfig.label}
+                              </span>
+                            )}
+                          </div>
+
+                          <input
+                            type="text"
+                            className="glass-input text-xs font-semibold w-full bg-slate-50/50 focus:bg-white transition-colors"
+                            value={dppSpecs.waktu || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setDppSpecs({ ...dppSpecs, waktu: val });
+                              setPackageMetadata(prev => ({ ...prev, waktu_penyelesaian: val }));
+                            }}
+                            placeholder={timeConfig.defaultWaktu}
+                            disabled={isSigned}
+                          />
+
+                          {/* Quick-Pick Preset Chips */}
+                          {timeConfig.presets && timeConfig.presets.length > 0 && (
+                            <div className="mt-2.5">
+                              <div className="text-[10px] text-slate-500 font-semibold mb-1.5 flex items-center gap-1">
+                                <span>⚡ Pilihan Cepat (Rekomendasi Dokumen):</span>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {timeConfig.presets.map((preset, pIdx) => {
+                                  const isSelected = (dppSpecs.waktu || '').trim() === preset.value.trim();
+                                  return (
+                                    <button
+                                      key={pIdx}
+                                      type="button"
+                                      disabled={isSigned}
+                                      onClick={() => {
+                                        setDppSpecs({ ...dppSpecs, waktu: preset.value });
+                                        setPackageMetadata(prev => ({ ...prev, waktu_penyelesaian: preset.value }));
+                                      }}
+                                      className={`text-[10px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer font-medium disabled:opacity-50 ${
+                                        isSelected
+                                          ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm font-bold'
+                                          : 'bg-slate-50 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 border-slate-200'
+                                      }`}
+                                      title={preset.value}
+                                    >
+                                      {preset.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {timeConfig.keterangan && (
+                          <div className="text-[10px] text-slate-500 italic mt-2.5 pt-2 border-t border-slate-100 flex items-start gap-1">
+                            <span className="font-semibold text-slate-600">Info:</span>
+                            <span>{timeConfig.keterangan}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Tempat Tujuan Akhir Pengiriman */}
+                      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2">
+                            <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                              <Store className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Tempat Tujuan Akhir Pengiriman / Pekerjaan</span>
+                            </label>
+                            <button
+                              type="button"
+                              disabled={isSigned}
+                              onClick={() => {
+                                const defLoc = `Kantor ${currentUser?.department || 'Kecamatan Besuk'}`;
+                                setDppSpecs({ ...dppSpecs, tempat: formatTitleCase(defLoc) });
+                              }}
+                              className="text-[9px] font-semibold text-indigo-600 hover:text-indigo-800 underline cursor-pointer disabled:opacity-50"
+                            >
+                              Reset Lokasi Satker
+                            </button>
+                          </div>
+
+                          <input
+                            type="text"
+                            className="glass-input text-xs font-semibold w-full bg-slate-50/50 focus:bg-white transition-colors"
+                            value={dppSpecs.tempat || ''}
+                            onChange={(e) => setDppSpecs({ ...dppSpecs, tempat: e.target.value })}
+                            onBlur={(e) => {
+                              if (e.target.value) {
+                                setDppSpecs({ ...dppSpecs, tempat: formatTitleCase(e.target.value) });
+                              }
+                            }}
+                            placeholder={`Kantor ${currentUser?.department || 'Kecamatan Besuk'}`}
+                            disabled={isSigned}
+                          />
+
+                          <div className="mt-2.5">
+                            <div className="text-[10px] text-slate-500 font-semibold mb-1.5">
+                              <span>📍 Lokasi Cepat:</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {[
+                                `Kantor ${currentUser?.department || 'Kecamatan Besuk'}`,
+                                'Kantor Kecamatan Besuk, Jl. Raya Besuk No. 37',
+                                'Wilayah Kecamatan Besuk, Kabupaten Probolinggo'
+                              ].map((loc, lIdx) => (
+                                <button
+                                  key={lIdx}
+                                  type="button"
+                                  disabled={isSigned}
+                                  onClick={() => setDppSpecs({ ...dppSpecs, tempat: loc })}
+                                  className={`text-[10px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer font-medium disabled:opacity-50 ${
+                                    (dppSpecs.tempat || '').toLowerCase() === loc.toLowerCase()
+                                      ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm font-bold'
+                                      : 'bg-slate-50 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 border-slate-200'
+                                  }`}
+                                >
+                                  {loc.split(',')[0]}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-[10px] text-slate-500 italic mt-2.5 pt-2 border-t border-slate-100">
+                          Format kapitalisasi otomatis disesuaikan (Title Case) pada cetakan dokumen resmi.
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 
 
