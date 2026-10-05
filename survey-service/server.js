@@ -343,7 +343,8 @@ function resolvePriceRange(item) {
 
 /**
  * Menghitung skor kemiripan teks antara produk target (DPA) dan kandidat dari Inaproc.
- * Menggunakan perpaduan Word Overlap, Jaccard Similarity, dan Length Penalty.
+ * Menggunakan perpaduan Word Overlap, Jaccard Similarity, Length Penalty,
+ * serta perlindungan terhadap modifier words dan kategori produk yang bertentangan.
  */
 function getSimilarityScore(target, candidate) {
   if (!target || !candidate) return 0;
@@ -356,13 +357,46 @@ function getSimilarityScore(target, candidate) {
   const tSet = new Set(tClean);
   const cSet = new Set(cClean);
 
+  // 0. CEK KATA BENDA SPESIFIK YANG BERTENTANGAN (MUTUALLY EXCLUSIVE OBJECTS)
+  // Contoh: 'cairan' / 'pembersih' bertentangan dengan 'sapu' atau 'sikat' (keduanya bukan barang yang sama)
+  const CONFLICT_MAP = [
+    { primary: ['cairan', 'pembersih', 'karbol', 'wipol', 'deterjen'], conflicting: ['sapu', 'sikat', 'kemoceng'] },
+    { primary: ['sapu'], conflicting: ['cairan', 'karbol', 'wipol', 'deterjen', 'pel'] },
+    { primary: ['lap', 'serbet'], conflicting: ['sabun'] },
+    { primary: ['sampah'], conflicting: ['karpet', 'keset'] }
+  ];
+
+  for (const rule of CONFLICT_MAP) {
+    const targetHasPrimary = rule.primary.some(w => tSet.has(w));
+    const candHasConflict = rule.conflicting.some(w => cSet.has(w));
+    const candHasPrimary = rule.primary.some(w => cSet.has(w));
+    if (targetHasPrimary && candHasConflict && !candHasPrimary) {
+      return 0; // Kategori barang bertentangan mutlak!
+    }
+  }
+
   // 1. Hitung Word Overlap (berapa banyak kata target yang ada di kandidat)
   let overlapCount = 0;
+  const matchedWords = [];
   tClean.forEach(word => {
     if (cSet.has(word)) {
       overlapCount++;
+      matchedWords.push(word);
     }
   });
+
+  // JIKA SEMUA KATA YANG COCOK HANYA KATA SIFAT/LOKASI/WADAH (MODIFIERS):
+  // Misalnya hanya kata "lantai", "kaca", "ruangan", "piring", "kantor", "dinas", "karet", "plastik"
+  const MODIFIERS = new Set([
+    'lantai', 'kaca', 'kantor', 'dinas', 'ruang', 'ruangan', 'rumah', 'tangga',
+    'gedung', 'meja', 'kamar', 'mandi', 'piring', 'baju', 'dinding'
+  ]);
+  const hasSubstantiveWord = matchedWords.some(w => !MODIFIERS.has(w));
+  if (matchedWords.length > 0 && !hasSubstantiveWord) {
+    // Hanya kata modifier yang cocok (misal 'Cairan Pembersih Lantai' vs 'Sapu Lantai' -> hanya cocok kata 'lantai')
+    return 0;
+  }
+
   const overlapScore = overlapCount / tClean.length;
 
   // 2. Hitung Jaccard Similarity (irisan dibanding gabungan)
@@ -835,7 +869,7 @@ async function searchItem(page, item, index) {
 
             // 💡 FIX: Pada pencarian toko vendor, jika 10 produk yang didapatkan TIDAK ada yang cocok kata kunci sama sekali (hanya etalase umum),
             // JANGAN break! Lanjutkan ke query pencarian yang lebih spesifik/sederhana (misal: "Bantalan Stempel")
-            const hasAnyMatchingCandidate = candidates.some(cand => getSimilarityScore(searchTarget, cand.title) > 0);
+            const hasAnyMatchingCandidate = candidates.some(cand => getSimilarityScore(searchTarget, cand.title) >= 0.25);
             if (scenario.type === 'vendor' && !hasAnyMatchingCandidate) {
               console.log(`    ⚠️ Query vendor "${query}" hanya mengembalikan etalase umum toko tanpa produk yang cocok kata kunci ("${searchTarget}"). Lanjut ke query pencarian berikutnya...`);
             } else if (!item.autoComparator || (scenario.type === 'global' && hasComparator)) {
@@ -893,10 +927,13 @@ async function searchItem(page, item, index) {
         let score = getSimilarityScore(searchTarget, cand.title);
         
         // 🛡️ LEGAL SHIELD: Boost skor jika sesuai target penyedia
-        // HANYA berikan bonus jika judul produk kandidat memiliki minimal kemiripan kata kunci (score > 0)
-        if (isTargetMatch && score > 0) {
+        // HANYA berikan bonus jika judul produk kandidat memiliki minimal kemiripan substansial (score >= 0.25)
+        // Jangan boost jika yang cocok hanya kata modifier atau skor 0 karena barang berbeda (misal sapu vs cairan)
+        if (isTargetMatch && score >= 0.25) {
           score += 10.0;
           console.log(`    ⭐ [TARGET MATCH] Vendor ${cand.vendor} mendapat prioritas mutlak ("${cand.title}")!`);
+        } else if (isTargetMatch && score < 0.25) {
+          console.log(`    ⚠️ [TARGET MATCH DITOLAK] Vendor cocok (${cand.vendor}) TAPI produk ("${cand.title}") tidak sesuai substansi target ("${searchTarget}")`);
         }
 
         cand.score = score;
