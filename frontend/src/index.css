@@ -126,6 +126,12 @@
     .print\:shadow-none { box-shadow: none !important; }
     .print\:border-none { border: none !important; }
     .print\:w-full { width: 100% !important; max-width: 100% !important; }
+    .bahp-sheet, #bahp-sheet {
+      padding: 0 !important;
+      margin: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
   }
 }
 

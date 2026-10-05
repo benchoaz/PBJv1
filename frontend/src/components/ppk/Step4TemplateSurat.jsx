@@ -1668,6 +1668,12 @@ export default function Step4TemplateSurat() {
                 min-height: auto !important;
                 background: white !important;
               }
+              .bahp-sheet, #bahp-sheet {
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+              }
               
               /* Table formatting & pagination breaks */
               table {
@@ -1759,10 +1765,10 @@ export default function Step4TemplateSurat() {
  style={{
  width: docSettings.paperSize === 'F4' ? '215mm' : '210mm',
  minHeight: docSettings.paperSize === 'F4' ? '330mm' : '297mm',
- paddingTop: `${docSettings.marginTop}mm`,
- paddingRight: `${docSettings.marginRight}mm`,
- paddingBottom: `${docSettings.marginBottom}mm`,
- paddingLeft: `${docSettings.marginLeft}mm`,
+ paddingTop: activeDocPreview === 'bahp' ? '0mm' : `${docSettings.marginTop}mm`,
+ paddingRight: activeDocPreview === 'bahp' ? '0mm' : `${docSettings.marginRight}mm`,
+ paddingBottom: activeDocPreview === 'bahp' ? '0mm' : `${docSettings.marginBottom}mm`,
+ paddingLeft: activeDocPreview === 'bahp' ? '0mm' : `${docSettings.marginLeft}mm`,
  fontFamily: docSettings.fontFamily === 'Bookman Old Style' 
  ? "'Bookman Old Style', Georgia, serif" 
  : docSettings.fontFamily === 'Arial' 
@@ -1774,7 +1780,7 @@ export default function Step4TemplateSurat() {
  >
  <div>
  {/* KOP SURAT DINAS / SATKER */}
- {docSettings.showKop && (
+ {docSettings.showKop && activeDocPreview !== 'bahp' && (
  <div className="w-full mb-6" style={{ pageBreakInside: 'avoid', fontFamily: '"Times New Roman", Times, serif' }}>
  <table className="no-border" style={{ width: '100%', borderCollapse: 'collapse', borderBottom: '3px solid black', marginBottom: '2px' }}>
  <tbody>

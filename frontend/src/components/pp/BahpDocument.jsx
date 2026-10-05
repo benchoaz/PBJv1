@@ -100,7 +100,7 @@ export default function BahpDocument({
 
   // ── Style shortcuts ───────────────────────────────────────────────────────
   const B  = 'border border-black';
-  const TD = `${B} p-1.5 text-[0.85em]`;
+  const TD = `${B} px-1.5 py-1 text-[0.78em] leading-snug`;
   const TH = `${TD} bg-gray-50 font-bold text-center`;
 
   // ── Seksi A: kolom tambahan khas tiap template ────────────────────────────
@@ -231,7 +231,8 @@ export default function BahpDocument({
     </div>
 
     <div 
-      className="bg-white text-black mx-auto print:shadow-none print:border-none print:w-full transition-all duration-300"
+      id="bahp-sheet"
+      className="bahp-sheet bg-white text-black mx-auto print:shadow-none print:border-none print:w-full print:p-0 transition-all duration-300"
       style={{
         width: '100%',
         minHeight: docSettings.paperSize === 'F4' ? '330mm' : '297mm',
@@ -388,9 +389,6 @@ export default function BahpDocument({
           ║ SEKSI A — RINCIAN PENETAPAN PRODUK/JASA      ║
           ╚══════════════════════════════════════════════╝ */}
       <SectionTitle letter="A">
-        Hasil Rincian Penetapan {tpl.jenisPengadaan} melalui e-Purchasing
-      </SectionTitle>
-      <SectionTitle letter="A">
         {activeAddendum 
           ? 'Hasil Rincian Komparasi Adendum Surat Pesanan / Kontrak'
           : `Hasil Rincian Penetapan ${tpl.jenisPengadaan} melalui e-Purchasing`
@@ -474,12 +472,12 @@ export default function BahpDocument({
           </table>
         );
       })() : (
-        <table className="w-full border-collapse mb-4">
+        <table className="w-full border-collapse mb-4 text-[0.8em] table-auto" style={{ wordBreak: 'break-word' }}>
           <thead>
             <tr>
-              <td className={`${TH} w-5`}>No</td>
+              <td className={`${TH} w-6`}>No</td>
               <td className={TH}>Nama {tpl.jenisPengadaan}</td>
-              <td className={`${TH} w-10`}>Vol</td>
+              <td className={`${TH} w-12`}>Vol</td>
               <td className={TH}>Penyedia</td>
               <td className={`${TH} text-right`}>Harga DPA</td>
               <td className={`${TH} text-right`}>Harga Tayang</td>
@@ -505,26 +503,26 @@ export default function BahpDocument({
               return (
                 <tr key={item.no} className={idx % 2 === 0 ? 'bg-white' : ''}>
                   <td className={`${TD} text-center`}>{idx + 1}</td>
-                  <td className={TD}>{item.name}</td>
-                  <td className={`${TD} text-center`}>{item.qty} {item.unit}</td>
-                  <td className={TD}>{vendor}</td>
-                  <td className={`${TD} text-right font-mono`}>Rp {dpaPrice.toLocaleString('id-ID')}</td>
-                  <td className={`${TD} text-right font-mono`}>Rp {tayang.toLocaleString('id-ID')}</td>
-                  <td className={`${TD} text-right font-mono font-bold`}>Rp {negoVal.toLocaleString('id-ID')}</td>
+                  <td className={`${TD} font-medium`}>{item.name}</td>
+                  <td className={`${TD} text-center whitespace-nowrap`}>{item.qty} {item.unit}</td>
+                  <td className={`${TD} break-words`}>{vendor}</td>
+                  <td className={`${TD} text-right font-mono whitespace-nowrap`}>Rp {dpaPrice.toLocaleString('id-ID')}</td>
+                  <td className={`${TD} text-right font-mono whitespace-nowrap`}>Rp {tayang.toLocaleString('id-ID')}</td>
+                  <td className={`${TD} text-right font-mono font-bold whitespace-nowrap`}>Rp {negoVal.toLocaleString('id-ID')}</td>
                   {extraCols.map(c => (
                     <td key={c.key} className={`${TD} text-center`}>
                       {nego?.[c.key] || resolveCritVal(c.key, { vendor, harga_tayang: tayang, harga_nego: negoVal, extra: nego }, true)}
                     </td>
                   ))}
-                  <td className={`${TD} text-right font-mono font-bold`}>Rp {total.toLocaleString('id-ID')}</td>
+                  <td className={`${TD} text-right font-mono font-bold whitespace-nowrap`}>Rp {total.toLocaleString('id-ID')}</td>
                   <td className={`${TD} text-center`}>{status}</td>
                 </tr>
               );
             })}
             {activeItems.length > 0 && (
               <tr className="bg-gray-50 font-bold ">
-                <td colSpan={7 + extraCols.length} className={`${TD} text-right`}>TOTAL NILAI NEGOSIASI</td>
-                <td className={`${TD} text-right font-mono`}>Rp {grandTotal.toLocaleString('id-ID')}</td>
+                <td colSpan={7 + extraCols.length} className={`${TD} text-right font-bold`}>TOTAL NILAI NEGOSIASI</td>
+                <td className={`${TD} text-right font-mono font-bold whitespace-nowrap`}>Rp {grandTotal.toLocaleString('id-ID')}</td>
                 <td className={TD}></td>
               </tr>
             )}
