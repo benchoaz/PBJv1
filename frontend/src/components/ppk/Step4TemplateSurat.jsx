@@ -2306,77 +2306,93 @@ export default function Step4TemplateSurat() {
           Dalam penyusunan Harga Perkiraan Sendiri (HPS) untuk Jasa Pemeliharaan ini, PPK mengumpulkan referensi harga yang dapat dipertanggungjawabkan melalui survei pasar, daftar harga resmi suku cadang pabrikan (pricelist OEM), standar upah/jasa servis berkala, dan/atau perbandingan harga tayang pada Katalog Elektronik (e-Katalog LKPP).
         </p>
 
-        <div className="font-bold mb-1">Rincian Perhitungan HPS (Jasa/Upah Tenaga Kerja & Suku Cadang/Bahan Material):</div>
-        <table className="w-full border-collapse border border-slate-900 mb-2">
-          <thead>
-            <tr className="bg-slate-100 font-bold text-center">
-              <td className="border border-slate-900 p-1 w-8">No</td>
-              <td className="border border-slate-900 p-1 w-28">Kategori</td>
-              <td className="border border-slate-900 p-1">Uraian Pekerjaan / Komponen</td>
-              <td className="border border-slate-900 p-1 w-16 text-center">Vol</td>
-              <td className="border border-slate-900 p-1 w-16 text-center">Satuan</td>
-              <td className="border border-slate-900 p-1 w-28 text-right">Harga Satuan (Rp)</td>
-              <td className="border border-slate-900 p-1 w-32 text-right">Total Harga (Rp)</td>
-            </tr>
-          </thead>
-          <tbody>
-            {(!dppSpecs.maintenanceHpsItems || dppSpecs.maintenanceHpsItems.length === 0) ? (
-              <tr>
-                <td colSpan={7} className="border border-slate-900 p-2 text-center italic text-slate-500">
-                  Belum ada rincian item HPS pemeliharaan.
-                </td>
-              </tr>
-            ) : (
-              dppSpecs.maintenanceHpsItems.map((it, idx) => {
-                const rowTotal = (parseFloat(it.volume) || 0) * (parseFloat(it.hargaSatuan) || 0);
-                return (
-                  <tr key={it.id || idx}>
-                    <td className="border border-slate-900 p-1 text-center align-top">{idx + 1}</td>
-                    <td className="border border-slate-900 p-1 align-top text-xs font-semibold">
-                      {it.kategori || 'Jasa/Upah'}
-                    </td>
-                    <td className="border border-slate-900 p-1 align-top">
-                      <strong>{it.nama || '-'}</strong>
-                    </td>
-                    <td className="border border-slate-900 p-1 text-center align-top">{it.volume || 1}</td>
-                    <td className="border border-slate-900 p-1 text-center align-top">{formatSatuanClean(it.satuan, it.nama)}</td>
-                    <td className="border border-slate-900 p-1 text-right align-top font-mono">
-                      {formatRupiahIndo(it.hargaSatuan || 0)}
-                    </td>
-                    <td className="border border-slate-900 p-1 text-right align-top font-mono font-semibold">
-                      {formatRupiahIndo(rowTotal)}
-                    </td>
+        {(() => {
+          const validItems = (dppSpecs.maintenanceHpsItems || []).filter(
+            it => (it.nama && it.nama.trim() !== '') || ((parseFloat(it.hargaSatuan) || 0) > 0)
+          );
+          if (validItems.length === 0) {
+            return (
+              <p className="indent-8 mb-4 italic text-slate-700 text-justify">
+                Catatan Analisis: Rincian upah tenaga kerja/mekanik tidak dicantumkan secara terpisah dalam tabel karena harga satuan jasa pemeliharaan/servis yang ditetapkan telah mencakup (termasuk) upah tenaga mekanik/teknisi terampil, biaya peralatan kerja pendukung, suku cadang dan bahan habis pakai berstandar OEM/SNI, mobilisasi, keuntungan wajar penyedia, serta seluruh pajak yang berlaku sesuai ketentuan perundang-undangan (paket servis all-in).
+              </p>
+            );
+          }
+
+          return (
+            <>
+              <div className="font-bold mb-1">
+                Rincian Perhitungan HPS {subtotalJasa > 0 ? '(Jasa/Upah Tenaga Kerja & Suku Cadang/Bahan Material)' : '(Suku Cadang & Bahan Material)'}:
+              </div>
+              <table className="w-full border-collapse border border-slate-900 mb-2">
+                <thead>
+                  <tr className="bg-slate-100 font-bold text-center">
+                    <td className="border border-slate-900 p-1 w-8">No</td>
+                    <td className="border border-slate-900 p-1 w-28">Kategori</td>
+                    <td className="border border-slate-900 p-1">Uraian Pekerjaan / Komponen</td>
+                    <td className="border border-slate-900 p-1 w-16 text-center">Vol</td>
+                    <td className="border border-slate-900 p-1 w-16 text-center">Satuan</td>
+                    <td className="border border-slate-900 p-1 w-28 text-right">Harga Satuan (Rp)</td>
+                    <td className="border border-slate-900 p-1 w-32 text-right">Total Harga (Rp)</td>
                   </tr>
-                );
-              })
-            )}
-          </tbody>
-          {dppSpecs.maintenanceHpsItems && dppSpecs.maintenanceHpsItems.length > 0 && (
-            <tfoot>
-              <tr className="bg-slate-50 font-semibold">
-                <td colSpan={6} className="border border-slate-900 p-1 text-right">Subtotal Jasa / Upah Tenaga Kerja:</td>
-                <td className="border border-slate-900 p-1 text-right font-mono">Rp {formatRupiahIndo(subtotalJasa)}</td>
-              </tr>
-              <tr className="bg-slate-50 font-semibold">
-                <td colSpan={6} className="border border-slate-900 p-1 text-right">Subtotal Suku Cadang / Bahan Material:</td>
-                <td className="border border-slate-900 p-1 text-right font-mono">Rp {formatRupiahIndo(subtotalBahan)}</td>
-              </tr>
-              {includePpn && (
-                <tr className="bg-slate-50 font-semibold">
-                  <td colSpan={6} className="border border-slate-900 p-1 text-right">PPN 11%:</td>
-                  <td className="border border-slate-900 p-1 text-right font-mono">Rp {formatRupiahIndo(nilaiPpn)}</td>
-                </tr>
-              )}
-              <tr className="bg-slate-100 font-bold border-t-2 border-slate-900">
-                <td colSpan={6} className="border border-slate-900 p-1 text-right">TOTAL HARGA PERKIRAAN SENDIRI (HPS):</td>
-                <td className="border border-slate-900 p-1 text-right font-mono">Rp {formatRupiahIndo(totalHpsPemeliharaan)}</td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
-        <p className="indent-8 mb-4 italic text-slate-700">
-          Catatan Analisis: Seluruh harga yang tertera pada HPS telah memperhitungkan upah tenaga mekanik/teknisi terampil, biaya peralatan kerja pendukung, suku cadang dan bahan habis pakai berstandar OEM/SNI, mobilisasi, keuntungan wajar penyedia, serta seluruh pajak yang berlaku sesuai ketentuan perundang-undangan.
-        </p>
+                </thead>
+                <tbody>
+                  {validItems.map((it, idx) => {
+                    const rowTotal = (parseFloat(it.volume) || 0) * (parseFloat(it.hargaSatuan) || 0);
+                    return (
+                      <tr key={it.id || idx}>
+                        <td className="border border-slate-900 p-1 text-center align-top">{idx + 1}</td>
+                        <td className="border border-slate-900 p-1 align-top text-xs font-semibold">
+                          {it.kategori || 'Jasa/Upah'}
+                        </td>
+                        <td className="border border-slate-900 p-1 align-top">
+                          <strong>{it.nama || '-'}</strong>
+                        </td>
+                        <td className="border border-slate-900 p-1 text-center align-top">{it.volume || 1}</td>
+                        <td className="border border-slate-900 p-1 text-center align-top">{formatSatuanClean(it.satuan, it.nama)}</td>
+                        <td className="border border-slate-900 p-1 text-right align-top font-mono">
+                          {formatRupiahIndo(it.hargaSatuan || 0)}
+                        </td>
+                        <td className="border border-slate-900 p-1 text-right align-top font-mono font-semibold">
+                          {formatRupiahIndo(rowTotal)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  {subtotalJasa > 0 && (
+                    <tr className="bg-slate-50 font-semibold">
+                      <td colSpan={6} className="border border-slate-900 p-1 text-right">Subtotal Jasa / Upah Tenaga Kerja:</td>
+                      <td className="border border-slate-900 p-1 text-right font-mono">Rp {formatRupiahIndo(subtotalJasa)}</td>
+                    </tr>
+                  )}
+                  {subtotalBahan > 0 && (
+                    <tr className="bg-slate-50 font-semibold">
+                      <td colSpan={6} className="border border-slate-900 p-1 text-right">Subtotal Suku Cadang / Bahan Material:</td>
+                      <td className="border border-slate-900 p-1 text-right font-mono">Rp {formatRupiahIndo(subtotalBahan)}</td>
+                    </tr>
+                  )}
+                  {includePpn && (
+                    <tr className="bg-slate-50 font-semibold">
+                      <td colSpan={6} className="border border-slate-900 p-1 text-right">PPN 11%:</td>
+                      <td className="border border-slate-900 p-1 text-right font-mono">Rp {formatRupiahIndo(nilaiPpn)}</td>
+                    </tr>
+                  )}
+                  <tr className="bg-slate-100 font-bold border-t-2 border-slate-900">
+                    <td colSpan={6} className="border border-slate-900 p-1 text-right">TOTAL HARGA PERKIRAAN SENDIRI (HPS):</td>
+                    <td className="border border-slate-900 p-1 text-right font-mono">Rp {formatRupiahIndo(totalHpsPemeliharaan)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+              <p className="indent-8 mb-4 italic text-slate-700 text-justify">
+                Catatan Analisis: {subtotalJasa === 0
+                  ? 'Biaya upah tenaga kerja/mekanik tidak dicantumkan secara terpisah karena seluruh biaya jasa servis/pemeliharaan telah mencakup (termasuk) upah tenaga mekanik/teknisi terampil, biaya peralatan kerja pendukung, suku cadang dan bahan habis pakai berstandar OEM/SNI, mobilisasi, keuntungan wajar penyedia, serta seluruh pajak yang berlaku sesuai ketentuan perundang-undangan (paket servis all-in).'
+                  : 'Seluruh harga yang tertera pada HPS telah memperhitungkan upah tenaga mekanik/teknisi terampil, biaya peralatan kerja pendukung, suku cadang dan bahan habis pakai berstandar OEM/SNI, mobilisasi, keuntungan wajar penyedia, serta seluruh pajak yang berlaku sesuai ketentuan perundang-undangan.'
+                }
+              </p>
+            </>
+          );
+        })()}
 
         {/* BAB IV JASA PEMELIHARAAN */}
         <div className="font-bold uppercase mt-8 mb-2 text-center">BAB IV. RENCANA METODE PEMILIHAN PENYEDIA</div>
