@@ -904,8 +904,11 @@ export default function BahpDocument({
             const autoComps = nego.autoComparators || [];
 
             // Selected product URL and screenshot
-            const selectedUrl = nego.linkSelected || item.link || "https://e-katalog.lkpp.go.id";
-            const selectedScreenshot = nego.screenshotUrl || nego.screenshot || null;
+            const selectedUrl = nego.linkSelected || item.link || item.url || "https://e-katalog.lkpp.go.id";
+            let selectedScreenshot = nego.screenshotUrl || nego.screenshot || item.img || item.screenshotUrl || item.screenshot || null;
+            if (selectedScreenshot && typeof selectedScreenshot === 'string' && selectedScreenshot.startsWith('/screenshots/')) {
+              selectedScreenshot = window.location.origin + selectedScreenshot;
+            }
 
             return (
               <div key={item.no} className="border border-black rounded p-3 bg-white">
@@ -977,7 +980,10 @@ export default function BahpDocument({
                     <div className="space-y-4">
                       {autoComps.map((comp, ci) => {
                         const compUrl = comp.link || comp.url || "https://e-katalog.lkpp.go.id";
-                        const compScreenshot = comp.screenshotUrl || comp.screenshot || null;
+                        let compScreenshot = comp.screenshotUrl || comp.screenshot || comp.img || null;
+                        if (compScreenshot && typeof compScreenshot === 'string' && compScreenshot.startsWith('/screenshots/')) {
+                          compScreenshot = window.location.origin + compScreenshot;
+                        }
 
                         return (
                           <div key={ci} className=" p-2 rounded border border-black">

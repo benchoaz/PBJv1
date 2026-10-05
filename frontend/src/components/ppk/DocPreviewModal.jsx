@@ -775,10 +775,48 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
     submittedPack={selectedPack}
     negotiatedItems={(() => {
       const map = {};
+      const sData = getActiveSurveyData();
+      const sProducts = sData?.products || [];
       const items = getPackageItems(selectedPack);
-      items.forEach(item => {
-        const price = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : item.price;
-        map[item.no] = { price, note: 'Sesuai Hasil survei & negosiasi E-Purchasing' };
+      items.forEach((item, idx) => {
+        const matchedProd = sProducts.find(p => p.id === item.id || p.name === item.name) || sProducts[idx] || {};
+        const price = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : (matchedProd.price || item.price);
+        
+        let sImg = matchedProd.img || matchedProd.searchImg || item.img || null;
+        if (sImg && typeof sImg === 'string' && sImg.startsWith('/screenshots/')) {
+          sImg = window.location.origin + sImg;
+        }
+
+        const autoComps = (matchedProd.comparators || []).map(c => {
+          let cImg = c.img || c.screenshot || c.screenshotUrl || null;
+          if (cImg && typeof cImg === 'string' && cImg.startsWith('/screenshots/')) {
+            cImg = window.location.origin + cImg;
+          }
+          return {
+            name: c.name || item.name,
+            vendor: c.vendor || '-',
+            price: c.price,
+            link: c.link || c.url || 'https://e-katalog.lkpp.go.id',
+            screenshotUrl: cImg
+          };
+        });
+
+        const vendorName = (matchedProd.vendor && matchedProd.vendor !== 'TIDAK DITEMUKAN')
+          ? matchedProd.vendor
+          : (item.vendor || item.dppVendor || '-');
+
+        const prodLink = matchedProd.link || item.link || 'https://e-katalog.lkpp.go.id';
+
+        map[item.no] = {
+          price: price,
+          tayang: matchedProd.price || item.price,
+          vendor: vendorName,
+          linkSelected: prodLink,
+          screenshotUrl: sImg,
+          screenshot: sImg,
+          autoComparators: autoComps,
+          note: 'Sesuai Hasil survei & negosiasi E-Purchasing'
+        };
       });
       return map;
     })()}
