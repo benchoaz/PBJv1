@@ -76,6 +76,33 @@ function terbilang(angka) {
   return terbilangHelper(n).replace(/\s+/g, ' ').trim();
 }
 
+const getSafeNoSirup = (pack, metadata) => {
+  const metaRup = metadata?.id_rup;
+  if (metaRup && !String(metaRup).includes('.')) return String(metaRup).trim();
+
+  const packRup = pack?.noSirup || pack?.idPaket;
+  if (packRup && !String(packRup).includes('.')) return String(packRup).trim();
+
+  try {
+    const raw = localStorage.getItem('pbj_sirup_packages');
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list) && pack?.packName) {
+        const cleanPName = pack.packName.toLowerCase().trim();
+        const found = list.find(p => {
+          const pName = (p.packName || '').toLowerCase().trim();
+          return pName === cleanPName || (p.pagu && pack.pagu && Number(p.pagu) === Number(pack.pagu) && (pName.includes(cleanPName) || cleanPName.includes(pName)));
+        });
+        if (found?.noSirup && !String(found.noSirup).includes('.')) {
+          return String(found.noSirup).trim();
+        }
+      }
+    }
+  } catch (e) {}
+
+  return '-';
+};
+
 const getDynamicProductLink = (vendorName, keyword) => {
   if (!vendorName) return '';
   const cleanVendor = vendorName.trim();
@@ -813,6 +840,21 @@ export default function Step4TemplateSurat() {
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Nota Dinas</label>
                       <input type="date" value={packageMetadata.tanggal_nd || ''} onChange={(e) => setPackageMetadata({...packageMetadata, tanggal_nd: e.target.value})} className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
                     </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ID RUP (SiRUP LKPP)</label>
+                      <input 
+                        type="text" 
+                        value={packageMetadata.id_rup ?? (selectedPack?.noSirup && !selectedPack.noSirup.includes('.') ? selectedPack.noSirup : '')}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setPackageMetadata(prev => ({ ...prev, id_rup: val }));
+                          setSelectedPack(prev => prev ? ({ ...prev, noSirup: val }) : prev);
+                        }} 
+                        placeholder="Contoh: 65302934" 
+                        className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" 
+                      />
+                    </div>
+
                   </div>
 
                   {/* Pemilihan Template DPP */}
@@ -2042,7 +2084,7 @@ export default function Step4TemplateSurat() {
  '{{pra_dipa}}': selectedPack.praDipa ? 'Ya' : 'Tidak',
  '{{volume_pekerjaan}}': selectedPack.volume || '1 Paket',
  '{{uraian_pekerjaan}}': `Pengadaan ${selectedPack.packName || ''} untuk operasional`,
- '{{kode_rup}}': selectedPack.noSirup || selectedPack.idPaket || '-'
+ '{{kode_rup}}': getSafeNoSirup(selectedPack, packageMetadata)
  };
  
  Object.keys(replacements).forEach(key => {
@@ -2163,7 +2205,7 @@ export default function Step4TemplateSurat() {
  '{{pra_dipa}}': selectedPack.praDipa ? 'Ya' : 'Tidak',
  '{{volume_pekerjaan}}': selectedPack.volume || '1 Paket',
  '{{uraian_pekerjaan}}': (selectedPack.packName || '').toLowerCase().includes('pemeliharaan') ? `Pelaksanaan pekerjaan ${selectedPack.packName || ''} untuk mendukung kelancaran operasional kedinasan` : `Pengadaan ${selectedPack.packName || ''} untuk operasional`,
- '{{kode_rup}}': selectedPack.noSirup || selectedPack.idPaket || '-'
+ '{{kode_rup}}': getSafeNoSirup(selectedPack, packageMetadata)
  };
 
  Object.keys(replacements).forEach(key => {

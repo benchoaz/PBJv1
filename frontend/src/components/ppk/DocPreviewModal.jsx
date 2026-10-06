@@ -140,6 +140,33 @@ const getTteBadge = (name, nip) => {
   return `data:image/svg+xml;utf8,${svg}`;
 };
 
+const getSafeNoSirup = (pack, metadata) => {
+  const metaRup = metadata?.id_rup;
+  if (metaRup && !String(metaRup).includes('.')) return String(metaRup).trim();
+
+  const packRup = pack?.noSirup || pack?.idPaket;
+  if (packRup && !String(packRup).includes('.')) return String(packRup).trim();
+
+  try {
+    const raw = localStorage.getItem('pbj_sirup_packages');
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list) && pack?.packName) {
+        const cleanPName = pack.packName.toLowerCase().trim();
+        const found = list.find(p => {
+          const pName = (p.packName || '').toLowerCase().trim();
+          return pName === cleanPName || (p.pagu && pack.pagu && Number(p.pagu) === Number(pack.pagu) && (pName.includes(cleanPName) || cleanPName.includes(pName)));
+        });
+        if (found?.noSirup && !String(found.noSirup).includes('.')) {
+          return String(found.noSirup).trim();
+        }
+      }
+    }
+  } catch (e) {}
+
+  return '-';
+};
+
 export default function DocPreviewModal({ isHpsExemptSelected }) {
   const {
     activeDocPreview, setActiveDocPreview,
@@ -909,7 +936,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{pra_dipa}}': selectedPack.praDipa ? 'Ya' : 'Tidak',
  '{{volume_pekerjaan}}': selectedPack.volume || '1 Paket',
  '{{uraian_pekerjaan}}': `Pengadaan ${selectedPack.packName || ''} untuk operasional`,
- '{{kode_rup}}': selectedPack.noSirup || selectedPack.idPaket || '-'
+ '{{kode_rup}}': getSafeNoSirup(selectedPack, packageMetadata)
  };
  
  Object.keys(replacements).forEach(key => {
@@ -1061,7 +1088,7 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{pra_dipa}}': selectedPack.praDipa ? 'Ya' : 'Tidak',
  '{{volume_pekerjaan}}': selectedPack.volume || '1 Paket',
  '{{uraian_pekerjaan}}': `Pengadaan ${selectedPack.packName || ''} untuk operasional`,
- '{{kode_rup}}': selectedPack.noSirup || selectedPack.idPaket || '-'
+ '{{kode_rup}}': getSafeNoSirup(selectedPack, packageMetadata)
  };
 
  Object.keys(replacements).forEach(key => {

@@ -77,7 +77,20 @@ export function PPKProvider({ children }) {
   }, [currentUser]);
 
   const [scrapedData, setScrapedData] = useState(() => { const s = localStorage.getItem('pbj_scraped_data'); return s ? JSON.parse(s) : []; });
-  const [selectedPack, setSelectedPack] = useState(() => { const s = localStorage.getItem('pbj_selected_pack'); return s ? JSON.parse(s) : null; });
+  const [selectedPack, setSelectedPack] = useState(() => {
+    const s = localStorage.getItem('pbj_selected_pack');
+    if (!s) return null;
+    try {
+      const p = JSON.parse(s);
+      if (p && p.noSirup && p.noSirup.includes('.')) {
+        p.mak = p.mak || p.noSirup;
+        p.noSirup = '';
+      }
+      return p;
+    } catch (e) {
+      return null;
+    }
+  });
   const [detailModalPack, setDetailModalPack] = useState(null);
   const [rincianModal, setRincianModal] = useState(null);
   const [hpsValue, setHpsValue] = useState(() => localStorage.getItem('pbj_hps_value') || '');
@@ -414,15 +427,21 @@ export function PPKProvider({ children }) {
       
       // If it is submitted, parsed has no selectedPack directly but has the flat properties
       if (parsed.selectedPack) {
-        setSelectedPack(parsed.selectedPack);
+        const pack = { ...parsed.selectedPack };
+        if (pack.noSirup && pack.noSirup.includes('.')) {
+          pack.mak = pack.mak || pack.noSirup;
+          pack.noSirup = '';
+        }
+        setSelectedPack(pack);
       } else if (parsed.packName || parsed.pagu) {
+        const safeSirup = (parsed.noSirup && !parsed.noSirup.includes('.')) ? parsed.noSirup : '';
         setSelectedPack({
           packName: parsed.packName,
           pagu: parsed.pagu,
           mak: parsed.mak || '',
           volume: parsed.volume || '1 Paket',
           spesifikasi: parsed.spesifikasi || '',
-          noSirup: parsed.noSirup || parsed.mak || '',
+          noSirup: safeSirup,
           klpd: parsed.klpd || '',
           satker: parsed.satker || '',
           uraian: parsed.uraian || parsed.packName || '',
@@ -582,6 +601,9 @@ export function PPKProvider({ children }) {
            }
         }
 
+        const rawIdRup = md.id_rup || (parsed.selectedPack?.noSirup && !parsed.selectedPack.noSirup.includes('.') ? parsed.selectedPack.noSirup : '');
+        const cleanIdRup = (rawIdRup && !String(rawIdRup).includes('.')) ? String(rawIdRup).trim() : '';
+
         setPackageMetadata({
           ...md,
           lokasi_pekerjaan: md.lokasi_pekerjaan || parsed.location || '',
@@ -594,9 +616,13 @@ export function PPKProvider({ children }) {
           nomor_sub_kegiatan: nomor_sub_kegiatan,
           sumber_dana: sumber_dana,
           nomor_dpp: md.nomor_dpp || parsed.nomor_dpp || '',
-          nomor_nd: md.nomor_nd || parsed.nomor_nd || ''
+          nomor_nd: md.nomor_nd || parsed.nomor_nd || '',
+          id_rup: cleanIdRup
         });
       } else {
+        const rawIdRup = parsed.selectedPack?.noSirup && !parsed.selectedPack.noSirup.includes('.') ? parsed.selectedPack.noSirup : '';
+        const cleanIdRup = (rawIdRup && !String(rawIdRup).includes('.')) ? String(rawIdRup).trim() : '';
+
         setPackageMetadata({
           lokasi_pekerjaan: parsed.location || '',
           waktu_penyelesaian: parsed.duration || '14 (empat belas) hari kalender',
@@ -606,7 +632,8 @@ export function PPKProvider({ children }) {
           nomor_sub_kegiatan: '',
           sumber_dana: '',
           nomor_dpp: parsed.nomor_dpp || '',
-          nomor_nd: parsed.nomor_nd || ''
+          nomor_nd: parsed.nomor_nd || '',
+          id_rup: cleanIdRup
         });
       }
 
