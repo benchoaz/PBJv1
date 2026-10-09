@@ -619,52 +619,53 @@ export function resolveCritVal(kritKey, col, isSelected) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 9. REKOMENDASI PROSEDUR PEMILIHAN PENYEDIA — saran untuk PP/PPK
+// 9. VALIDASI & KETENTUAN PROSEDUR PEMILIHAN PENYEDIA (SEKSI D BAHP)
 // ─────────────────────────────────────────────────────────────────────────────
 export const REKOMENDASI_PP_PPK = {
   atk: {
-    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
-    isi: `1. Pejabat Pengadaan (PP) dan PPK disarankan melakukan komparasi harga minimal terhadap 2 (dua) atau lebih penyedia sejenis di e-Katalog untuk memastikan kewajaran harga.
-2. Memprioritaskan penyedia lokal terdekat untuk meminimalkan waktu pengiriman dan mempermudah layanan purna jual.`
+    judul: 'Validasi dan Ketentuan Prosedur Pemilihan Penyedia',
+    isi: `1. Pemenuhan Komparasi dan Kewajaran Harga: Pejabat Pengadaan telah melaksanakan penelusuran katalog elektronik dan komparasi harga terhadap minimal 2 (dua) atau lebih penyedia sejenis sebagai dasar penetapan kewajaran harga serta efisiensi anggaran belanja negara.
+2. Kesepakatan Teknis dan Pengiriman: Telah disepakati spesifikasi teknis barang ATK/habis pakai, ketersediaan stok, dan waktu pengiriman dengan memprioritaskan penyedia terdekat guna efisiensi biaya logistik.`
   },
   mamin: {
-    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
-    isi: `1. Penerapan Metode Rotasi Kerja/Order: Mengingat terdapat lebih dari 1 (satu) penyedia Mamin dalam wilayah kecamatan yang sama, Pejabat Pengadaan (PP) dan PPK disarankan menerapkan sistem rotasi kerja secara bergiliran pada paket belanja berikutnya. Langkah ini penting untuk mencegah monopoli usaha, mendukung pemerataan ekonomi bagi seluruh UMKK lokal, serta memelihara iklim kemitraan yang sehat.
-2. Penyesuaian Spesifikasi Sajian (Menu Matching): Pemilihan penyedia harus disesuaikan dengan kapasitas dan kekhasan menu sajian yang ditawarkan oleh penyedia (misal: nasi kotak, prasmanan, atau snack box) agar selaras dengan kebutuhan jenis kegiatan kedinasan.
-3. Penentuan Lokasi Pengiriman Riil: Apabila pengantaran makanan ditujukan ke tempat lain di luar kantor instansi/kecamatan (seperti aula desa atau lokasi lapangan), maka pemilihan katering harus memprioritaskan penyedia yang memiliki jarak terdekat ke titik pengiriman riil tersebut demi menjaga kesegaran hidangan, efisiensi waktu, serta meminimalisir biaya pengiriman (ongkir).`
+    judul: 'Validasi Prosedur dan Kesepakatan Pemilihan Penyedia',
+    isi: `1. Asas Pemerataan Usaha dan Rotasi Pelaku Usaha: Berdasarkan ketentuan Pasal 65 Perpres No. 12 Tahun 2021 tentang pemberdayaan Usaha Mikro, Kecil, dan Koperasi (UMKK), pemilihan penyedia makanan dan minuman pada Satuan Kerja dilaksanakan dengan mempertimbangkan rotasi giliran kerja/order secara proporsional dan adil di antara para pelaku usaha lokal yang telah memenuhi standar izin edar dan higienitas untuk mencegah praktik monopoli usaha.
+2. Kesepakatan Spesifikasi Menu & Kualitas: Telah disepakati rincian menu sajian, standar higienitas/halal, dan kesiapan penyajian tepat waktu sesuai kebutuhan agenda kedinasan.
+3. Efisiensi Distribusi Pengantaran: Lokasi penyedia telah diselaraskan dengan titik pengiriman riil guna menjaga kesegaran hidangan serta efisiensi beban biaya pengiriman.`
   },
   jasa: {
-    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
-    isi: `1. Memastikan ruang lingkup pekerjaan dalam KAK telah terdefinisi dengan jelas sebelum mengundang penyedia jasa sejenis.
-2. Memverifikasi portofolio dan pengalaman pekerjaan sejenis dari personil yang ditugaskan oleh penyedia jasa.`
+    judul: 'Validasi dan Ketentuan Prosedur Pemilihan Penyedia',
+    isi: `1. Keselarasan Ruang Lingkup KAK: Ruang lingkup pekerjaan telah diverifikasi dan disepakati bersama penyedia sesuai dengan Kerangka Acuan Kerja (KAK) dan dokumen persiapan pengadaan.
+2. Kualifikasi dan Portofolio Personil: Penyedia telah menyatakan kesanggupan pemenuhan tenaga terampil serta metodologi kerja yang dipersyaratkan.`
   },
   modal: {
-    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
-    isi: `1. Selalu melakukan negosiasi harga tayang e-Katalog, terutama untuk pembelian dalam jumlah volume besar (grosir).
-2. Memastikan ketersediaan suku cadang dan garansi resmi minimal 1 tahun yang dapat diklaim melalui service center terdekat.`
+    judul: 'Validasi dan Kesepakatan Hasil Negosiasi Belanja Modal',
+    isi: `1. Kesepakatan Negosiasi Harga: Pejabat Pengadaan dan Penyedia telah menyepakati harga final setelah dilakukan klarifikasi teknis dan negosiasi harga pada sistem e-Katalog.
+2. Jaminan Garansi & Layanan Purna Jual: Penyedia menjamin ketersediaan suku cadang dan garansi resmi pabrikan minimal 1 (satu) tahun serta fasilitas dukungan teknis resmi.`
   },
   pemeliharaan: {
-    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
-    isi: `1. Melakukan inventarisasi kerusakan awal secara mendetail agar estimasi biaya perbaikan logis dan efisien.
-2. Menggunakan penyedia yang mampu memberikan jaminan respons cepat (Response Time) apabila terjadi kendala teknis.`
+    judul: 'Validasi Ruang Lingkup dan Ketentuan Pemeliharaan',
+    isi: `1. Validasi Kerusakan Awal & Lingkup Servis: Rincian pekerjaan perbaikan/servis telah didasarkan pada hasil pemeriksaan kondisi awal objek pemeliharaan secara riil dan logis.
+2. Kesepakatan Waktu Tanggap (Response Time): Penyedia berkomitmen memberikan respon cepat dan jaminan garansi hasil pekerjaan perbaikan atas suku cadang/komponen yang diganti.`
   },
   konstruksi: {
-    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
-    isi: `1. Melakukan evaluasi mendalam terhadap metode pelaksanaan kerja dan kurva S yang diajukan kontraktor untuk mencegah keterlambatan.
-2. Memastikan seluruh personil inti kontraktor memiliki sertifikat kompetensi konstruksi yang valid.`
+    judul: 'Validasi Ketentuan Teknis & SMKK Pekerjaan Konstruksi',
+    isi: `1. Kepatuhan Standar SMKK: Pelaksanaan pekerjaan wajib menerapkan Sistem Manajemen Keselamatan Konstruksi (SMKK) sesuai ketentuan Peraturan Menteri PUPR Nomor 8 Tahun 2023.
+2. Kualifikasi Tenaga Kerja: Penyedia menjamin seluruh personil pelaksana memiliki Sertifikat Kompetensi Kerja (SKK) konstruksi yang valid dan kompeten di bidangnya.`
   },
   konsultasi_non: {
-    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
-    isi: `1. Melakukan klarifikasi teknis tatap muka untuk memastikan pemahaman konsultan terhadap KAK.
-2. Memastikan komponen non-personil dihitung secara wajar sesuai kebutuhan riil di lapangan.`
+    judul: 'Validasi Teknis dan Kesepakatan Penugasan Tenaga Ahli',
+    isi: `1. Klarifikasi Metodologi Kerja: Metodologi pelaksanaan, rencana kerja, dan pemahaman KAK telah diklarifikasi dan disepakati bersama penyedia jasa konsultansi.
+2. Kesepakatan Kualifikasi Tenaga Ahli: Struktur biaya personil dan non-personil telah diverifikasi kewajarannya sesuai standar remunerasi yang berlaku.`
   },
   konsultasi_konstruksi: {
-    judul: 'Rekomendasi Prosedur Pemilihan Penyedia (Saran untuk PP/PPK)',
-    isi: `1. Memprioritaskan konsultan pengawas yang memiliki integritas tinggi dan pengalaman pengawasan proyek sejenis.
-2. Memastikan konsultan pengawas aktif menyerahkan laporan berkala mengenai progres pekerjaan fisik.`
+    judul: 'Validasi Teknis dan Kesepakatan Pengawasan Konstruksi',
+    isi: `1. Integritas dan Pengalaman Pengawasan: Personil pengawas lapangan yang ditugaskan memiliki sertifikat keahlian konstruksi yang sah dan berkomitmen melakukan pengawasan secara independen.
+2. Kewajiban Pelaporan Berkala: Penyedia jasa konsultansi pengawasan sepakat menyampaikan laporan progres harian, mingguan, dan bulanan secara tertib kepada PPK.`
   },
   konsolidasi: {
     judul: 'Catatan Prosedur Pemilihan Penyedia Terkonsolidasi',
-    isi: `1. Pelaksanaan pengadaan terkonsolidasi ini telah dilaksanakan berdasarkan koordinasi antara seluruh Satuan Kerja peserta konsolidasi. Surat Pesanan (SP) selanjutnya diterbitkan secara individual oleh masing-masing PPK Satuan Kerja sesuai volume kebutuhan yang telah dikonfirmasi dan tercantum dalam Daftar Satker Peserta.\n2. Dalam hal terdapat perubahan volume kebutuhan dari Satuan Kerja peserta setelah berita acara ini ditetapkan, perubahan dimaksud wajib dituangkan dalam addendum Surat Pesanan dan dilaporkan kepada Pejabat Pengadaan yang menetapkan berita acara ini.`
+    isi: `1. Pelaksanaan pengadaan terkonsolidasi ini telah dilaksanakan berdasarkan koordinasi antara seluruh Satuan Kerja peserta konsolidasi. Surat Pesanan (SP) selanjutnya diterbitkan secara individual oleh masing-masing PPK Satuan Kerja sesuai volume kebutuhan yang telah dikonfirmasi dan tercantum dalam Daftar Satker Peserta.
+2. Dalam hal terdapat perubahan volume kebutuhan dari Satuan Kerja peserta setelah berita acara ini ditetapkan, perubahan dimaksud wajib dituangkan dalam addendum Surat Pesanan dan dilaporkan kepada Pejabat Pengadaan yang menetapkan berita acara ini.`
   }
 };

@@ -1771,6 +1771,23 @@ app.post('/api/survey/screenshot', async (req, res) => {
   }
 });
 
+app.post('/api/survey/upload-screenshot', (req, res) => {
+  const { imageBase64 } = req.body;
+  if (!imageBase64) return res.status(400).json({ error: 'imageBase64 is required' });
+  try {
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    const filename = `manual_upload_${Date.now()}_${Math.floor(Math.random() * 1000)}.png`;
+    const filePath = path.join(screenshotDir, filename);
+    fs.writeFileSync(filePath, buffer);
+    console.log(`[Upload] Berhasil menyimpan screenshot manual: ${filename}`);
+    res.json({ success: true, img: `/screenshots/${filename}` });
+  } catch (err) {
+    console.error('Upload screenshot error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/api/survey/analyze', async (req, res) => {
   const { keyword, targetVendor, pagu } = req.body;
   if (!keyword) return res.status(400).json({ error: 'Keyword is required' });

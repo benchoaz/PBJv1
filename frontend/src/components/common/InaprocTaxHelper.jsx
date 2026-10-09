@@ -59,17 +59,18 @@ export default function InaprocTaxHelper({
     maxDpp = Math.max(0, vendorDpp - 1);
   }
 
-  const maxPpn = maxDpp * (effectiveRate / 100);
+  // PPN = (11/12 x Harga Produk) x 12% = 11% Efektif
+  const maxPpn = Math.round(maxDpp * (effectiveRate / 100));
   const maxTotalSatuan = maxDpp + maxPpn;
   const maxGrandTotal = maxTotalSatuan * qtyNum;
   const dpaGrandTotal = priceNum * qtyNum;
 
   // Skenario penawaran hemat
   const dpp2pct = Math.floor((ceilingNett * 0.98) / multiplier);
-  const total2pctSatuan = dpp2pct * multiplier;
+  const total2pctSatuan = dpp2pct + Math.round(dpp2pct * (effectiveRate / 100));
 
   const dpp5pct = Math.floor((ceilingNett * 0.95) / multiplier);
-  const total5pctSatuan = dpp5pct * multiplier;
+  const total5pctSatuan = dpp5pct + Math.round(dpp5pct * (effectiveRate / 100));
 
   const handleCopy = (text, key) => {
     navigator.clipboard.writeText(text.toString());

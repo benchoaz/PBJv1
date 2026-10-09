@@ -395,6 +395,54 @@ Pejabat Pembuat Komitmen (PPK),
 NIP. {{nip_ppk}}`,
     isDefault: true,
     panelRedirect: 'Panel PPK (/ppk) → Langkah 3 HPS → Cetak Penetapan HPS'
+  },
+  {
+    id: 'TPL-008',
+    category: 'Tahap Pelaksanaan',
+    name: 'Surat Perintah Kerja (SPK) Pemeliharaan',
+    content: `SURAT PERINTAH KERJA (SPK)
+Nomor: {{nomor_spk}}
+Paket Pekerjaan: {{nama_pekerjaan}}
+
+Pada hari ini {{hari_spk}} tanggal {{tanggal_spk}}, bertempat di {{tempat_penetapan}}, kami yang bertanda tangan di bawah ini:
+
+I. {{nama_ppk}}, Selaku Pejabat Pembuat Komitmen (PPK), selanjutnya disebut PIHAK PERTAMA.
+II. {{nama_penyedia}}, Selaku Penyedia Jasa Pemeliharaan, selanjutnya disebut PIHAK KEDUA.
+
+PIHAK PERTAMA memberikan perintah kerja kepada PIHAK KEDUA dan PIHAK KEDUA menyatakan sanggup melaksanakan pekerjaan pemeliharaan dengan ketentuan:
+1. Ruang Lingkup: Perbaikan rutin/servis berkala, penggantian suku cadang, dan pengujian kelayakan.
+2. Nilai Kontrak/SPK: {{nilai_kontrak}} (Termasuk Pajak).
+3. Waktu Pelaksanaan: {{waktu_pelaksanaan}}.
+4. Jaminan/Garansi Pemeliharaan serta kepatuhan pengelolaan suku cadang bekas (BMD) sesuai PP 28/2020.
+5. Sanksi Keterlambatan: 1/1000 per hari kalender keterlambatan sesuai Perpres 16/2018 jo Perpres 12/2021.
+
+Demikian Surat Perintah Kerja ini dibuat dalam rangkap secukupnya bermeterai cukup dan memiliki kekuatan hukum yang sama.`,
+    isDefault: true,
+    panelRedirect: 'Panel PPK (/ppk) → Langkah 4 Dokumen → Lihat SPK'
+  },
+  {
+    id: 'TPL-009',
+    category: 'Tahap Pelaksanaan',
+    name: 'Surat Pernyataan Kesanggupan Pemeliharaan (SKP)',
+    content: `SURAT PERNYATAAN KESANGGUPAN PEMELIHARAAN (SKP)
+Nomor: {{nomor_skp}}
+Lampiran SPK Nomor: {{nomor_spk}}
+
+Yang bertanda tangan di bawah ini:
+Nama Penanggung Jawab : {{nama_penyedia}}
+Jabatan               : Pimpinan Bengkel / Rekanan Pemeliharaan
+Alamat                : {{alamat_penyedia}}
+
+Dengan ini menyatakan dengan sebenarnya dan penuh rasa tanggung jawab bahwa kami:
+1. SANGGUP melaksanakan seluruh pekerjaan pemeliharaan sesuai standar teknis pabrikan/APM.
+2. MEMBERIKAN GARANSI PURNA JUAL serta perbaikan cacat mutu bebas biaya selama masa garansi.
+3. MENJAMIN KEASLIAN DAN KELAYAKAN SUKU CADANG (Spare Parts) 100% baru serta berstandar SNI/OEM.
+4. MENYERAHKAN SELURUH SUKU CADANG BEKAS (rongsok/afkir) kepada Pengurus Barang / PPK sebagai bukti akuntabilitas Barang Milik Daerah (PP 28/2020 jo Permendagri 19/2016).
+5. Bersedia dikenakan sanksi ganti rugi atau sanksi daftar hitam (blacklist) apabila melanggar pernyataan ini.
+
+Demikian Surat Pernyataan Kesanggupan Pemeliharaan (SKP) ini kami buat dengan sadar dan sukarela bermeterai Rp 10.000,-.`,
+    isDefault: true,
+    panelRedirect: 'Panel PPK (/ppk) → Langkah 4 Dokumen → Lihat SKP'
   }
 ];
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { usePPK } from './PPKContext';
 import { 
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { DEFAULT_TEMPLATES } from '../TemplateSuratManager';
 import BahpDocument from '../pp/BahpDocument';
+import { SpkMaintenanceDocument, SkpMaintenanceDocument } from './MaintenanceContracts';
 import {
   MAINTENANCE_TYPES,
   getMaintenanceConfig,
@@ -183,6 +184,54 @@ export default function Step4TemplateSurat() {
     selectedNdTplId, setSelectedNdTplId,
     comparisons, currentProjectId, status, loadProjectData, handleSimpanPaket
   } = usePPK();
+
+  // Load daftar user dari backend secara dinamis agar data PP & PPK selalu akurat
+  const [usersList, setUsersList] = useState(() => {
+    try {
+      const cached = localStorage.getItem('pbj_users_cache');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    fetch('/api/users')
+      .then(res => res.ok ? res.json() : [])
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setUsersList(data);
+          try { localStorage.setItem('pbj_users_cache', JSON.stringify(data)); } catch {}
+        }
+      })
+      .catch(err => console.error('Error fetching users in Step4TemplateSurat:', err));
+  }, []);
+
+  const satkerId = selectedPack?.idSatker || currentUser?.idSatker || '';
+  const packDept = (selectedPack?.senderDepartment || currentUser?.department || '').toLowerCase();
+
+  const ppUser = useMemo(() => {
+    if (!usersList || usersList.length === 0) return null;
+    const match = usersList.find(u => {
+      if (u.role !== 'PP') return false;
+      if (satkerId && u.idSatker && (u.idSatker === satkerId || u.idSatker.includes(satkerId))) return true;
+      if (packDept && u.department && (u.department.toLowerCase().includes(packDept) || packDept.includes(u.department.toLowerCase()))) return true;
+      return false;
+    });
+    return match || usersList.find(u => u.role === 'PP') || null;
+  }, [usersList, satkerId, packDept]);
+
+  const ppkUser = useMemo(() => {
+    if (currentUser && currentUser.role === 'PPK') return currentUser;
+    if (!usersList || usersList.length === 0) return null;
+    const match = usersList.find(u => {
+      if (u.role !== 'PPK') return false;
+      if (satkerId && u.idSatker && (u.idSatker === satkerId || u.idSatker.includes(satkerId))) return true;
+      if (packDept && u.department && (u.department.toLowerCase().includes(packDept) || packDept.includes(u.department.toLowerCase()))) return true;
+      return false;
+    });
+    return match || currentUser;
+  }, [usersList, currentUser, satkerId, packDept]);
 
   const [activeDocPreview, setActiveDocPreview] = useState(null);
   const [isEnhancingDPP, setIsEnhancingDPP] = useState({});
@@ -854,6 +903,30 @@ export default function Step4TemplateSurat() {
                         className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" 
                       />
                     </div>
+                    {isMaintenanceDoc && (
+                      <>
+                        <div>
+                          <label className="block text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">Nomor SPK Pemeliharaan (Manual)</label>
+                          <input 
+                            type="text" 
+                            value={packageMetadata.nomor_spk || ''} 
+                            onChange={(e) => setPackageMetadata({...packageMetadata, nomor_spk: e.target.value})} 
+                            placeholder="Contoh: 000.3.1/029/SPK/KEC.BESUK/2026 (Opsional)" 
+                            className="w-full text-xs px-3 py-2 border border-amber-300 rounded-lg focus:border-amber-500 bg-amber-50/30 outline-none transition-colors" 
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1">Nomor SKP Kesanggupan (Manual)</label>
+                          <input 
+                            type="text" 
+                            value={packageMetadata.nomor_skp || ''} 
+                            onChange={(e) => setPackageMetadata({...packageMetadata, nomor_skp: e.target.value})} 
+                            placeholder="Contoh: 001/SKP/BENGKEL/X/2026 (Opsional)" 
+                            className="w-full text-xs px-3 py-2 border border-emerald-300 rounded-lg focus:border-emerald-500 bg-emerald-50/30 outline-none transition-colors" 
+                          />
+                        </div>
+                      </>
+                    )}
 
                   </div>
 
@@ -1643,6 +1716,22 @@ export default function Step4TemplateSurat() {
                     >
                       📜 Lihat & Download BAHP (Hasil Pemilihan)
                     </button>
+                    {isMaintenanceDoc && (
+                      <>
+                        <button
+                          onClick={() => setActiveDocPreview('spk')}
+                          className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 px-5 py-3 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
+                        >
+                          🛠️ Lihat SPK (Surat Perintah Kerja)
+                        </button>
+                        <button
+                          onClick={() => setActiveDocPreview('skp')}
+                          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-5 py-3 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
+                        >
+                          🛡️ Lihat SKP (Kesanggupan Pemeliharaan)
+                        </button>
+                      </>
+                    )}
                   </div>
                   
                   {/* Action Buttons Step 4 */}
@@ -1761,10 +1850,62 @@ export default function Step4TemplateSurat() {
               }
             }
           `}} />
-          <div className="fixed top-4 left-4 right-4 flex justify-between items-center z-50 bg-white/95 border border-slate-200/90 px-6 py-3.5 rounded-2xl shadow-2xl backdrop-blur-md max-w-7xl mx-auto print:hidden transition-all duration-300">
-            <div className="text-slate-800 text-[11px] font-bold uppercase tracking-wider flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-slate-800 animate-pulse"></span>
-              Pratinjau Dokumen Resmi {activeDocPreview === 'hps' ? 'Surat Penetapan HPS' : activeDocPreview === 'nd' ? 'Nota Dinas Usulan' : activeDocPreview === 'bahp' ? 'Berita Acara Hasil Pemilihan (BAHP)' : 'Dokumen Persiapan Pengadaan (DPP)'}
+          <div className="fixed top-4 left-4 right-4 flex flex-col md:flex-row justify-between items-center z-50 bg-white/95 border border-slate-200/90 px-6 py-3 rounded-2xl shadow-2xl backdrop-blur-md max-w-7xl mx-auto print:hidden transition-all duration-300 gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-slate-800 text-[11px] font-bold uppercase tracking-wider flex items-center gap-2 mr-2">
+                <span className="w-2 h-2 rounded-full bg-slate-800 animate-pulse"></span>
+                {activeDocPreview === 'hps' ? 'Surat Penetapan HPS' : activeDocPreview === 'nd' ? 'Nota Dinas Usulan' : activeDocPreview === 'bahp' ? 'BAHP' : activeDocPreview === 'spk' ? 'Surat Perintah Kerja (SPK)' : activeDocPreview === 'skp' ? 'Surat Kesanggupan (SKP)' : 'DPP PPK'}
+              </div>
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveDocPreview('dpp')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeDocPreview === 'dpp' ? 'bg-white text-indigo-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                  DPP
+                </button>
+                {!isHpsExemptSelected && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveDocPreview('hps')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeDocPreview === 'hps' ? 'bg-white text-indigo-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    HPS
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveDocPreview('nd')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeDocPreview === 'nd' ? 'bg-white text-indigo-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                  Nota Dinas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveDocPreview('bahp')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeDocPreview === 'bahp' ? 'bg-white text-indigo-700 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                  BAHP
+                </button>
+                {isMaintenanceDoc && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setActiveDocPreview('spk')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1 ${activeDocPreview === 'spk' ? 'bg-amber-500 text-white shadow-sm' : 'text-amber-800 bg-amber-50 hover:bg-amber-100'}`}
+                    >
+                      🛠️ SPK
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveDocPreview('skp')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1 ${activeDocPreview === 'skp' ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100'}`}
+                    >
+                      🛡️ SKP
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <button 
@@ -1822,7 +1963,7 @@ export default function Step4TemplateSurat() {
  >
  <div>
  {/* KOP SURAT DINAS / SATKER */}
- {docSettings.showKop && activeDocPreview !== 'bahp' && (
+ {docSettings.showKop && activeDocPreview !== 'bahp' && activeDocPreview !== 'skp' && (
  <div className="w-full mb-6" style={{ pageBreakInside: 'avoid', fontFamily: '"Times New Roman", Times, serif' }}>
  <table className="no-border" style={{ width: '100%', borderCollapse: 'collapse', borderBottom: '3px solid black', marginBottom: '2px' }}>
  <tbody>
@@ -2004,6 +2145,8 @@ export default function Step4TemplateSurat() {
     })()}
     docSettings={docSettings || {}}
     user={currentUser}
+    ppUser={ppUser}
+    ppkUser={ppkUser}
     getPackageItems={getPackageItems}
   />
   ) : activeDocPreview === 'nd' ? (
@@ -2046,16 +2189,16 @@ export default function Step4TemplateSurat() {
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
  '{{sumber_dana}}': `${packageMetadata.sumber_dana || selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date().getFullYear()}`,
  '{{tahun_anggaran}}': `${new Date().getFullYear()}`,
- '{{nama_ppk}}': currentUser?.name || '',
- '{{nip_ppk}}': currentUser?.nip || '',
+ '{{nama_ppk}}': ppkUser?.name || currentUser?.name || 'Handik Hariyanto, S.Kom., M.Si',
+ '{{nip_ppk}}': ppkUser?.nip || currentUser?.nip || '197909102002121004',
  '{{nomor_surat}}': nomorBase.replace('{nomor}', '045.2'),
  '{{nomor_nd}}': nomorBase.replace('{nomor}', '011/ND'),
  '{{nama_penyedia}}': '_______________________',
  '{{hari_tanggal_acara}}': '_______________________',
  '{{waktu_acara}}': '_______________________',
  '{{tempat_acara}}': '_______________________',
- '{{nama_pejabat_pengadaan}}': '_______________________',
- '{{nip_pejabat_pengadaan}}': '_______________________',
+ '{{nama_pejabat_pengadaan}}': ppUser?.name || 'Beni Trisna Wijaya, S.Kom',
+ '{{nip_pejabat_pengadaan}}': ppUser?.nip || '198205192010011010',
  '{{nomor_ba}}': nomorBase.replace('{nomor}', '108/BAKN'),
  '{{hari_ba}}': '_______________________',
  '{{tanggal_ba}}': '_______________________',
@@ -2123,6 +2266,24 @@ export default function Step4TemplateSurat() {
  return <div className="text-center py-10">Template Nota Dinas tidak ditemukan.</div>;
  })()}
  </div>
+ ) : activeDocPreview === 'spk' ? (
+  <SpkMaintenanceDocument
+    selectedPack={selectedPack}
+    packageMetadata={packageMetadata}
+    dppSpecs={dppSpecs}
+    currentUser={currentUser}
+    docSettings={docSettings}
+    tanggalSurat={tanggalSurat}
+  />
+ ) : activeDocPreview === 'skp' ? (
+  <SkpMaintenanceDocument
+    selectedPack={selectedPack}
+    packageMetadata={packageMetadata}
+    dppSpecs={dppSpecs}
+    currentUser={currentUser}
+    docSettings={docSettings}
+    tanggalSurat={tanggalSurat}
+  />
  ) : (
  // DOKUMEN PERSIAPAN PENGADAAN (DPP)
  <div className="space-y-4 relative">
@@ -2167,16 +2328,16 @@ export default function Step4TemplateSurat() {
  '{{nilai_pagu}}': `Rp ${(selectedPack.pagu || 0).toLocaleString()} (${terbilang(selectedPack.pagu || 0)} Rupiah)`,
  '{{sumber_dana}}': `${packageMetadata.sumber_dana || selectedPack.sumberDana || 'APBD'} Tahun Anggaran ${new Date().getFullYear()}`,
  '{{tahun_anggaran}}': `${new Date().getFullYear()}`,
- '{{nama_ppk}}': currentUser?.name || '',
- '{{nip_ppk}}': currentUser?.nip || '',
+ '{{nama_ppk}}': ppkUser?.name || currentUser?.name || 'Handik Hariyanto, S.Kom., M.Si',
+ '{{nip_ppk}}': ppkUser?.nip || currentUser?.nip || '197909102002121004',
  '{{nomor_surat}}': nomorBase.replace('{nomor}', '045.2'),
  '{{nomor_nd}}': nomorBase.replace('{nomor}', '011/ND'),
  '{{nama_penyedia}}': '_______________________',
  '{{hari_tanggal_acara}}': '_______________________',
  '{{waktu_acara}}': '_______________________',
  '{{tempat_acara}}': '_______________________',
- '{{nama_pejabat_pengadaan}}': '_______________________',
- '{{nip_pejabat_pengadaan}}': '_______________________',
+ '{{nama_pejabat_pengadaan}}': ppUser?.name || 'Beni Trisna Wijaya, S.Kom',
+ '{{nip_pejabat_pengadaan}}': ppUser?.nip || '198205192010011010',
  '{{nomor_ba}}': nomorBase.replace('{nomor}', '108/BAKN'),
  '{{hari_ba}}': '_______________________',
  '{{tanggal_ba}}': '_______________________',
@@ -2549,11 +2710,13 @@ export default function Step4TemplateSurat() {
 
         <div className="pl-4 space-y-2 mb-4">
           <div className="font-bold">a. Daftar Penyedia Potensial e-Katalog</div>
-          {getActiveSurveyData() ? (() => {
-            const foundProducts = getActiveSurveyData().products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN');
-            if (foundProducts.length === 0) {
-              return <p className="italic text-slate-600 my-1 pb-1 ">* Seluruh item barang tidak ditemukan di e-Katalog LKPP. Referensi e-Katalog tidak terlampir.</p>
+          {(() => {
+            const activePackItems = (getPackageItems(selectedPack) || []).filter(item => (item.qty === '' ? 0 : Number(item.qty || 0)) > 0);
+            if (activePackItems.length === 0) {
+              return <p className="italic text-slate-600 my-1 pb-1 ">* Seluruh item barang aktif tidak ditemukan di e-Katalog LKPP atau kuantitas dinolkan. Referensi e-Katalog tidak terlampir.</p>;
             }
+            const sProducts = getActiveSurveyData()?.products || [];
+
             return (
               <table className="w-full border-collapse border border-slate-900 mb-2">
                 <thead>
@@ -2565,21 +2728,44 @@ export default function Step4TemplateSurat() {
                   </tr>
                 </thead>
                 <tbody>
-                  {foundProducts.flatMap((p, pIdx) => {
+                  {activePackItems.flatMap((item, pIdx) => {
+                    const p = sProducts.find(prod => (prod.name || '').trim().toLowerCase() === (item.name || '').trim().toLowerCase())
+                           || sProducts.find(prod => prod.id === item.id)
+                           || null;
+                    const isFound = p && p.success && p.vendor && p.vendor !== 'TIDAK DITEMUKAN';
+
+                    if (!isFound) {
+                      return [
+                        <tr key={`item-${pIdx}`}>
+                          <td className="border border-slate-900 p-1 text-center font-bold">{pIdx + 1}</td>
+                          <td className="border border-slate-900 p-1 text-sm font-semibold">{item.name}</td>
+                          <td className="border border-slate-900 p-1 text-xs text-rose-600 italic">
+                            Tidak ditemukan di e-Katalog LKPP / Belum Disurvei
+                          </td>
+                          <td className="border border-slate-900 p-1 text-right text-xs text-slate-400 font-mono italic">
+                            -
+                          </td>
+                        </tr>
+                      ];
+                    }
+
                     const rows = [];
                     const totalRows = 1 + (p.comparators && p.comparators.length > 0 ? p.comparators.length : 0);
+                    const effectiveKatalogPrice = (hpsPrices && hpsPrices[item.name] !== undefined && Number(hpsPrices[item.name]) > 0)
+                      ? Number(hpsPrices[item.name])
+                      : (p.price || 0);
                     rows.push(
                       <tr key={`win-${pIdx}`}>
-                        <td className="border border-slate-900 p-1 text-center" rowSpan={totalRows}>{pIdx + 1}</td>
-                        <td className="border border-slate-900 p-1 text-sm" rowSpan={totalRows}>
-                          <a href={p.link} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 break-all">{p.name}</a>
+                        <td className="border border-slate-900 p-1 text-center font-bold" rowSpan={totalRows}>{pIdx + 1}</td>
+                        <td className="border border-slate-900 p-1 text-sm font-semibold" rowSpan={totalRows}>
+                          <a href={p.link} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 break-all">{p.name || item.name}</a>
                         </td>
                         <td className="border border-slate-900 p-1 text-xs text-slate-800">
                           <div className="font-semibold">{p.vendor}</div>
-                          <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 break-all text-[9px] print:text-[8px]">{p.link}</a>
+                          {p.link && <a href={p.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 break-all text-[9px] print:text-[8px]">{p.link}</a>}
                         </td>
                         <td className="border border-slate-900 p-1 text-right text-xs text-slate-800 align-top font-mono">
-                          {formatRupiahIndo(p.price || 0)}
+                          {formatRupiahIndo(effectiveKatalogPrice)}
                         </td>
                       </tr>
                     );
@@ -2604,7 +2790,7 @@ export default function Step4TemplateSurat() {
                 </tbody>
               </table>
             );
-          })() : <p className="italic text-slate-600 my-1 pb-1 ">* Belum ada survei yang dilakukan.</p>}
+          })()}
         </div>
 
         <div className="pl-4 space-y-2 mb-4">
@@ -2738,7 +2924,14 @@ export default function Step4TemplateSurat() {
  <div className="pt-4 space-y-3">
  {/* Lampiran Screenshot Jika Ada */}
  {getActiveSurveyData() && (() => {
- const foundProducts = getActiveSurveyData().products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN');
+ const activePackItems = (getPackageItems(selectedPack) || []).filter(item => (item.qty === '' ? 0 : Number(item.qty || 0)) > 0);
+ const activeItemNames = new Set(activePackItems.map(i => (i.name || '').trim().toLowerCase()));
+ const foundProducts = getActiveSurveyData().products.filter(p => {
+   if (!p.success || p.vendor === 'TIDAK DITEMUKAN') return false;
+   if (!activeItemNames.has((p.name || '').trim().toLowerCase())) return false;
+   const hasAnyImg = !!(p.img || p.searchImg || (p.comparators && p.comparators.some(c => c.img)));
+   return hasAnyImg;
+ });
  if (foundProducts.length === 0) return null;
  return (
  <div className="mt-8 break-before-page" style={{ pageBreakBefore: 'always', breakBefore: 'page' }}>
@@ -2752,9 +2945,14 @@ export default function Step4TemplateSurat() {
 
   const targetLinkHref = p.link && !p.link.includes('/search?keyword=') ? p.link : getDynamicProductLink(p.vendor, p.name);
 
+  const matchedItem = activePackItems.find(i => (i.name || '').trim().toLowerCase() === (p.name || '').trim().toLowerCase() || i.id === p.id);
+  const effectivePrice = (matchedItem && hpsPrices && hpsPrices[matchedItem.name] !== undefined && Number(hpsPrices[matchedItem.name]) > 0)
+    ? Number(hpsPrices[matchedItem.name])
+    : ((hpsPrices && hpsPrices[p.name] !== undefined && Number(hpsPrices[p.name]) > 0) ? Number(hpsPrices[p.name]) : (p.price || 0));
+
   // Kumpulkan semua penyedia: utama + comparators
   const allProviders = [
-    { vendor: p.vendor, price: p.price, link: targetLinkHref, img: imgSrc, label: 'Penyedia Utama' },
+    { vendor: p.vendor, price: effectivePrice, link: targetLinkHref, img: imgSrc, label: 'Penyedia Utama' },
     ...(p.comparators || []).map((comp, cIdx) => {
       let compImg = comp.img;
       if (compImg && compImg.startsWith('/screenshots/')) compImg = window.location.origin + compImg;
@@ -2811,7 +3009,7 @@ export default function Step4TemplateSurat() {
  )}
 
  {/* SIGNATURE SECTION (FOOTER) */}
- {activeDocPreview !== 'bahp' && (
+ {activeDocPreview !== 'bahp' && activeDocPreview !== 'spk' && activeDocPreview !== 'skp' && (
  <div className="flex justify-between items-end mt-12 pt-6 border-t border-slate-200 signature-section" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
  <div className="flex-1">
  {/* Kosong untuk memberikan ruang tanda tangan di kanan */}

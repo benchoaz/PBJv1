@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   BAHP_TEMPLATE_TYPES,
   KOMPARASI_KRITERIA,
@@ -21,6 +21,8 @@ export default function BahpDocument({
   checkedItems = {},
   docSettings = {},
   user,
+  ppUser,
+  ppkUser,
   refinedBahpIntro,
   refinedBahpConclusion,
   getPackageItems,
@@ -35,6 +37,28 @@ export default function BahpDocument({
     try { const s = localStorage.getItem(STORE_KEY); return s ? JSON.parse(s) : {}; }
     catch { return {}; }
   });
+
+  // Fetch daftar user dari backend secara dinamis agar data PP & PPK selalu akurat dan tidak hardcoded
+  const [userList, setUserList] = useState(() => {
+    try {
+      const cached = localStorage.getItem('pbj_users_cache');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    fetch('/api/users')
+      .then(res => res.ok ? res.json() : [])
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setUserList(data);
+          try { localStorage.setItem('pbj_users_cache', JSON.stringify(data)); } catch {}
+        }
+      })
+      .catch(err => console.error('Error fetching users in BahpDocument:', err));
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORE_KEY, JSON.stringify(overrides));
@@ -53,6 +77,59 @@ export default function BahpDocument({
   const ukpbj      = docSettings.namaUKPBJ       || 'Unit Kerja Pengadaan Barang/Jasa (UKPBJ)';
   const alamat     = docSettings.alamatInstansi   || 'Kabupaten Probolinggo, Jawa Timur';
   const tahun      = new Date().getFullYear();
+
+  // ── Resolusi Dinamis Pejabat Pengadaan (PP) & Pejabat Pembuat Komitmen (PPK) ──
+  const resolvedPpUser = useMemo(() => {
+    if (ppUser && ppUser.name) return ppUser;
+    if (user && user.role === 'PP') return user;
+    if (submittedPack?.ppUser && submittedPack.ppUser.name) return submittedPack.ppUser;
+
+    const satkerId = submittedPack?.idSatker || user?.idSatker || '';
+    const dept = (submittedPack?.senderDepartment || docSettings.namaInstansi || user?.department || '').toLowerCase();
+
+    if (userList && userList.length > 0) {
+      const matched = userList.find(u => {
+        if (u.role !== 'PP') return false;
+        if (satkerId && u.idSatker && (u.idSatker === satkerId || u.idSatker.includes(satkerId))) return true;
+        if (dept && u.department && (u.department.toLowerCase().includes(dept) || dept.includes(u.department.toLowerCase()))) return true;
+        return false;
+      });
+      if (matched) return matched;
+
+      const anyPp = userList.find(u => u.role === 'PP');
+      if (anyPp) return anyPp;
+    }
+    return null;
+  }, [ppUser, user, submittedPack, docSettings, userList]);
+
+  const resolvedPpkUser = useMemo(() => {
+    if (ppkUser && ppkUser.name) return ppkUser;
+    if (user && user.role === 'PPK') return user;
+    if (submittedPack?.ppkUser && submittedPack.ppkUser.name) return submittedPack.ppkUser;
+
+    const satkerId = submittedPack?.idSatker || user?.idSatker || '';
+    const dept = (submittedPack?.senderDepartment || docSettings.namaInstansi || user?.department || '').toLowerCase();
+
+    if (userList && userList.length > 0) {
+      const matched = userList.find(u => {
+        if (u.role !== 'PPK') return false;
+        if (satkerId && u.idSatker && (u.idSatker === satkerId || u.idSatker.includes(satkerId))) return true;
+        if (dept && u.department && (u.department.toLowerCase().includes(dept) || dept.includes(u.department.toLowerCase()))) return true;
+        return false;
+      });
+      if (matched) return matched;
+
+      const anyPpk = userList.find(u => u.role === 'PPK');
+      if (anyPpk) return anyPpk;
+    }
+    return null;
+  }, [ppkUser, user, submittedPack, docSettings, userList]);
+
+  const resolvedPpName = overrides.namaPp || resolvedPpUser?.name || 'Beni Trisna Wijaya, S.Kom';
+  const resolvedPpNip  = overrides.nipPp  || resolvedPpUser?.nip  || '198205192010011010';
+
+  const resolvedPpkName = overrides.namaPpk || resolvedPpkUser?.name || docSettings.namaPpk || 'Handik Hariyanto, S.Kom., M.Si';
+  const resolvedPpkNip  = overrides.nipPpk  || resolvedPpkUser?.nip  || docSettings.nipPpk  || '197909102002121004';
   const nomorFmt   = docSettings.formatNomorSurat || '027/{nomor}/PP/437.82/{tahun}';
   // Gunakan tanggal yang diinput manual jika tersedia
   const customDate = docSettings.tanggalBahp ? new Date(docSettings.tanggalBahp) : new Date();
@@ -72,10 +149,10 @@ export default function BahpDocument({
   const klausul     = KLAUSUL_KHUSUS[templateId];
   const penutup     = PENUTUP_TEMPLATE[templateId]     || PENUTUP_TEMPLATE.atk;
 
-  const activeItems = (getPackageItems?.(submittedPack) || []).filter(i => checkedItems[i.no]);
+  const activeItems = (getPackageItems?.(submittedPack) || []).filter(i => checkedItems[i.no] && (Number(i.qty || 0) > 0));
   const grandTotal  = activeItems.reduce((acc, item) => {
     const n = negotiatedItems[item.no] || {};
-    return acc + parseFloat(n.price || 0) * (item.qty || 1);
+    return acc + parseFloat(n.price || 0) * Number(item.qty || 0);
   }, 0);
 
   // Load template-specific dynamic fields from localStorage
@@ -223,8 +300,57 @@ export default function BahpDocument({
             />
           </div>
 
+          {/* Pejabat Pengadaan & PPK (Dinamis dari Database User) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-white p-3 rounded-xl border border-amber-200">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider">Pejabat Pengadaan (PP)</label>
+                {(overrides.namaPp || overrides.nipPp) && (
+                  <button onClick={() => { resetOv('namaPp'); resetOv('nipPp'); }} className="text-[9px] text-rose-600 hover:underline font-bold">↺ Reset</button>
+                )}
+              </div>
+              <input
+                type="text"
+                value={overrides.namaPp ?? resolvedPpName}
+                onChange={e => setOv('namaPp', e.target.value)}
+                placeholder="Nama Pejabat Pengadaan"
+                className="w-full text-xs border border-amber-200 rounded-lg p-2 mb-2 focus:outline-none focus:border-amber-400 font-semibold"
+              />
+              <input
+                type="text"
+                value={overrides.nipPp ?? resolvedPpNip}
+                onChange={e => setOv('nipPp', e.target.value)}
+                placeholder="NIP Pejabat Pengadaan"
+                className="w-full text-xs border border-amber-200 rounded-lg p-2 focus:outline-none focus:border-amber-400 font-mono"
+              />
+            </div>
+
+            <div className="bg-white p-3 rounded-xl border border-amber-200">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider">Pejabat Pembuat Komitmen (PPK)</label>
+                {(overrides.namaPpk || overrides.nipPpk) && (
+                  <button onClick={() => { resetOv('namaPpk'); resetOv('nipPpk'); }} className="text-[9px] text-rose-600 hover:underline font-bold">↺ Reset</button>
+                )}
+              </div>
+              <input
+                type="text"
+                value={overrides.namaPpk ?? resolvedPpkName}
+                onChange={e => setOv('namaPpk', e.target.value)}
+                placeholder="Nama Pejabat Pembuat Komitmen"
+                className="w-full text-xs border border-amber-200 rounded-lg p-2 mb-2 focus:outline-none focus:border-amber-400 font-semibold"
+              />
+              <input
+                type="text"
+                value={overrides.nipPpk ?? resolvedPpkNip}
+                onChange={e => setOv('nipPpk', e.target.value)}
+                placeholder="NIP Pejabat Pembuat Komitmen"
+                className="w-full text-xs border border-amber-200 rounded-lg p-2 focus:outline-none focus:border-amber-400 font-mono"
+              />
+            </div>
+          </div>
+
           <div className="text-[9px] text-amber-700 border-t border-amber-200 pt-2">
-            💡 Perubahan otomatis tersimpan ke browser. Saat cetak, teks yang sudah diedit akan digunakan. Tabel data, komparasi, dan tanda tangan tidak dapat diedit di sini.
+            💡 Perubahan otomatis tersimpan ke browser. Data PP dan PPK otomatis terhubung ke master data user Satker.
           </div>
         </div>
       )}
@@ -827,8 +953,8 @@ export default function BahpDocument({
                   <text x="90" y="32" fontSize="6" fontWeight="bold" fill="#475569">Sertifikat Elektronik Diterbitkan Oleh:</text>
                   <text x="90" y="42" fontSize="7" fontWeight="black" fill="#1e3a8a">BSrE BSSN</text>
                   <line x1="90" y1="48" x2="210" y2="48" stroke="#cbd5e1" strokeWidth="1" />
-                  <text x="90" y="58" fontSize="6.5" fontWeight="bold" fill="#0f172a">PEJABAT PEMBUAT KOMITMEN</text>
-                  <text x="90" y="68" fontSize="6" fill="#475569">NIP: .......................................</text>
+                  <text x="90" y="58" fontSize="6.5" fontWeight="bold" fill="#0f172a">{resolvedPpkName}</text>
+                  <text x="90" y="68" fontSize="6" fill="#475569">NIP: {resolvedPpkNip}</text>
                   <text x="90" y="78" fontSize="5" fontWeight="bold" fill="#16a34a">✓ VERIFIED &amp; SECURED BY BSSN</text>
                 </svg>
               </div>
@@ -845,9 +971,9 @@ export default function BahpDocument({
             )}
           </div>
           <div className={`text-[1.05em] font-bold text-black underline ${(!docSettings.ttdPpk && docSettings.signatureMethodPpk !== 'tte') ? 'mt-14' : 'mt-2'}`}>
-            .......................................................
+            {resolvedPpkName}
           </div>
-          <div className="text-[0.95em] text-black">NIP. ...............................................</div>
+          <div className="text-[0.95em] text-black">NIP. {resolvedPpkNip}</div>
         </div>
 
         {/* Tanda Tangan PP (Kanan) */}
@@ -867,8 +993,8 @@ export default function BahpDocument({
                   <text x="90" y="32" fontSize="6" fontWeight="bold" fill="#475569">Sertifikat Elektronik Diterbitkan Oleh:</text>
                   <text x="90" y="42" fontSize="7" fontWeight="black" fill="#1e3a8a">BSrE BSSN</text>
                   <line x1="90" y1="48" x2="210" y2="48" stroke="#cbd5e1" strokeWidth="1" />
-                  <text x="90" y="58" fontSize="6.5" fontWeight="bold" fill="#0f172a">{user?.name || '-'}</text>
-                  <text x="90" y="68" fontSize="6" fill="#475569">NIP: {user?.nip || '-'}</text>
+                  <text x="90" y="58" fontSize="6.5" fontWeight="bold" fill="#0f172a">{resolvedPpName}</text>
+                  <text x="90" y="68" fontSize="6" fill="#475569">NIP: {resolvedPpNip}</text>
                   <text x="90" y="78" fontSize="5" fontWeight="bold" fill="#16a34a">✓ VERIFIED &amp; SECURED BY BSSN</text>
                 </svg>
               </div>
@@ -882,8 +1008,8 @@ export default function BahpDocument({
               )
             )}
           </div>
-          <div className={`text-[1.05em] font-bold text-black underline ${(!docSettings.ttdPp && docSettings.signatureMethodPp !== 'tte') ? 'mt-14' : 'mt-2'}`}>{user?.name || '-'}</div>
-          <div className="text-[0.95em] text-black">NIP. {user?.nip || '-'}</div>
+          <div className={`text-[1.05em] font-bold text-black underline ${(!docSettings.ttdPp && docSettings.signatureMethodPp !== 'tte') ? 'mt-14' : 'mt-2'}`}>{resolvedPpName}</div>
+          <div className="text-[0.95em] text-black">NIP. {resolvedPpNip}</div>
         </div>
       </div>
 

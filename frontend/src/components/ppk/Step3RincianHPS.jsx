@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { usePPK } from './PPKContext';
 import { DEFAULT_TEMPLATES } from '../../utils/defaultTemplates';
-import { Save, Search, RefreshCw, Camera, Sparkles, CheckCircle2, XCircle, AlertTriangle, Loader2, Check, FileText, ClipboardList, Edit3, Store, Globe, LayoutGrid, Clock } from 'lucide-react';
+import { Save, Search, RefreshCw, Camera, Sparkles, CheckCircle2, XCircle, AlertTriangle, Loader2, Check, FileText, ClipboardList, Edit3, Store, Globe, LayoutGrid, Clock, Trash2, Upload, Clipboard, Image, Calculator, Copy, ShieldCheck, TrendingDown } from 'lucide-react';
+import InaprocTaxHelper from '../common/InaprocTaxHelper';
 import { dialog } from '../../utils/dialog';
 import { getTimeConfigForPackage, getDefaultWaktuForPackage } from '../../config/procurementTimeConfig';
 import { formatTitleCase } from '../../config/maintenanceConfig';
@@ -76,6 +77,7 @@ export default function Step3RincianHPS() {
     isHpsExemptSelected, setIsHpsExemptSelected,
     hpsPrices, setHpsPrices,
     negotiatedPrices, setNegotiatedPrices,
+    negotiatedBeforeTaxPrices, setNegotiatedBeforeTaxPrices,
     techSpecs, setTechSpecs,
     packageMetadata, setPackageMetadata,
     selectedTplId, setSelectedTplId,
@@ -97,6 +99,71 @@ export default function Step3RincianHPS() {
     justifications, setJustifications,
     autoComparator, setAutoComparator
   } = usePPK();
+
+  const [copiedDppKey, setCopiedDppKey] = useState(null);
+  const [expandedTaxRows, setExpandedTaxRows] = useState({});
+
+  const handleCopyDpp = (dppValue, itemName) => {
+    navigator.clipboard.writeText(dppValue.toString());
+    setCopiedDppKey(itemName);
+    setTimeout(() => setCopiedDppKey(null), 2000);
+  };
+
+  const handleApplyQuickScenario = (item, type = 'max') => {
+    const dpa = item.price || 0;
+    const unitHps = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : dpa;
+    const ceiling = (unitHps > 0 && unitHps < dpa) ? unitHps : dpa;
+
+    let targetNett = ceiling;
+    if (type === '2pct') targetNett = Math.floor(ceiling * 0.98);
+    else if (type === '5pct') targetNett = Math.floor(ceiling * 0.95);
+
+    // Formula resmi INAPROC: PPN = (11/12 x DPP) x 12% = 11% Efektif
+    let dpp = Math.floor(targetNett / 1.11);
+    const vendorDpp = unitHps > 0 ? Math.floor(unitHps / 1.11) : 0;
+    if (vendorDpp > 0 && dpp >= vendorDpp && type === 'max') {
+      dpp = Math.max(0, vendorDpp - 1);
+    }
+    const ppn = Math.round((11 / 12) * dpp * 0.12);
+    const total = dpp + ppn;
+
+    setNegotiatedBeforeTaxPrices(prev => ({ ...prev, [item.name]: dpp }));
+    setNegotiatedPrices(prev => ({ ...prev, [item.name]: total }));
+    setIsSigned(false);
+    if (step === 4) setStep(3);
+  };
+
+  const handleAutoCalculateAllInaprocTax = () => {
+    const items = getPackageItems(selectedPack);
+    const newBeforeTax = { ...(negotiatedBeforeTaxPrices || {}) };
+    const newNego = { ...(negotiatedPrices || {}) };
+
+    items.forEach(item => {
+      const dpa = item.price || 0;
+      const unitHps = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : dpa;
+      const ceiling = (unitHps > 0 && unitHps < dpa) ? unitHps : dpa;
+
+      const vendorDpp = unitHps > 0 ? Math.floor(unitHps / 1.11) : 0;
+      let dpp = Math.floor(ceiling / 1.11);
+      if (vendorDpp > 0 && dpp >= vendorDpp) {
+        dpp = Math.max(0, vendorDpp - 1);
+      }
+      const ppn = Math.round((11 / 12) * dpp * 0.12);
+      const total = dpp + ppn;
+
+      newBeforeTax[item.name] = dpp;
+      newNego[item.name] = total;
+    });
+
+    setNegotiatedBeforeTaxPrices(newBeforeTax);
+    setNegotiatedPrices(newNego);
+    setIsSigned(false);
+    if (step === 4) setStep(3);
+    dialog.alert(
+      'Perhitungan Otomatis Selesai! ✅',
+      'Semua harga negosiasi sebelum pajak (DPP) telah dihitung otomatis sesuai ketentuan resmi e-Katalog LKPP:\n\n• PPN = (11/12 × Harga Produk) × 12% (11% Efektif)\n• Nilai tidak melebihi Pagu DPA & Harga Tayang\n\nSilakan klik tombol "Salin" pada produk untuk langsung mem-paste ke portal INAPROC.'
+    );
+  };
   const [isAiEditorOpen, setIsAiEditorOpen] = useState(true);
   const [aiLoadingField, setAiLoadingField] = useState(null);
   const [globalMaxProviders, setGlobalMaxProviders] = useState(3);
@@ -1124,14 +1191,168 @@ export default function Step3RincianHPS() {
     }
   };
 
+  const handleRemoveItemScreenshot = (targetProduct) => {
+    if (!targetProduct) return;
+    if (surveyData && surveyData.products) {
+      const updatedProducts = surveyData.products.map(prod => {
+        if (prod.id === targetProduct.id || prod.name === targetProduct.name) {
+          const clearedComparators = (prod.comparators || []).map(comp => ({
+            ...comp,
+            img: null,
+            screenshotUrl: null,
+            screenshot: null
+          }));
+          return {
+            ...prod,
+            img: null,
+            searchImg: null,
+            screenshotUrl: null,
+            screenshot: null,
+            comparators: clearedComparators
+          };
+        }
+        return prod;
+      });
+      setSurveyData({ ...surveyData, products: updatedProducts });
+    }
+    setScreenshotStatus(prev => {
+      const next = { ...prev };
+      delete next[targetProduct.id];
+      return next;
+    });
+    setIsSigned(false);
+  };
+
+  const handleManualScreenshotUpload = async (targetProduct, file) => {
+    if (!targetProduct || !file) return;
+    try {
+      setScreenshotStatus(prev => ({ ...prev, [targetProduct.id]: 'loading' }));
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target.result;
+        let finalImgUrl = base64Data;
+
+        // Coba upload ke server agar disimpan sebagai file png statis yang ringan
+        try {
+          const res = await fetch('/api/survey/upload-screenshot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageBase64: base64Data })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.img) {
+              finalImgUrl = data.img;
+            }
+          }
+        } catch (uploadErr) {
+          console.warn('Gagal upload ke server static, menggunakan base64 Data URL:', uploadErr);
+        }
+
+        // Simpan ke surveyData
+        setSurveyData(prev => {
+          if (!prev || !prev.products) return prev;
+          const updatedProducts = prev.products.map(prod =>
+            prod.id === targetProduct.id || prod.name === targetProduct.name
+              ? { ...prod, img: finalImgUrl, searchImg: finalImgUrl, success: true }
+              : prod
+          );
+          return { ...prev, products: updatedProducts };
+        });
+
+        setScreenshotStatus(prev => ({ ...prev, [targetProduct.id]: 'done' }));
+        setIsSigned(false);
+        dialog.alert(`Bukti screenshot varian untuk "${targetProduct.name}" berhasil disimpan dan akan dicetak pada dokumen.`, 'Screenshot Tersimpan', 'success');
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      setScreenshotStatus(prev => ({ ...prev, [targetProduct.id]: 'error' }));
+      dialog.error(`Gagal mengunggah screenshot: ${err.message}`, 'Upload Gagal');
+    }
+  };
+
+  const handlePasteScreenshot = async (targetProduct) => {
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.read) {
+        dialog.info('Fitur paste langsung memerlukan izin browser. Silakan gunakan tombol "Unggah File" untuk memilih gambar screenshot dari laptop Anda.', 'Petunjuk Tempel');
+        return;
+      }
+      const clipboardItems = await navigator.clipboard.read();
+      let foundImage = null;
+      for (const item of clipboardItems) {
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            foundImage = await item.getType(type);
+            break;
+          }
+        }
+        if (foundImage) break;
+      }
+
+      if (!foundImage) {
+        dialog.warning('Tidak ada gambar di clipboard!\n\nCara pakai:\n1. Buka e-Katalog, klik varian yang dipilih di layar Anda.\n2. Tekan Win + Shift + S (atau Print Screen) untuk menangkap area layar.\n3. Kembali ke sini dan klik "Tempel (Ctrl+V)".', 'Clipboard Kosong');
+        return;
+      }
+
+      await handleManualScreenshotUpload(targetProduct, foundImage);
+    } catch (err) {
+      console.warn('Clipboard read error:', err);
+      dialog.info('Untuk menempelkan gambar dari clipboard, pastikan Anda telah mengizinkan akses clipboard di browser, atau gunakan tombol "Unggah File".', 'Akses Clipboard');
+    }
+  };
+
+  const handleDeleteItemFromPack = (item, idx) => {
+    if (!window.confirm(`Hapus item "${item.name}" dari rincian paket pengadaan ini? Data survei dan bukti tangkapan layar untuk barang ini juga akan dibersihkan.`)) {
+      return;
+    }
+    const matchedAcc = getMatchingDpaAccount(selectedPack);
+    const kodeRekening = matchedAcc?.account || `nosirup_${selectedPack?.noSirup}`;
+    if (kodeRekening && dpaRincian[kodeRekening]) {
+      const newRincian = { ...dpaRincian };
+      const newArr = [...newRincian[kodeRekening]];
+      newArr.splice(idx, 1);
+      newRincian[kodeRekening] = newArr;
+      setDpaRincian(newRincian);
+    }
+    // Hapus juga produk terkait dari surveyData
+    if (surveyData && surveyData.products) {
+      const matchedProd = surveyData.products.find(prod => prod.name === item.name || prod.id === item.id);
+      const updatedProducts = surveyData.products.filter(prod => prod.name !== item.name && prod.id !== item.id);
+      setSurveyData({ ...surveyData, products: updatedProducts });
+      if (matchedProd) {
+        setScreenshotStatus(prev => {
+          const next = { ...prev };
+          delete next[matchedProd.id];
+          return next;
+        });
+      }
+    }
+    setIsSigned(false);
+  };
+
   const captureAllScreenshots = async () => {
     const activeData = surveyData;
     if (!activeData || !activeData.products) return;
     
-    const toCapture = activeData.products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN' && screenshotStatus[p.id] !== 'done');
+    // Pastikan hanya menangkap produk yang kuantitasnya > 0 di paket saat ini
+    const packItems = getPackageItems(selectedPack) || [];
+    const activeItemNames = new Set(
+      packItems
+        .filter(item => (item.qty === '' ? 0 : Number(item.qty || 0)) > 0)
+        .map(item => (item.name || '').trim().toLowerCase())
+    );
+
+    const toCapture = activeData.products.filter(p => 
+      p.success && 
+      p.vendor !== 'TIDAK DITEMUKAN' && 
+      activeItemNames.has((p.name || '').trim().toLowerCase()) &&
+      screenshotStatus[p.id] !== 'done'
+    );
     
     if (toCapture.length === 0) {
-      dialog.alert('Semua screenshot produk sudah tersedia atau tidak ada produk valid.', 'Informasi', 'info');
+      dialog.alert('Semua screenshot produk aktif sudah tersedia atau tidak ada produk yang perlu ditangkap.', 'Informasi', 'info');
       return;
     }
 
@@ -1719,17 +1940,55 @@ export default function Step3RincianHPS() {
                     })()}
                   </div>
 
+                  {/* BANNER PANDUAN PPN & AUTO-CALCULATE E-KATALOG */}
+                  <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 border border-emerald-500/30 rounded-2xl p-3.5 mb-4 text-white shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-emerald-500/20 p-2 rounded-xl border border-emerald-400/30 shrink-0">
+                        <Calculator className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-black uppercase tracking-wider text-emerald-300">
+                            Panduan Pajak e-Katalog INAPROC
+                          </span>
+                          <span className="bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 text-[9.5px] px-2 py-0.5 rounded-full font-mono font-bold">
+                            PPN = (11/12 × Harga Produk) × 12% (11% Efektif)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 mt-0.5">
+                          Pagu DPA &amp; Harga Tayang adalah <strong>harga termasuk pajak</strong>. Di portal e-Katalog LKPP, Anda menginput <strong>Harga Sebelum Pajak (Harga Produk / DPP)</strong>. Salin angka hijau di bawah langsung ke form e-Katalog!
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAutoCalculateAllInaprocTax}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 shrink-0 self-stretch md:self-auto justify-center cursor-pointer"
+                      title="Hitung otomatis harga sebelum pajak yang aman di bawah DPA dan Tayang untuk semua barang"
+                    >
+                      <Sparkles className="w-4 h-4 text-emerald-200" />
+                      <span>⚡ Hitung Otomatis Nego e-Katalog Semua Item</span>
+                    </button>
+                  </div>
+
                   <div className="w-full">
-                    <table className="w-full text-xs text-left border-collapse block md:table md:min-w-[800px]">
+                    <table className="w-full text-xs text-left border-collapse block md:table md:min-w-[850px]">
                       <thead className="hidden md:table-header-group">
                         <tr className="text-slate-500 border-b border-slate-200 font-bold uppercase text-[9px] tracking-wider bg-slate-50/50">
                           <th className="py-2.5 px-3 w-8 text-center rounded-l-xl">No</th>
                           <th className="py-2.5 px-2">Nama Barang / Rincian DPA</th>
                           <th className="py-2.5 px-2">Referensi e-Katalog</th>
                           <th className="py-2.5 px-2 text-center w-12">Qty</th>
-                          <th className="py-2.5 px-2 text-right">Pagu DPA (Rp)</th>
+                          <th className="py-2.5 px-2 text-right w-28">Pagu DPA (Rp)</th>
                           <th className="py-2.5 px-3 text-right w-36">Harga Tayang E-Katalog (Rp)</th>
-                          <th className="py-2.5 px-3 text-right w-36 text-indigo-700 bg-indigo-50/60">Harga Negosiasi (Rp)</th>
+                          <th className="py-2.5 px-3 text-right w-64 text-indigo-700 bg-indigo-50/60">
+                            <div className="flex flex-col items-end">
+                              <span>Harga Negosiasi (Rp)</span>
+                              <span className="text-[8px] font-bold text-emerald-700 normal-case tracking-normal">
+                                Input e-Katalog: Sblm Pajak (DPP)
+                              </span>
+                            </div>
+                          </th>
                           <th className="py-2.5 px-3 text-right rounded-r-xl">Total Kesepakatan (Rp)</th>
                         </tr>
                       </thead>
@@ -1759,10 +2018,31 @@ export default function Step3RincianHPS() {
                             return (
                               <React.Fragment key={item.no || idx}>
                               <tr className={`block md:table-row bg-white md:bg-transparent border border-slate-200 md:border-x-0 md:border-t-0 md:border-b-slate-100 rounded-xl md:rounded-none mb-4 md:mb-0 p-4 md:p-0 relative hover:bg-slate-50/60 transition-colors ${isOverbudget ? 'bg-rose-50/50' : ''}`}>
-                                <td className="hidden md:table-cell py-3 px-3 text-center text-slate-400 font-bold">{idx + 1}</td>
+                                <td className="hidden md:table-cell py-3 px-3 text-center text-slate-400 font-bold">
+                                  <div className="flex flex-col items-center justify-center gap-1">
+                                    <span>{idx + 1}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteItemFromPack(item, idx)}
+                                      className="p-1 text-slate-350 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                                      title={`Hapus "${item.name}" dari rincian paket ini`}
+                                    >
+                                      <Trash2 className="w-3 h-3 text-slate-400 hover:text-rose-600" />
+                                    </button>
+                                  </div>
+                                </td>
                                 <td className="block md:table-cell py-2 md:py-3 px-0 md:px-2 text-slate-800">
                                   <div className="md:hidden flex justify-between items-center mb-2 border-b border-dashed border-slate-200 pb-2">
                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Item #{idx + 1}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteItemFromPack(item, idx)}
+                                      className="text-[10px] font-bold text-rose-600 hover:bg-rose-50 px-2 py-0.5 rounded border border-rose-200 flex items-center gap-1"
+                                      title={`Hapus "${item.name}" dari rincian paket ini`}
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                      <span>Hapus Barang</span>
+                                    </button>
                                   </div>
                                   <div className="font-bold">{item.name}</div>
                                   <span className="text-[10px] text-slate-450 block font-normal mt-0.5 mb-2">Satuan: {item.unit}</span>
@@ -1950,6 +2230,38 @@ export default function Step3RincianHPS() {
                                         setDpaRincian(newRincian);
                                         setIsSigned(false);
                                       }
+                                      if (newQty === 0 || newQty === '') {
+                                        if (surveyData && surveyData.products) {
+                                          const matchedProd = surveyData.products.find(prod => prod.name === item.name || prod.id === item.id);
+                                          if (matchedProd) {
+                                            const updatedProducts = surveyData.products.map(prod => {
+                                              if (prod.name === item.name || prod.id === item.id) {
+                                                const clearedComparators = (prod.comparators || []).map(comp => ({
+                                                  ...comp,
+                                                  img: null,
+                                                  screenshotUrl: null,
+                                                  screenshot: null
+                                                }));
+                                                return {
+                                                  ...prod,
+                                                  img: null,
+                                                  searchImg: null,
+                                                  screenshotUrl: null,
+                                                  screenshot: null,
+                                                  comparators: clearedComparators
+                                                };
+                                              }
+                                              return prod;
+                                            });
+                                            setSurveyData({ ...surveyData, products: updatedProducts });
+                                            setScreenshotStatus(prev => {
+                                              const next = { ...prev };
+                                              delete next[matchedProd.id];
+                                              return next;
+                                            });
+                                          }
+                                        }
+                                      }
                                     }}
                                     className="w-16 mx-0 md:mx-auto bg-slate-50 border border-slate-200 text-slate-800 rounded-lg py-1 px-2 text-xs font-bold text-center focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                                     min="0"
@@ -1960,7 +2272,12 @@ export default function Step3RincianHPS() {
                                 <td className={`block md:table-cell py-2 md:py-3 px-0 md:px-2 text-left md:text-right font-mono transition-colors ${unitHpsPrice !== item.price ? 'text-slate-400' : 'text-slate-500'}`}>
                                   <div className="flex md:block items-center justify-between">
                                     <span className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider inline-block w-32 font-sans">Pagu DPA:</span>
-                                    <span>Rp&nbsp;{(item.price || 0).toLocaleString()}</span>
+                                    <div>
+                                      <span>Rp&nbsp;{(item.price || 0).toLocaleString()}</span>
+                                      <span className="block text-[8.5px] text-slate-400 font-sans mt-0.5" title="Nilai sebelum PPN 11% (DPP)">
+                                        Sblm PPN: Rp {Math.floor((item.price || 0) / 1.11).toLocaleString('id-ID')}
+                                      </span>
+                                    </div>
                                   </div>
                                 </td>
                                 <td className="block md:table-cell py-2 md:py-3 px-0 md:px-2 text-right mt-2 md:mt-0">
@@ -1976,45 +2293,157 @@ export default function Step3RincianHPS() {
                                           ...prev,
                                           [item.name]: newPrice
                                         }));
+                                        if (surveyData && surveyData.products) {
+                                          const updatedProducts = surveyData.products.map(prod => {
+                                            if ((prod.name || '').trim().toLowerCase() === (item.name || '').trim().toLowerCase() || prod.id === item.id) {
+                                              return { ...prod, price: newPrice };
+                                            }
+                                            return prod;
+                                          });
+                                          setSurveyData({ ...surveyData, products: updatedProducts });
+                                        }
                                         setIsSigned(false);
                                         if (step === 4) setStep(3);
                                       }}
                                       className={`w-full bg-slate-50 border rounded-xl py-1.5 pl-7 pr-2 text-xs font-mono font-bold text-right focus:ring-2 outline-none transition-all ${isOverbudget ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200 text-rose-700 bg-rose-50/50' : (unitHpsPrice < item.price ? 'border-emerald-200 focus:border-emerald-400 focus:ring-emerald-100 text-emerald-700 bg-emerald-50/40' : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-150 text-slate-800')}`}
-                                      title="Harga tayang resmi e-Katalog LKPP"
+                                      title="Harga tayang resmi e-Katalog LKPP (termasuk pajak)"
                                     />
+                                  </div>
+                                  <div className="text-[8.5px] text-slate-400 font-sans text-right mt-0.5" title="Nilai sebelum PPN 11% (DPP)">
+                                    Sblm PPN: Rp {Math.floor(unitHpsPrice / 1.11).toLocaleString('id-ID')}
                                   </div>
                                   {isOverbudget && <div className="text-[9px] font-bold text-rose-500 text-right mt-1 animate-pulse">⚠️ Melebihi Pagu</div>}
                                 </td>
                                 <td className="block md:table-cell py-2 md:py-3 px-0 md:px-2 text-right mt-2 md:mt-0 bg-indigo-50/20 md:bg-indigo-50/30">
                                   <div className="md:hidden text-[9px] font-bold text-indigo-700 uppercase tracking-wider mb-1.5 text-left">Harga Negosiasi:</div>
-                                  <div className="relative inline-block w-full">
-                                    <span className={`absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-[10px] ${isNegoOverHps ? 'text-rose-500' : (isNegoSaving ? 'text-emerald-600' : 'text-indigo-400')}`}>Rp</span>
-                                    <input
-                                      type="number"
-                                      value={unitNegoPrice}
-                                      onChange={(e) => {
-                                        const newPrice = parseFloat(e.target.value) || 0;
-                                        setNegotiatedPrices(prev => ({
-                                          ...prev,
-                                          [item.name]: newPrice
-                                        }));
-                                        setIsSigned(false);
-                                        if (step === 4) setStep(3);
-                                      }}
-                                      className={`w-full bg-white border rounded-xl py-1.5 pl-7 pr-2 text-xs font-mono font-bold text-right focus:ring-2 outline-none transition-all ${isNegoOverHps ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200 text-rose-700 bg-rose-50/50' : (isNegoSaving ? 'border-emerald-300 focus:border-emerald-500 focus:ring-emerald-200 text-emerald-700 bg-emerald-50/50' : 'border-indigo-200 focus:border-indigo-500 focus:ring-indigo-200 text-slate-900')}`}
-                                      title="Harga hasil negosiasi dengan penyedia (diisi sesuai kesepakatan e-Purchasing)"
-                                    />
-                                  </div>
-                                  {isNegoSaving && (
-                                    <div className="text-[9px] font-bold text-emerald-600 text-right mt-0.5 flex items-center justify-end gap-0.5">
-                                      <span>↓ Hemat Rp {(unitHpsPrice - unitNegoPrice).toLocaleString()}</span>
-                                    </div>
-                                  )}
-                                  {isNegoOverHps && (
-                                    <div className="text-[9px] font-bold text-rose-500 text-right mt-0.5">
-                                      ⚠️ Melebihi HPS
-                                    </div>
-                                  )}
+                                  {(() => {
+                                    // Hitung sebelum pajak (DPP) & PPN: PPN = (11/12 x Harga Produk) x 12% = 11% Efektif
+                                    const beforeTaxPrice = (negotiatedBeforeTaxPrices && negotiatedBeforeTaxPrices[item.name] !== undefined)
+                                      ? negotiatedBeforeTaxPrices[item.name]
+                                      : Math.floor(unitNegoPrice / 1.11);
+                                    const ppnVal = Math.round((11 / 12) * beforeTaxPrice * 0.12);
+                                    const isCopied = copiedDppKey === item.name;
+
+                                    return (
+                                      <div className="flex flex-col gap-1.5 w-full">
+                                        {/* Card Input Nego Sebelum Pajak (Harga Produk untuk e-Katalog) */}
+                                        <div className="bg-white border-2 border-emerald-300 rounded-xl p-2 shadow-xs text-left">
+                                          <div className="flex items-center justify-between text-[9px] font-bold text-slate-700 mb-1">
+                                            <span className="flex items-center gap-1 uppercase tracking-wider text-emerald-800">
+                                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                              Nego Sblm Pajak (e-Katalog):
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleCopyDpp(beforeTaxPrice, item.name)}
+                                              className={`px-1.5 py-0.5 rounded text-[8.5px] font-extrabold flex items-center gap-1 transition-all cursor-pointer ${
+                                                isCopied
+                                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200'
+                                              }`}
+                                              title="Salin Harga Produk Sebelum Pajak untuk di-paste langsung ke kolom Nego di e-Katalog INAPROC"
+                                            >
+                                              {isCopied ? <Check className="w-2.5 h-2.5 text-white" /> : <Copy className="w-2.5 h-2.5" />}
+                                              <span>{isCopied ? 'Tersalin!' : 'Salin'}</span>
+                                            </button>
+                                          </div>
+
+                                          <div className="relative">
+                                            <span className="absolute left-2 top-1/2 -translate-y-1/2 font-bold text-[10px] text-emerald-600">Rp</span>
+                                            <input
+                                              type="number"
+                                              value={beforeTaxPrice}
+                                              onChange={(e) => {
+                                                const newDpp = Math.max(0, parseFloat(e.target.value) || 0);
+                                                const newPpn = Math.round((11 / 12) * newDpp * 0.12);
+                                                const newTotal = newDpp + newPpn;
+                                                setNegotiatedBeforeTaxPrices(prev => ({ ...prev, [item.name]: newDpp }));
+                                                setNegotiatedPrices(prev => ({ ...prev, [item.name]: newTotal }));
+                                                setIsSigned(false);
+                                                if (step === 4) setStep(3);
+                                              }}
+                                              placeholder="0"
+                                              className="w-full bg-emerald-50/50 border border-emerald-300 focus:border-emerald-600 focus:bg-white rounded-lg py-1 pl-7 pr-2 text-xs font-mono font-black text-right text-emerald-900 focus:ring-1 focus:ring-emerald-400 outline-none transition-all"
+                                              title="Ketik harga negosiasi sebelum pajak (Harga Produk) yang akan diajukan di e-Katalog"
+                                            />
+                                          </div>
+
+                                          {/* Breakdown Komponen PPN & Satuan Nett */}
+                                          <div className="mt-1.5 pt-1.5 border-t border-dashed border-slate-200 flex flex-col gap-0.5 text-[8.5px]">
+                                            <div className="flex justify-between text-slate-500 font-mono">
+                                              <span className="font-sans text-slate-400">PPN (11%):</span>
+                                              <span className="text-slate-600">Rp {ppnVal.toLocaleString('id-ID')}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center font-bold text-slate-800">
+                                              <span className="text-slate-500 text-[8px] uppercase">Satuan (+Pajak):</span>
+                                              <div className="relative inline-block w-28">
+                                                <input
+                                                  type="number"
+                                                  value={unitNegoPrice}
+                                                  onChange={(e) => {
+                                                    const newTotal = Math.max(0, parseFloat(e.target.value) || 0);
+                                                    const derivedDpp = Math.floor(newTotal / 1.11);
+                                                    setNegotiatedPrices(prev => ({ ...prev, [item.name]: newTotal }));
+                                                    setNegotiatedBeforeTaxPrices(prev => ({ ...prev, [item.name]: derivedDpp }));
+                                                    setIsSigned(false);
+                                                    if (step === 4) setStep(3);
+                                                  }}
+                                                  className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded px-1.5 py-0.5 text-right font-mono font-bold text-[10px] text-indigo-900 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                                  title="Atur langsung nilai total satuan setelah PPN (akan otomatis menghitung nilai sebelum pajak)"
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Action buttons & helper */}
+                                        <div className="flex items-center justify-between gap-1 text-[8px]">
+                                          <div className="flex items-center gap-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleApplyQuickScenario(item, 'max')}
+                                              className="px-1.5 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 rounded border border-slate-200 font-bold transition-all cursor-pointer"
+                                              title="Setel pas batas maksimal aman e-Katalog (di bawah Pagu & Tayang)"
+                                            >
+                                              Pas Batas
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleApplyQuickScenario(item, '2pct')}
+                                              className="px-1.5 py-0.5 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded border border-slate-200 font-bold transition-all cursor-pointer"
+                                              title="Target Nego Hemat 2% dari Tayang"
+                                            >
+                                              -2%
+                                            </button>
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => setExpandedTaxRows(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                                            className={`px-1.5 py-0.5 rounded font-extrabold flex items-center gap-0.5 transition-all cursor-pointer ${
+                                              expandedTaxRows[idx]
+                                                ? 'bg-indigo-600 text-white'
+                                                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+                                            }`}
+                                            title="Buka panduan kalkulator pajak INAPROC"
+                                          >
+                                            <span>🧮 {expandedTaxRows[idx] ? 'Tutup' : 'Tax Guide'}</span>
+                                          </button>
+                                        </div>
+
+                                        {/* Status hemat / warning */}
+                                        {isNegoSaving && (
+                                          <div className="text-[8.5px] font-bold text-emerald-600 text-right flex items-center justify-end gap-0.5">
+                                            <span>↓ Hemat Rp {(unitHpsPrice - unitNegoPrice).toLocaleString()}</span>
+                                          </div>
+                                        )}
+                                        {isNegoOverHps && (
+                                          <div className="text-[8.5px] font-bold text-rose-500 text-right">
+                                            ⚠️ Melebihi HPS
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </td>
                                 <td className={`block md:table-cell py-2 md:py-3 px-0 md:px-3 text-right font-mono font-bold transition-colors ${isNegoSaving ? 'text-emerald-700' : (isOverbudget ? 'text-rose-600' : 'text-indigo-650')}`}>
                                   <div className="flex md:block items-center justify-between mt-2 md:mt-0 pt-2 md:pt-0 border-t border-dashed border-slate-200 md:border-0">
@@ -2023,6 +2452,28 @@ export default function Step3RincianHPS() {
                                   </div>
                                 </td>
                               </tr>
+                              
+                              {/* EXPANDED INAPROC TAX GUIDE ACCORDION */}
+                              {expandedTaxRows[idx] && (
+                                <tr className="block md:table-row bg-slate-50/90 border-b border-indigo-100">
+                                  <td colSpan="8" className="block md:table-cell p-3 sm:p-4">
+                                    <InaprocTaxHelper
+                                      dpaPrice={item.price}
+                                      tayangPrice={unitHpsPrice}
+                                      qty={item.qty}
+                                      unit={item.unit}
+                                      itemName={item.name}
+                                      onApplyPrice={(dpp, totalSatuan) => {
+                                        setNegotiatedBeforeTaxPrices(prev => ({ ...prev, [item.name]: dpp }));
+                                        setNegotiatedPrices(prev => ({ ...prev, [item.name]: totalSatuan }));
+                                        setIsSigned(false);
+                                        if (step === 4) setStep(3);
+                                        dialog.alert('Berhasil Diterapkan!', `Harga Nego Sebelum Pajak Rp ${dpp.toLocaleString('id-ID')} (Rp ${totalSatuan.toLocaleString('id-ID')} setelah PPN) berhasil diterapkan untuk "${item.name}".`);
+                                      }}
+                                    />
+                                  </td>
+                                </tr>
+                              )}
                               
                               {/* EXPANDED ACCORDION ROW */}
                               {isRowExpanded && surveyItem && (
@@ -2046,7 +2497,7 @@ export default function Step3RincianHPS() {
                                             
                                             {!isFailed && (
                                               <div className="text-indigo-650 font-mono font-extrabold text-sm flex items-baseline gap-0.5">
-                                                <span className="text-[10px] font-bold">Rp</span> {(p.price || 0).toLocaleString('id-ID')}
+                                                <span className="text-[10px] font-bold">Rp</span> {((hpsPrices[item.name] !== undefined && Number(hpsPrices[item.name]) > 0) ? Number(hpsPrices[item.name]) : (p.price || 0)).toLocaleString('id-ID')}
                                               </div>
                                             )}
                                           </div>
@@ -2128,34 +2579,110 @@ export default function Step3RincianHPS() {
                                                 </div>
                                               </div>
 
-                                              <div className="pt-2 border-t border-slate-200">
-                                                { screenshotStatus[p.id] === 'done' ? (
-                                                  <div className="text-[10px] font-bold text-emerald-600 flex items-center gap-1.5 bg-emerald-50 w-fit px-3 py-1.5 rounded-lg border border-emerald-200">
-                                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                                    <span>✓ Bukti Screenshot Tersimpan</span>
-                                                  </div>
-                                                ) : screenshotStatus[p.id] === 'loading' ? (
-                                                  <div className="text-[10px] font-bold text-amber-600 flex items-center gap-1.5 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
-                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                    <span>Mengambil screenshot...</span>
-                                                  </div>
-                                                ) : screenshotStatus[p.id] === 'error' ? (
-                                                  <button
-                                                    onClick={() => captureScreenshot(p)}
-                                                    className="text-[10px] font-bold text-white bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm active:scale-95"
+                                              <div className="pt-2 border-t border-slate-200 space-y-2">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                  { screenshotStatus[p.id] === 'done' || (p && (p.img || p.searchImg)) ? (
+                                                    <>
+                                                      <div className="text-[10px] font-bold text-emerald-600 flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                                                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                                        <span>✓ Screenshot Tersimpan</span>
+                                                      </div>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveItemScreenshot(p)}
+                                                        className="text-[10px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 rounded-lg border border-rose-200 transition-colors flex items-center gap-1 shadow-sm active:scale-95"
+                                                        title="Hapus bukti tangkapan layar untuk barang ini"
+                                                      >
+                                                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                                        <span>Hapus</span>
+                                                      </button>
+                                                    </>
+                                                  ) : screenshotStatus[p.id] === 'loading' ? (
+                                                    <div className="text-[10px] font-bold text-amber-600 flex items-center gap-1.5 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
+                                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                      <span>Mengambil screenshot...</span>
+                                                    </div>
+                                                  ) : screenshotStatus[p.id] === 'error' ? (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => captureScreenshot(p)}
+                                                      className="text-[10px] font-bold text-white bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm active:scale-95"
+                                                    >
+                                                      <Camera className="w-3.5 h-3.5" />
+                                                      <span>Gagal — Coba Lagi</span>
+                                                    </button>
+                                                  ) : (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => captureScreenshot(p)}
+                                                      className="text-[10px] font-bold text-white bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shadow-sm active:scale-95 border border-indigo-400"
+                                                    >
+                                                      <Camera className="w-3.5 h-3.5" />
+                                                      <span>📸 Ambil Otomatis</span>
+                                                    </button>
+                                                  )}
+
+                                                  {/* Input File Unggah Screenshot Manual */}
+                                                  <label
+                                                    className="text-[10px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 hover:text-indigo-600 px-3 py-1.5 rounded-lg border border-slate-300 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                                                    title="Unggah file foto screenshot dari laptop (khususnya jika produk memiliki banyak pilihan varian)"
                                                   >
-                                                    <Camera className="w-3.5 h-3.5" />
-                                                    <span>Gagal — Coba Lagi</span>
-                                                  </button>
-                                                ) : (
+                                                    <Upload className="w-3.5 h-3.5 text-slate-500" />
+                                                    <span>📁 Unggah File</span>
+                                                    <input
+                                                      type="file"
+                                                      accept="image/*"
+                                                      className="hidden"
+                                                      onChange={(e) => {
+                                                        if (e.target.files && e.target.files[0]) {
+                                                          handleManualScreenshotUpload(p, e.target.files[0]);
+                                                        }
+                                                      }}
+                                                    />
+                                                  </label>
+
+                                                  {/* Tombol Tempel (Ctrl+V) dari Clipboard */}
                                                   <button
-                                                    onClick={() => captureScreenshot(p)}
-                                                    className="text-[10px] font-bold text-white bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 shadow-sm active:scale-95 border border-indigo-400"
+                                                    type="button"
+                                                    onClick={() => handlePasteScreenshot(p)}
+                                                    className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+                                                    title="Tempel langsung gambar yang sudah disalin di clipboard (Win+Shift+S lalu klik ini)"
                                                   >
-                                                    <Camera className="w-3.5 h-3.5" />
-                                                    <span>📸 Ambil Screenshot Bukti</span>
+                                                    <Clipboard className="w-3.5 h-3.5 text-indigo-600" />
+                                                    <span>📋 Tempel (Ctrl+V)</span>
                                                   </button>
+                                                </div>
+
+                                                {/* Preview thumbnail gambar jika ada */}
+                                                {(p.img || p.searchImg) && (
+                                                  <div className="flex items-center gap-2 pt-1">
+                                                    <div className="relative group rounded-lg overflow-hidden border border-slate-200 w-28 h-16 bg-slate-100 flex items-center justify-center">
+                                                      <img
+                                                        src={p.img || p.searchImg}
+                                                        alt={p.name}
+                                                        className="w-full h-full object-cover"
+                                                      />
+                                                      <a
+                                                        href={p.img || p.searchImg}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[9px] text-white font-bold"
+                                                      >
+                                                        🔍 Perbesar
+                                                      </a>
+                                                    </div>
+                                                    <div className="text-[9px] text-slate-500 leading-tight">
+                                                      <span className="font-semibold text-slate-700 block">Preview Bukti Screenshot</span>
+                                                      Foto ini akan dilampirkan pada DPP dan Dokumen BAHP
+                                                    </div>
+                                                  </div>
                                                 )}
+
+                                                {/* Tips Varian Produk */}
+                                                <div className="text-[9px] text-slate-500 bg-amber-50/70 border border-amber-200/60 rounded-lg p-2 flex items-start gap-1.5">
+                                                  <span className="text-amber-600 font-bold">💡 Tips Multi-Varian:</span>
+                                                  <span>Jika 1 link e-Katalog memiliki beberapa varian (daya, ukuran, tipe): buka produk di browser, pilih varian yang sesuai, lalu tekan <strong>Win+Shift+S</strong> (atau Snipping Tool) dan klik tombol <strong>📋 Tempel (Ctrl+V)</strong> agar bukti harga varian terkunci sempurna.</span>
+                                                </div>
                                               </div>
                                             </div>
                                           )}
@@ -2453,7 +2980,17 @@ export default function Step3RincianHPS() {
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                       {/* Hitung berapa produk sudah screenshot dan belum */}
                       {(() => {
-                        const validProducts = surveyData.products.filter(p => p.success && p.vendor !== 'TIDAK DITEMUKAN');
+                        const packItems = getPackageItems(selectedPack) || [];
+                        const activeItemNames = new Set(
+                          packItems
+                            .filter(item => (item.qty === '' ? 0 : Number(item.qty || 0)) > 0)
+                            .map(item => (item.name || '').trim().toLowerCase())
+                        );
+                        const validProducts = surveyData.products.filter(p => 
+                          p.success && 
+                          p.vendor !== 'TIDAK DITEMUKAN' &&
+                          activeItemNames.has((p.name || '').trim().toLowerCase())
+                        );
                         const doneCount = validProducts.filter(p => screenshotStatus[p.id] === 'done').length;
                         const totalCount = validProducts.length;
                         const allDone = doneCount === totalCount && totalCount > 0;
@@ -2589,7 +3126,7 @@ export default function Step3RincianHPS() {
                               ) : (
                                 <>
                                   <div className="text-indigo-650 font-mono font-extrabold text-sm flex items-baseline gap-0.5">
-                                    <span className="text-[10px] font-bold">Rp</span> {(p.price || 0).toLocaleString('id-ID')}
+                                    <span className="text-[10px] font-bold">Rp</span> {((hpsPrices[p.name] !== undefined && Number(hpsPrices[p.name]) > 0) ? Number(hpsPrices[p.name]) : (p.price || 0)).toLocaleString('id-ID')}
                                   </div>
                                   <div className="text-[10px] text-slate-500 font-medium truncate flex items-center gap-1">
                                     <Store className="w-3 h-3 text-slate-400" />
@@ -2606,34 +3143,78 @@ export default function Step3RincianHPS() {
                                     <a href={p.link} target="_blank" rel="noopener noreferrer">Lihat di e-Katalog</a>
                                   </div>
                                   
-                                  <div className="mt-2 pt-2 border-t border-slate-100">
-                                    { screenshotStatus[p.id] === 'done' ? (
-                                      <div className="text-[9px] font-bold text-emerald-600 flex items-center gap-1.5 bg-emerald-50 w-fit px-2.5 py-1.5 rounded-lg border border-emerald-200">
-                                        <Check className="w-3 h-3 text-emerald-600" />
-                                        <span>✓ Bukti Screenshot Tersimpan</span>
-                                      </div>
-                                    ) : screenshotStatus[p.id] === 'loading' ? (
-                                      <div className="text-[9px] font-bold text-amber-600 flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
-                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                        <span>Mengambil screenshot...</span>
-                                      </div>
-                                    ) : screenshotStatus[p.id] === 'error' ? (
-                                      <button
-                                        onClick={() => captureScreenshot(p)}
-                                        className="text-[9px] font-bold text-white bg-red-500 hover:bg-red-600 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 w-full justify-center shadow-sm"
+                                  <div className="mt-2 pt-2 border-t border-slate-100 space-y-1.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      { screenshotStatus[p.id] === 'done' || (p && (p.img || p.searchImg)) ? (
+                                        <>
+                                          <div className="text-[9px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-1.5 rounded-lg border border-emerald-200">
+                                            <Check className="w-3 h-3 text-emerald-600" />
+                                            <span>✓ Screenshot Tersimpan</span>
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveItemScreenshot(p)}
+                                            className="text-[9px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1.5 rounded-lg border border-rose-200 transition-colors flex items-center gap-1 shadow-sm active:scale-95"
+                                            title="Hapus screenshot barang ini"
+                                          >
+                                            <Trash2 className="w-3 h-3 text-rose-500" />
+                                            <span>Hapus</span>
+                                          </button>
+                                        </>
+                                      ) : screenshotStatus[p.id] === 'loading' ? (
+                                        <div className="text-[9px] font-bold text-amber-600 flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
+                                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                          <span>Mengambil screenshot...</span>
+                                        </div>
+                                      ) : screenshotStatus[p.id] === 'error' ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => captureScreenshot(p)}
+                                          className="text-[9px] font-bold text-white bg-red-500 hover:bg-red-600 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                                        >
+                                          <Camera className="w-3 h-3" />
+                                          <span>Gagal — Coba Lagi</span>
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => captureScreenshot(p)}
+                                          className="text-[9px] font-bold text-white bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 shadow-sm active:scale-95 border border-indigo-400"
+                                        >
+                                          <Camera className="w-3 h-3" />
+                                          <span>📸 Ambil Otomatis</span>
+                                        </button>
+                                      )}
+
+                                      {/* Opsi Upload & Paste */}
+                                      <label
+                                        className="text-[9px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2 py-1.5 rounded-lg border border-slate-300 transition-all flex items-center gap-1 cursor-pointer shadow-sm"
+                                        title="Unggah screenshot varian"
                                       >
-                                        <Camera className="w-3 h-3" />
-                                        <span>Gagal — Coba Lagi</span>
-                                      </button>
-                                    ) : (
+                                        <Upload className="w-3 h-3 text-slate-500" />
+                                        <span>📁 Unggah</span>
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          onChange={(e) => {
+                                            if (e.target.files && e.target.files[0]) {
+                                              handleManualScreenshotUpload(p, e.target.files[0]);
+                                            }
+                                          }}
+                                        />
+                                      </label>
+
                                       <button
-                                        onClick={() => captureScreenshot(p)}
-                                        className="text-[9px] font-bold text-white bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 w-full justify-center shadow-sm active:scale-95 border border-indigo-400"
+                                        type="button"
+                                        onClick={() => handlePasteScreenshot(p)}
+                                        className="text-[9px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-1.5 rounded-lg border border-indigo-200 transition-all flex items-center gap-1 shadow-sm"
+                                        title="Tempel screenshot dari clipboard (Ctrl+V)"
                                       >
-                                        <Camera className="w-3 h-3" />
-                                        <span>📸 Ambil Screenshot Bukti</span>
+                                        <Clipboard className="w-3 h-3 text-indigo-600" />
+                                        <span>📋 Tempel</span>
                                       </button>
-                                    )}
+                                    </div>
                                   </div>
                                 </>
                               )}
