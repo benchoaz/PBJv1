@@ -1,3 +1,0 @@
-
---- Testing CURRENT (REVERTED) ---
-ROOT TEXT LENGTH: 2387

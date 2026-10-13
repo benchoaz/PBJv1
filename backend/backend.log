@@ -1,5 +1,0 @@
-nohup: ignoring input
-
-2026/06/30 12:50:31 [35m/home/beni/PBJ/backend/cmd/server/main.go:23
-[0m[31m[error] [0mfailed to initialize database, got error failed to connect to `user=postgres database=pbj`: 127.0.0.1:5432 (localhost): server error: FATAL: database "pbj" does not exist (SQLSTATE 3D000)
-2026/06/30 12:50:31 Failed to connect to database via GORM: failed to connect to `user=postgres database=pbj`: 127.0.0.1:5432 (localhost): server error: FATAL: database "pbj" does not exist (SQLSTATE 3D000)
