@@ -150,7 +150,6 @@ export default function Step5Review() {
                     })
                   }).then(res => {
                     if (res.ok) {
-                      console.log('Terkirim');
                       alert('✅ Dokumen berhasil dikirim ke PP!');
                     } else {
                       alert('Gagal mengirim ke PP');

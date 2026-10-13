@@ -136,8 +136,6 @@ export default function RAKUploadModal({ onClose, onSuccess, satkerId }) {
         throw new Error(parsedDataRaw.pesan || "AI gagal mengekstrak data rekening dari RAK.");
       }
 
-      console.log('Parsed RAK Data by AI:', parsedData);
-
       const payload = {
         satker_id: satkerId,
         tahun_anggaran: new Date().getFullYear(),

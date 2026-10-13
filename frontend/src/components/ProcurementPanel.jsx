@@ -410,7 +410,6 @@ export default function ProcurementPanel() {
             successCount++;
           }
           const key = targetItem.originalNo;
-          console.log(`[SURVEY RESULT] item key=${key} price=${res.price} vendor=${res.vendor} success=${res.success}`);
           updatedNego[key] = {
             ...(updatedNego[key] || {}),
             tayang: res.price,
