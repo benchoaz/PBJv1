@@ -35,14 +35,30 @@ out/
 backend/tmp/
 backend/bin/
 backend/main
+backend/server
+backend/cmd/server/server
 main
+*.db
 
-# DPA Parser logs and pycache
+# Python & Virtualenv
+venv/
+.venv/
 dpa-parser/logs/
 dpa-parser/__pycache__/
 *.pyc
 
-# Screenshots and Scratch files
+# Logs & Archives & Backups
+*.log
+logs/
+*.bak
+*.bak*
+*.tmp
+*.tar.gz
+*.sql
+*.Zone.Identifier
+
+# Scratch, Debug, and Screenshots
+scratch/
 frontend/public/screenshots/
 inaproc_search_page.html
 patch_*.js
@@ -50,4 +66,4 @@ scratch_*.js
 take_screenshots.js
 survey_runner.js
 test_search_result.png
-*.sql
+
