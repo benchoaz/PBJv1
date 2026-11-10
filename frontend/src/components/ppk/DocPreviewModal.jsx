@@ -264,25 +264,30 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
   const getPacketCategory = (packName) => {
     if (!packName) return 'ATK';
     const name = packName.toLowerCase();
-    if (name.includes('pemeliharaan') || name.includes('perawatan') || name.includes('servis') || name.includes('service')) return 'Pemeliharaan';
-    if (name.includes('laptop') || name.includes('printer') || name.includes('komputer') || name.includes('kendaraan') || name.includes('mesin') || name.includes('elektronik') || name.includes('modal')) return 'Modal';
-    if (name.includes('kertas sektoral') || name.includes('seragam dinas') || name.includes('konsolidasi')) return 'Konsolidasi';
+    // Prioritaskan Mamin & Konsumsi
     if (name.includes('prasmanan') || name.includes('katering') || name.includes('catering')) return 'Mamin-Prasmanan';
     if (name.includes('nasi kotak') || name.includes('nasi bungkus') || name.includes('kotak')) return 'Mamin-Bungkus';
     if (name.includes('snack') || name.includes('kudapan')) return 'Mamin-Snack';
     if (name.includes('makan') || name.includes('minum') || name.includes('mamin') || name.includes('konsumsi')) return 'Mamin-Bungkus';
+    // Belanja Modal
+    if (name.includes('laptop') || name.includes('printer') || name.includes('komputer') || name.includes('kendaraan') || name.includes('mesin') || name.includes('elektronik') || name.includes('modal')) return 'Modal';
+    if (name.includes('kertas sektoral') || name.includes('seragam dinas') || name.includes('konsolidasi')) return 'Konsolidasi';
+    // Pemeliharaan Teknis (Abaikan "pemeliharaan keutuhan")
+    if (name.includes('servis') || name.includes('service') || name.includes('perawatan') || (name.includes('pemeliharaan') && !name.includes('pemeliharaan keutuhan'))) return 'Pemeliharaan';
     if (name.includes('jasa')) return 'Jasa';
     return 'ATK';
   };
 
   const cat = getPacketCategory(selectedPack?.packName || '');
-  const isMaintenanceDoc = selectedTplId === 'TPL-006F' ||
-    selectedPack?.dppTemplateId === 'TPL-006F' ||
-    selectedPack?.dppSpecs?.templateId === 'TPL-006F' ||
-    cat === 'Pemeliharaan' ||
-    (selectedPack?.packName || '').toLowerCase().includes('pemeliharaan') ||
-    (selectedPack?.packName || '').toLowerCase().includes('perawatan') ||
-    (selectedPack?.packName || '').toLowerCase().includes('servis');
+  let defaultTplId = 'TPL-006A';
+  if (cat.startsWith('Mamin')) defaultTplId = 'TPL-006B';
+  else if (cat === 'Modal') defaultTplId = 'TPL-006C';
+  else if (cat === 'Pemeliharaan') defaultTplId = 'TPL-006F';
+  else if (cat === 'Jasa' || cat === 'Konstruksi') defaultTplId = 'TPL-006D';
+  else if (cat === 'Konsolidasi') defaultTplId = 'TPL-006E';
+
+  const activeTplId = selectedTplId || selectedPack?.dppTemplateId || selectedPack?.dppSpecs?.templateId || defaultTplId;
+  const isMaintenanceDoc = activeTplId === 'TPL-006F';
 
   const handleExportWord = async () => {
     const printSheet = document.getElementById('print-sheet');
@@ -901,15 +906,25 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
   // BERITA ACARA HASIL PEMILIHAN (BAHP E-PURCHASING)
   <BahpDocument
     templateId={(() => {
+      // 1. Prioritaskan template DPP yang aktif
+      if (activeTplId === 'TPL-006F') return 'pemeliharaan';
+      if (activeTplId === 'TPL-006B') return 'mamin';
+      if (activeTplId === 'TPL-006C') return 'modal';
+      if (activeTplId === 'TPL-006D') return 'jasa';
+      if (activeTplId === 'TPL-006E') return 'seragam';
+      if (activeTplId === 'TPL-006A') return 'atk';
+
+      // 2. Fallback kategori
       const cat = getPacketCategory(selectedPack?.packName || '');
-      if (cat === 'Pemeliharaan') return 'pemeliharaan';
       if (cat.startsWith('Mamin')) return 'mamin';
       if (cat === 'Modal') return 'modal';
+      if (cat === 'Pemeliharaan') return 'pemeliharaan';
       if (cat === 'Jasa' || cat === 'Konstruksi') return 'jasa';
       if (cat === 'Konsolidasi') return 'seragam';
       return 'atk';
     })()}
     submittedPack={selectedPack}
+    packageMetadata={packageMetadata}
     negotiatedItems={(() => {
       const map = {};
       const sData = getActiveSurveyData();
@@ -994,6 +1009,17 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  if (ndTemplate.id === 'TPL-001' && !content.includes('NOTA DINAS')) {
     content = `<div class="text-center mb-6"><div class="font-bold text-lg underline leading-none mb-1">NOTA DINAS</div><div class="leading-none">Nomor : {{nomor_nd}}</div></div>\n` + content;
  }
+
+ // Pastikan ID RUP (SiRUP LKPP) ada di Nota Dinas jika belum ada
+ if (!content.includes('{{id_rup}}') && !content.includes('{{kode_rup}}') && !/ID\s*RUP/i.test(content)) {
+   if (content.includes('Sumber Dana')) {
+     content = content.replace(/(Sumber Dana\s*:[^\n]*)/i, `$1\nID RUP (SiRUP) : {{id_rup}}`);
+   } else if (content.includes('{{sumber_dana}}')) {
+     content = content.replace(/(\{\{sumber_dana\}\}[^\n]*)/i, `$1\nID RUP (SiRUP) : {{id_rup}}`);
+   } else if (content.includes('{{nilai_pagu}}')) {
+     content = content.replace(/(\{\{nilai_pagu\}\}[^\n]*)/i, `$1\nID RUP (SiRUP) : {{id_rup}}`);
+   }
+ }
  
  // Force remove legacy signature block from cached templates to prevent duplication
  content = content.replace(/Pejabat Pembuat Komitmen \(PPK\),?[\s\S]*?\{\{nama_ppk\}\}[\s\S]*?NIP\. \{\{nip_ppk\}\}/gi, '');
@@ -1025,7 +1051,8 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{tanggal_ba}}': '_______________________',
  '{{harga_penawaran}}': '_______________________',
  '{{harga_negosiasi}}': '_______________________',
- '{{nomor_bahp}}': nomorBase.replace('{nomor}', '112/BAHP'),
+ '{{nomor_bahp}}': packageMetadata?.nomor_bahp || (packageMetadata?.nomor_dpp ? packageMetadata.nomor_dpp.replace(/DPP/gi, 'BAHP') : nomorBase.replace('{nomor}', '112/BAHP')),
+ '{{tanggal_bahp}}': formatTanggalIndo(packageMetadata?.tanggal_bahp || packageMetadata?.tanggal_dpp || tanggalSurat),
  '{{nilai_hps}}': '_______________________',
  '{{nama_penyedia_terpilih}}': '_______________________',
  '{{harga_final}}': '_______________________',
@@ -1048,7 +1075,9 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{pra_dipa}}': selectedPack.praDipa ? 'Ya' : 'Tidak',
  '{{volume_pekerjaan}}': selectedPack.volume || '1 Paket',
  '{{uraian_pekerjaan}}': `Pengadaan ${selectedPack.packName || ''} untuk operasional`,
- '{{kode_rup}}': getSafeNoSirup(selectedPack, packageMetadata)
+ '{{kode_rup}}': getSafeNoSirup(selectedPack, packageMetadata) || packageMetadata?.id_rup || '-',
+ '{{id_rup}}': getSafeNoSirup(selectedPack, packageMetadata) || packageMetadata?.id_rup || '-',
+ '{{id_rup_sirup}}': getSafeNoSirup(selectedPack, packageMetadata) || packageMetadata?.id_rup || '-'
  };
  
  Object.keys(replacements).forEach(key => {
@@ -1130,11 +1159,8 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
     else if (cat === 'Konsolidasi') tplId = 'TPL-006E';
   }
 
-  const isMaintenanceDoc = selectedTplId === 'TPL-006F' ||
-    tplId === 'TPL-006F' ||
-    (selectedPack?.packName || '').toLowerCase().includes('pemeliharaan') ||
-    (selectedPack?.packName || '').toLowerCase().includes('perawatan') ||
-    (selectedPack?.packName || '').toLowerCase().includes('servis');
+  const activeDocTpl = selectedTplId || tplId;
+  const isMaintenanceDoc = activeDocTpl === 'TPL-006F';
 
   const currentJenis = dppSpecs.jenisPemeliharaan || 'kendaraan';
   const mConfig = getMaintenanceConfig(currentJenis);
@@ -1195,7 +1221,8 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{tanggal_ba}}': '_______________________',
  '{{harga_penawaran}}': '_______________________',
  '{{harga_negosiasi}}': '_______________________',
- '{{nomor_bahp}}': nomorBase.replace('{nomor}', '112/BAHP'),
+ '{{nomor_bahp}}': packageMetadata?.nomor_bahp || (packageMetadata?.nomor_dpp ? packageMetadata.nomor_dpp.replace(/DPP/gi, 'BAHP') : nomorBase.replace('{nomor}', '112/BAHP')),
+ '{{tanggal_bahp}}': formatTanggalIndo(packageMetadata?.tanggal_bahp || packageMetadata?.tanggal_dpp || tanggalSurat),
  '{{nilai_hps}}': '_______________________',
  '{{nama_penyedia_terpilih}}': '_______________________',
  '{{harga_final}}': '_______________________',
@@ -1218,7 +1245,9 @@ export default function DocPreviewModal({ isHpsExemptSelected }) {
  '{{pra_dipa}}': selectedPack.praDipa ? 'Ya' : 'Tidak',
  '{{volume_pekerjaan}}': selectedPack.volume || '1 Paket',
  '{{uraian_pekerjaan}}': `Pengadaan ${selectedPack.packName || ''} untuk operasional`,
- '{{kode_rup}}': getSafeNoSirup(selectedPack, packageMetadata)
+ '{{kode_rup}}': getSafeNoSirup(selectedPack, packageMetadata) || packageMetadata?.id_rup || '-',
+ '{{id_rup}}': getSafeNoSirup(selectedPack, packageMetadata) || packageMetadata?.id_rup || '-',
+ '{{id_rup_sirup}}': getSafeNoSirup(selectedPack, packageMetadata) || packageMetadata?.id_rup || '-'
  };
 
  Object.keys(replacements).forEach(key => {

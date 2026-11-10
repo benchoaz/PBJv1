@@ -119,7 +119,9 @@ export default function ProcurementPanel() {
             senderDepartment: parsedData?.senderDepartment || parsedData?.currentUser?.department || user?.department || 'Kecamatan Besuk',
             sentDate: new Date(incomingPack.updated_at || incomingPack.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
             items: mappedItems,
-            dppTemplateId: parsedData?.selectedTplId || ''
+            dppTemplateId: parsedData?.selectedTplId || '',
+            packageMetadata: parsedData?.packageMetadata || {},
+            rawDescription: parsedData
           };
           setSubmittedPack(convertedPack);
         } else {
@@ -1141,16 +1143,15 @@ export default function ProcurementPanel() {
         if (dppTpl === 'TPL-006I')  return 'konsultasi_konstruksi';
         if (dppTpl === 'TPL-006K')  return 'konsolidasi';
 
-        // 2. Dari MAK (Kode Akun Belanja) — sesuai BAS Permendagri 90/2019
-        // 5.1.x = Belanja Modal, 5.2.1 = ATK/Barang Persediaan, 5.2.2 = Mamin
-        // 5.2.3 = Jasa, 5.2.4 = Pemeliharaan, 5.2.5 = Perjalanan Dinas
-        if (mak.startsWith('51'))   return 'modal';         // 5.1.x Belanja Modal
-        if (mak.startsWith('522'))  return 'mamin';         // 5.2.2 Belanja Mamin
-        if (mak.startsWith('521'))  return 'atk';           // 5.2.1 Belanja ATK/Persediaan
-        if (mak.startsWith('5231')) return 'jasa';          // 5.2.3.1 Jasa Lainnya
-        if (mak.startsWith('5232')) return 'konsultasi_non'; // 5.2.3.2 Jasa Konsultansi
-        if (mak.startsWith('524'))  return 'pemeliharaan';  // 5.2.4 Pemeliharaan
-        if (mak.startsWith('526'))  return 'konstruksi';    // 5.2.6 Konstruksi
+        // 2. Dari MAK (Kode Akun Belanja) — sesuai BAS Permendagri 90/2019 & SIPD RI
+        // SIPD: 5.1.06 = Belanja Modal, 5.1.02.01 = Barang, 5.1.02.02 = Jasa, 5.1.02.03 = Pemeliharaan
+        // Kode lama: 5.2.1 = ATK, 5.2.2 = Mamin, 5.2.3 = Jasa, 5.2.4 = Pemeliharaan, 5.2.6/5.3 = Modal/Konstruksi
+        if (mak.startsWith('5.1.06') || mak.startsWith('5106') || mak.startsWith('523') || mak.startsWith('5.3')) return 'modal';
+        if (mak.startsWith('5.1.02.03') || mak.startsWith('524'))  return 'pemeliharaan';
+        if (mak.startsWith('5.1.02.02') || mak.startsWith('5231')) return 'jasa';
+        if (mak.startsWith('522') || (mak.startsWith('5.1.02.01') && (nama.includes('mamin') || nama.includes('makan') || nama.includes('minum')))) return 'mamin';
+        if (mak.startsWith('521') || mak.startsWith('5.1.02.01')) return 'atk';
+        if (mak.startsWith('526'))  return 'konstruksi';
 
         // 3. Dari field jenisPengadaan SIRUP
         if (jenis.includes('konsultansi konstruksi'))  return 'konsultasi_konstruksi';
@@ -1159,10 +1160,10 @@ export default function ProcurementPanel() {
         if (jenis.includes('jasa lainnya'))            return 'jasa';
 
         // 4. Fallback dari kata kunci nama paket
-        if (nama.includes('mamin') || nama.includes('makanan') || nama.includes('katering') || nama.includes('konsumsi')) return 'mamin';
+        if (nama.includes('mamin') || nama.includes('makanan') || nama.includes('minum') || nama.includes('katering') || nama.includes('konsumsi') || nama.includes('snack')) return 'mamin';
         if (nama.includes('komputer') || nama.includes('laptop') || nama.includes('printer') || nama.includes('modal') || nama.includes('mesin') || nama.includes('kendaraan')) return 'modal';
         if (nama.includes('konstruksi') || nama.includes('bangunan') || nama.includes('rehab') || nama.includes('gedung') || nama.includes('jalan')) return 'konstruksi';
-        if (nama.includes('pemeliharaan') || nama.includes('perawatan') || nama.includes('service ac') || nama.includes('servis')) return 'pemeliharaan';
+        if (nama.includes('servis') || nama.includes('service ac') || (nama.includes('pemeliharaan') && !nama.includes('pemeliharaan keutuhan')) || (nama.includes('perawatan') && !nama.includes('perawatan keutuhan'))) return 'pemeliharaan';
         if (nama.includes('konsultansi') || nama.includes('konsultan') || nama.includes('perencanaan') || nama.includes('pengawasan') || nama.includes('kajian') || nama.includes('studi') || nama.includes('audit')) {
           return (nama.includes('konstruksi') || nama.includes('bangunan') || nama.includes('gedung')) ? 'konsultasi_konstruksi' : 'konsultasi_non';
         }
@@ -2378,7 +2379,7 @@ export default function ProcurementPanel() {
                 {/* SEKSI D: VALIDASI KEWAJARAN HARGA OLEH PP                  */}
                 {/* ═══════════════════════════════════════════════════════════ */}
                 <div className="font-bold text-[11px] uppercase tracking-wide border-b border-slate-200 pb-1 mt-8 text-indigo-850">D. Validasi Kewajaran Harga oleh Pejabat Pengadaan (PP)</div>
-                <p className="font-sans text-[10px] text-slate-600 mb-3">Sesuai <strong>Perpres No. 12 Tahun 2021 Pasal 50</strong> dan <strong>Peraturan LKPP No. 9 Tahun 2021</strong>, PP wajib melakukan verifikasi kewajaran harga sebelum menerbitkan Surat Pesanan (SP). Proses verifikasi meliputi kesesuaian spesifikasi, kelengkapan komponen harga, serta kewajaran nilai negosiasi yang tidak melebihi HPS yang telah ditetapkan PPK:</p>
+                <p className="font-sans text-[10px] text-slate-600 mb-3">Sesuai <strong>Perpres No. 12 Tahun 2021 Pasal 50</strong>, <strong>Perka LKPP No. 2 Tahun 2026</strong>, dan <strong>Peraturan LKPP No. 9 Tahun 2021</strong>, PP wajib melakukan verifikasi kewajaran harga sebelum menerbitkan Surat Pesanan (SP). Proses verifikasi meliputi kesesuaian spesifikasi, kelengkapan komponen harga, serta kewajaran nilai negosiasi yang tidak melebihi HPS yang telah ditetapkan PPK:</p>
 
                 {/* Checklist Spesifikasi */}
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3 font-sans print:border-slate-300">
@@ -2805,7 +2806,7 @@ export default function ProcurementPanel() {
                 {/* SEKSI E: DOKUMENTASI NEGOSIASI & KOMUNIKASI PIHAK KETIGA  */}
                 {/* ═══════════════════════════════════════════════════════════ */}
                 <div className="font-bold text-[11px] uppercase tracking-wide border-b border-slate-200 pb-1 mt-8 text-indigo-850">E. Dokumentasi Negosiasi & Kesepakatan Teknis</div>
-                <p className="font-sans text-[10px] text-slate-600 mb-3">Rekaman proses komunikasi dan negosiasi antara Pejabat Pengadaan dengan Penyedia/vendor melalui media komunikasi resmi. Dokumentasi ini merupakan bukti pelaksanaan kewajiban PP sebagaimana diatur dalam <strong>Peraturan LKPP No. 9 Tahun 2021 tentang Tata Cara Pengadaan Barang/Jasa melalui Penyedia</strong>:</p>
+                <p className="font-sans text-[10px] text-slate-600 mb-3">Rekaman proses komunikasi dan negosiasi antara Pejabat Pengadaan dengan Penyedia/vendor melalui media komunikasi resmi. Dokumentasi ini merupakan bukti pelaksanaan kewajiban PP sebagaimana diatur dalam <strong>Perka LKPP No. 2 Tahun 2026</strong> dan <strong>Peraturan LKPP No. 9 Tahun 2021 tentang Tata Cara Pengadaan Barang/Jasa melalui Penyedia</strong>:</p>
 
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-3 font-sans print:border-slate-300">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
@@ -3403,6 +3404,7 @@ export default function ProcurementPanel() {
             <BahpDocument
               templateId={bahpTemplateId}
               submittedPack={submittedPack}
+              packageMetadata={submittedPack?.packageMetadata}
               negotiatedItems={negotiatedItems}
               checkedItems={checkedItems}
               docSettings={docSettings}

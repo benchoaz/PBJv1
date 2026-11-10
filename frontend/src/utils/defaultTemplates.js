@@ -11,6 +11,7 @@ Sehubungan dengan kebutuhan operasional di lingkungan {{nama_satker}}, bersama i
 Nama Pekerjaan : {{nama_pekerjaan}}
 Nilai Pagu     : {{nilai_pagu}}
 Sumber Dana    : {{sumber_dana}}
+ID RUP (SiRUP) : {{id_rup}}
 
 Berkenaan dengan hal tersebut, mohon bantuan Saudara untuk dapat memproses pengadaan dimaksud sesuai dengan ketentuan perundang-undangan yang berlaku.
 

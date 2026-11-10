@@ -214,6 +214,7 @@ export function SpkMaintenanceDocument({
       <div className="font-bold uppercase text-[11pt] mt-4 mb-1">DASAR HUKUM DAN RUJUKAN PENGADAAN:</div>
       <ol className="list-decimal pl-8 space-y-1 mb-4 text-justify">
         <li>Peraturan Presiden Nomor 16 Tahun 2018 tentang Pengadaan Barang/Jasa Pemerintah sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021 (Pasal 28 ayat (1) huruf c perihal Bentuk Kontrak Surat Perintah Kerja untuk Pengadaan Jasa Lainnya);</li>
+        <li>Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah (Perka LKPP) Nomor 2 Tahun 2026 tentang Pedoman Pengadaan Barang/Jasa Pemerintah Melalui E-Purchasing;</li>
         <li>Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah (Perlem LKPP) Nomor 12 Tahun 2021 tentang Pedoman Pelaksanaan Pengadaan Barang/Jasa Pemerintah Melalui Penyedia;</li>
         <li>Peraturan Pemerintah Nomor 28 Tahun 2020 tentang Perubahan atas PP Nomor 27 Tahun 2014 tentang Pengelolaan Barang Milik Negara/Daerah jo Peraturan Menteri Dalam Negeri Nomor 19 Tahun 2016 tentang Pedoman Pengelolaan Barang Milik Daerah;</li>
         <li>Dokumen Pelaksanaan Anggaran (DPA) Satuan Kerja Tahun Anggaran {tahunAnggaran} pada Akun Belanja: <strong>{selectedPack?.mak || packageMetadata.mak || '-'}</strong>;</li>

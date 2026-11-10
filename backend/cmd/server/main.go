@@ -97,6 +97,7 @@ func main() {
 	budgetHandler := handlers.NewBudgetHandler(gormDB)
 	addendumHandler := handlers.NewAddendumHandler(gormDB)
 	refineTextHandler := handlers.NewRefineTextHandler(gormDB)
+	validatePPNHandler := handlers.NewValidatePPNHandler(gormDB)
 
 	mux := http.NewServeMux()
 
@@ -252,6 +253,15 @@ func main() {
 	// AI Generate Spec endpoint
 	mux.HandleFunc("POST /api/ai/generate-spec", handlers.GenerateSpec)
 	mux.HandleFunc("OPTIONS /api/ai/generate-spec", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-AI-Provider, X-AI-Key")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// AI Validate PPN endpoint (with Multi-tier DPA & Contextual Fallback)
+	mux.HandleFunc("POST /api/ai/validate-ppn", validatePPNHandler.Handle)
+	mux.HandleFunc("OPTIONS /api/ai/validate-ppn", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-AI-Provider, X-AI-Key")

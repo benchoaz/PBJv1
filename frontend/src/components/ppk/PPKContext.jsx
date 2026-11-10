@@ -39,6 +39,12 @@ export function PPKProvider({ children }) {
       }
       parsed.showKop = true;
       
+      // Auto-correct DKUPP typo to KEC.BESUK if current user is from Kecamatan Besuk
+      if ((currentUser?.department || '').toLowerCase().includes('besuk') && parsed.formatNomorSurat?.includes('DKUPP')) {
+        parsed.formatNomorSurat = parsed.formatNomorSurat.replace('DKUPP', 'KEC.BESUK');
+        localStorage.setItem('pbj_doc_settings', JSON.stringify(parsed));
+      }
+      
       // Fallback for empty strings (so that we don't render blank text if user saved empty strings)
       const finalSettings = { ...defaultSettings, ...parsed };
       if (!finalSettings.namaPemda?.trim()) finalSettings.namaPemda = defaultSettings.namaPemda;
@@ -98,6 +104,7 @@ export function PPKProvider({ children }) {
   const [hpsPrices, setHpsPrices] = useState(() => { const s = localStorage.getItem('pbj_hps_prices'); return s ? JSON.parse(s) : {}; });
   const [negotiatedPrices, setNegotiatedPrices] = useState(() => { const s = localStorage.getItem('pbj_negotiated_prices'); return s ? JSON.parse(s) : {}; });
   const [negotiatedBeforeTaxPrices, setNegotiatedBeforeTaxPrices] = useState(() => { const s = localStorage.getItem('pbj_negotiated_before_tax_prices'); return s ? JSON.parse(s) : {}; });
+  const [ppnExemptItems, setPpnExemptItems] = useState(() => { const s = localStorage.getItem('pbj_ppn_exempt_items'); return s ? JSON.parse(s) : {}; });
   const [techSpecs, setTechSpecs] = useState(() => localStorage.getItem('pbj_tech_specs') || '');
   const [dppSpecs, setDppSpecs] = useState(() => {
     const s = localStorage.getItem('pbj_dpp_specs');
@@ -121,7 +128,23 @@ export function PPKProvider({ children }) {
       return base;
     }
   });
-  const [packageMetadata, setPackageMetadata] = useState(() => { const s = localStorage.getItem('pbj_package_metadata'); return s ? JSON.parse(s) : { lokasi_pekerjaan: '', waktu_penyelesaian: '14 (empat belas) hari kalender', program: '', kegiatan: '', sub_kegiatan: '', nomor_dpp: '' }; });
+  const [packageMetadata, setPackageMetadata] = useState(() => { 
+    const s = localStorage.getItem('pbj_package_metadata'); 
+    return s ? JSON.parse(s) : { 
+      lokasi_pekerjaan: '', 
+      waktu_penyelesaian: '14 (empat belas) hari kalender', 
+      program: '', 
+      kegiatan: '', 
+      sub_kegiatan: '', 
+      nomor_dpp: '',
+      tanggal_dpp: '',
+      nomor_nd: '',
+      tanggal_nd: '',
+      nomor_bahp: '',
+      tanggal_bahp: '',
+      id_rup: ''
+    }; 
+  });
   const [selectedTplId, setSelectedTplId] = useState(() => localStorage.getItem('pbj_selected_tpl_id') || '');
   const [selectedNdTplId, setSelectedNdTplId] = useState(() => localStorage.getItem('pbj_selected_nd_tpl_id') || '');
   const [matchedDpaTypes, setMatchedDpaTypes] = useState(() => { const s = localStorage.getItem('pbj_matched_dpa_types'); return s ? JSON.parse(s) : []; });
@@ -219,6 +242,7 @@ export function PPKProvider({ children }) {
   useEffect(() => { localStorage.setItem('pbj_hps_prices', JSON.stringify(hpsPrices)); }, [hpsPrices]);
   useEffect(() => { localStorage.setItem('pbj_negotiated_prices', JSON.stringify(negotiatedPrices)); }, [negotiatedPrices]);
   useEffect(() => { localStorage.setItem('pbj_negotiated_before_tax_prices', JSON.stringify(negotiatedBeforeTaxPrices)); }, [negotiatedBeforeTaxPrices]);
+  useEffect(() => { localStorage.setItem('pbj_ppn_exempt_items', JSON.stringify(ppnExemptItems)); }, [ppnExemptItems]);
   useEffect(() => { localStorage.setItem('pbj_hps_value', hpsValue); }, [hpsValue]);
   useEffect(() => { localStorage.setItem('pbj_tech_specs', techSpecs); }, [techSpecs]);
   useEffect(() => { localStorage.setItem('pbj_dpp_specs', JSON.stringify(dppSpecs)); }, [dppSpecs]);
@@ -381,11 +405,13 @@ export function PPKProvider({ children }) {
     localStorage.removeItem('pbj_comparisons');
     localStorage.removeItem('pbj_justifications');
     localStorage.removeItem('pbj_auto_comparator');
+    localStorage.removeItem('pbj_ppn_exempt_items');
     
     setDpaName(null);
     setComparisons({});
     setJustifications({});
     setAutoComparator(false);
+    setPpnExemptItems({});
     setScrapedData([]);
     setMatchedDpaTypes([]);
     setSelectedPack(null);
@@ -398,7 +424,20 @@ export function PPKProvider({ children }) {
     setSirupPackages([]);
     setIsHpsExemptSelected(false);
     setSurveyData(null);
-    setPackageMetadata({ lokasi_pekerjaan: '', waktu_penyelesaian: '14 (empat belas) hari kalender', program: '', kegiatan: '', sub_kegiatan: '', nomor_dpp: '' });
+    setPackageMetadata({ 
+      lokasi_pekerjaan: '', 
+      waktu_penyelesaian: '14 (empat belas) hari kalender', 
+      program: '', 
+      kegiatan: '', 
+      sub_kegiatan: '', 
+      nomor_dpp: '',
+      tanggal_dpp: '',
+      nomor_nd: '',
+      tanggal_nd: '',
+      nomor_bahp: '',
+      tanggal_bahp: '',
+      id_rup: ''
+    });
     setNamaAcara('');
     setCurrentProjectId(null);
     setStatus('Draft');
@@ -618,7 +657,11 @@ export function PPKProvider({ children }) {
           nomor_sub_kegiatan: nomor_sub_kegiatan,
           sumber_dana: sumber_dana,
           nomor_dpp: md.nomor_dpp || parsed.nomor_dpp || '',
+          tanggal_dpp: md.tanggal_dpp || parsed.tanggal_dpp || '',
           nomor_nd: md.nomor_nd || parsed.nomor_nd || '',
+          tanggal_nd: md.tanggal_nd || parsed.tanggal_nd || '',
+          nomor_bahp: md.nomor_bahp || parsed.nomor_bahp || '',
+          tanggal_bahp: md.tanggal_bahp || parsed.tanggal_bahp || '',
           id_rup: cleanIdRup
         });
       } else {
@@ -634,7 +677,11 @@ export function PPKProvider({ children }) {
           nomor_sub_kegiatan: '',
           sumber_dana: '',
           nomor_dpp: parsed.nomor_dpp || '',
+          tanggal_dpp: parsed.tanggal_dpp || '',
           nomor_nd: parsed.nomor_nd || '',
+          tanggal_nd: parsed.tanggal_nd || '',
+          nomor_bahp: parsed.nomor_bahp || '',
+          tanggal_bahp: parsed.tanggal_bahp || '',
           id_rup: cleanIdRup
         });
       }
@@ -657,13 +704,20 @@ export function PPKProvider({ children }) {
       if (parsed.negotiatedBeforeTaxPrices) {
         setNegotiatedBeforeTaxPrices(parsed.negotiatedBeforeTaxPrices);
       }
+      if (parsed.ppnExemptItems) {
+        setPpnExemptItems(parsed.ppnExemptItems);
+      }
 
       if (parsed.tanggalSurat) setTanggalSurat(parsed.tanggalSurat);
       if (parsed.comparisons) setComparisons(parsed.comparisons);
       if (parsed.justifications) setJustifications(parsed.justifications);
       if (parsed.autoComparator !== undefined) setAutoComparator(parsed.autoComparator);
       if (parsed.selectedNdTplId) setSelectedNdTplId(parsed.selectedNdTplId);
+      else setSelectedNdTplId('');
       if (parsed.selectedTplId) setSelectedTplId(parsed.selectedTplId);
+      else if (parsed.selectedPack?.dppTemplateId) setSelectedTplId(parsed.selectedPack.dppTemplateId);
+      else if (parsed.dppSpecs?.templateId) setSelectedTplId(parsed.dppSpecs.templateId);
+      else setSelectedTplId(''); // Reset agar defaultTplId dari nama paket yang berlaku
 
       // 💡 RE-HYDRATION RESTORATION: Jika browser history / localStorage terhapus, pulihkan kembali dari DB Sentral PostgreSQL
       try {
@@ -672,6 +726,7 @@ export function PPKProvider({ children }) {
         if (parsed.hpsPrices) localStorage.setItem('pbj_hps_prices', JSON.stringify(parsed.hpsPrices));
         if (parsed.negotiatedPrices) localStorage.setItem('pbj_negotiated_prices', JSON.stringify(parsed.negotiatedPrices));
         if (parsed.negotiatedBeforeTaxPrices) localStorage.setItem('pbj_negotiated_before_tax_prices', JSON.stringify(parsed.negotiatedBeforeTaxPrices));
+        if (parsed.ppnExemptItems) localStorage.setItem('pbj_ppn_exempt_items', JSON.stringify(parsed.ppnExemptItems));
         if (parsed.packageMetadata) localStorage.setItem('pbj_package_metadata', JSON.stringify(parsed.packageMetadata));
         if (parsed.dppSpecs) localStorage.setItem('pbj_dpp_specs', JSON.stringify(parsed.dppSpecs));
         if (parsed.comparisons) localStorage.setItem('pbj_comparisons', JSON.stringify(parsed.comparisons));
@@ -733,6 +788,7 @@ export function PPKProvider({ children }) {
           hpsPrices,
           negotiatedPrices,
           negotiatedBeforeTaxPrices,
+          ppnExemptItems,
           tanggalSurat,
           selectedTplId,
           selectedNdTplId,
@@ -796,7 +852,7 @@ export function PPKProvider({ children }) {
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [step, surveyData, dpaRincian, hpsPrices, negotiatedPrices, negotiatedBeforeTaxPrices, dppSpecs, isHpsExemptSelected, comparisons, justifications, autoComparator, status]);
+  }, [step, surveyData, dpaRincian, hpsPrices, negotiatedPrices, negotiatedBeforeTaxPrices, dppSpecs, isHpsExemptSelected, comparisons, justifications, autoComparator, status, selectedTplId, packageMetadata]);
 
   const value = {
     comparisons, setComparisons,
@@ -815,6 +871,7 @@ export function PPKProvider({ children }) {
     hpsPrices, setHpsPrices,
     negotiatedPrices, setNegotiatedPrices,
     negotiatedBeforeTaxPrices, setNegotiatedBeforeTaxPrices,
+    ppnExemptItems, setPpnExemptItems,
     techSpecs, setTechSpecs,
     dppSpecs, setDppSpecs,
     packageMetadata, setPackageMetadata,

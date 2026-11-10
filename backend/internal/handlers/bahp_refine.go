@@ -80,7 +80,7 @@ func RefineBahp(w http.ResponseWriter, r *http.Request) {
 
 	itemsJSON, _ := json.Marshal(req.Items)
 
-	prompt := fmt.Sprintf(`Anda adalah ahli hukum pengadaan barang/jasa pemerintah Indonesia yang berpengalaman dalam menyusun dokumen BAHP (Berita Acara Hasil Pemilihan) sesuai Perpres No. 12 Tahun 2021 dan Peraturan LKPP No. 9 Tahun 2021.
+	prompt := fmt.Sprintf(`Anda adalah ahli hukum pengadaan barang/jasa pemerintah Indonesia yang berpengalaman dalam menyusun dokumen BAHP (Berita Acara Hasil Pemilihan) sesuai Perpres No. 12 Tahun 2021, Perka LKPP No. 2 Tahun 2026, dan Peraturan LKPP No. 9 Tahun 2021.
 
 Tugas Anda: Buat teks hukum yang sempurna, rapi, dan sesuai kaidah hukum pengadaan Indonesia untuk dokumen BAHP e-Purchasing Katalog Elektronik.
 

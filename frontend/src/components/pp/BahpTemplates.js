@@ -2,6 +2,7 @@
  * BahpTemplates.js
  * Template BAHP profesional per jenis pengadaan — disusun berdasarkan:
  * - Perpres 12/2021 tentang Pengadaan Barang/Jasa Pemerintah
+ * - Perka LKPP No. 2 Tahun 2026 tentang Pedoman Pengadaan Barang/Jasa Pemerintah Melalui E-Purchasing
  * - Perlem LKPP 9/2021 tentang Toko Daring dan Katalog Elektronik
  * - Perlem LKPP 11/2021 tentang Perencanaan Pengadaan
  * - Perlem LKPP 12/2021 tentang Pelaksanaan Pengadaan (Lamp. IV, V, VI)
@@ -94,6 +95,7 @@ export const BAHP_TEMPLATE_TYPES = [
 export const DASAR_HUKUM = {
   atk: [
     'Peraturan Presiden Nomor 16 Tahun 2018 sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021 tentang Pengadaan Barang/Jasa Pemerintah;',
+    'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah (Perka LKPP) Nomor 2 Tahun 2026 tentang Pedoman Pengadaan Barang/Jasa Pemerintah Melalui E-Purchasing;',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 9 Tahun 2021 tentang Toko Daring dan Katalog Elektronik dalam Pengadaan Barang/Jasa Pemerintah;',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 11 Tahun 2021 tentang Pedoman Perencanaan Pengadaan Barang/Jasa Pemerintah;',
     'Keputusan Kepala LKPP tentang Penyelenggaraan Katalog Elektronik Sektoral Pemerintah Daerah;',
@@ -101,6 +103,7 @@ export const DASAR_HUKUM = {
   ],
   mamin: [
     'Peraturan Presiden Nomor 16 Tahun 2018 sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021 tentang Pengadaan Barang/Jasa Pemerintah;',
+    'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah (Perka LKPP) Nomor 2 Tahun 2026 tentang Pedoman Pengadaan Barang/Jasa Pemerintah Melalui E-Purchasing;',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 9 Tahun 2021 tentang Toko Daring dan Katalog Elektronik;',
     'Peraturan Menteri Dalam Negeri Nomor 77 Tahun 2020 tentang Pedoman Teknis Pengelolaan Keuangan Daerah, khususnya terkait belanja barang pakai habis;',
     'Surat Edaran Kepala LKPP Nomor 3 Tahun 2022 tentang Pelaksanaan Pengadaan Makanan dan Minuman melalui e-Purchasing Katalog Elektronik;',
@@ -109,6 +112,7 @@ export const DASAR_HUKUM = {
   ],
   jasa: [
     'Peraturan Presiden Nomor 16 Tahun 2018 sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021 tentang Pengadaan Barang/Jasa Pemerintah;',
+    'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah (Perka LKPP) Nomor 2 Tahun 2026 tentang Pedoman Pengadaan Barang/Jasa Pemerintah Melalui E-Purchasing;',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 9 Tahun 2021 tentang Toko Daring dan Katalog Elektronik;',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 12 Tahun 2021 tentang Pedoman Pelaksanaan Pengadaan Barang/Jasa Pemerintah Melalui Penyedia;',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 7 Tahun 2021 tentang Sumber Daya Manusia Pengadaan Barang/Jasa;',
@@ -116,6 +120,7 @@ export const DASAR_HUKUM = {
   ],
   modal: [
     'Peraturan Presiden Nomor 16 Tahun 2018 sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021 tentang Pengadaan Barang/Jasa Pemerintah;',
+    'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah (Perka LKPP) Nomor 2 Tahun 2026 tentang Pedoman Pengadaan Barang/Jasa Pemerintah Melalui E-Purchasing;',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 9 Tahun 2021 tentang Toko Daring dan Katalog Elektronik;',
     'Peraturan Menteri Keuangan tentang Standar Biaya Masukan (SBM) Tahun Anggaran berjalan;',
     'Peraturan Menteri Perindustrian Nomor 46 Tahun 2022 tentang Ketentuan dan Tata Cara Penghitungan Nilai Tingkat Komponen Dalam Negeri (TKDN) Produk Barang;',
@@ -124,6 +129,7 @@ export const DASAR_HUKUM = {
   ],
   pemeliharaan: [
     'Peraturan Presiden Nomor 16 Tahun 2018 sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021 tentang Pengadaan Barang/Jasa Pemerintah;',
+    'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah (Perka LKPP) Nomor 2 Tahun 2026 tentang Pedoman Pengadaan Barang/Jasa Pemerintah Melalui E-Purchasing;',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 12 Tahun 2021 tentang Pedoman Pelaksanaan Pengadaan Barang/Jasa Pemerintah Melalui Penyedia;',
     'Peraturan Pemerintah Nomor 27 Tahun 2014 sebagaimana telah diubah dengan PP Nomor 28 Tahun 2020 tentang Pengelolaan Barang Milik Negara/Daerah (kewajiban pemeliharaan aset tetap pemerintah);',
     'Peraturan Menteri Dalam Negeri Nomor 19 Tahun 2016 tentang Pedoman Pengelolaan Barang Milik Daerah, khususnya terkait belanja pemeliharaan;',
@@ -131,6 +137,7 @@ export const DASAR_HUKUM = {
   ],
   konstruksi: [
     'Peraturan Presiden Nomor 16 Tahun 2018 sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021 tentang Pengadaan Barang/Jasa Pemerintah;',
+    'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah (Perka LKPP) Nomor 2 Tahun 2026 tentang Pedoman Pengadaan Barang/Jasa Pemerintah Melalui E-Purchasing;',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 12 Tahun 2021 tentang Pedoman Pelaksanaan Pengadaan Barang/Jasa Pemerintah Melalui Penyedia, Lampiran V Pekerjaan Konstruksi;',
     'Undang-Undang Nomor 2 Tahun 2017 tentang Jasa Konstruksi sebagaimana telah diubah dengan Undang-Undang Nomor 11 Tahun 2020 tentang Cipta Kerja;',
     'Peraturan Pemerintah Nomor 22 Tahun 2020 sebagaimana telah diubah dengan PP Nomor 14 Tahun 2021 tentang Peraturan Pelaksanaan UU Jasa Konstruksi;',
@@ -139,6 +146,7 @@ export const DASAR_HUKUM = {
   ],
   konsultasi_non: [
     'Peraturan Presiden Nomor 16 Tahun 2018 sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021 tentang Pengadaan Barang/Jasa Pemerintah, khususnya Pasal 3 huruf c tentang Jasa Konsultansi;',
+    'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah (Perka LKPP) Nomor 2 Tahun 2026 tentang Pedoman Pengadaan Barang/Jasa Pemerintah Melalui E-Purchasing;',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 12 Tahun 2021 tentang Pedoman Pelaksanaan Pengadaan Barang/Jasa Pemerintah Melalui Penyedia, Lampiran VI Jasa Konsultansi Non-Konstruksi;',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 7 Tahun 2021 tentang Sumber Daya Manusia Pengadaan Barang/Jasa;',
     'Surat Edaran Kepala LKPP Nomor 22 Tahun 2021 tentang Pengadaan Jasa Konsultansi Perencanaan dan Pengawasan Konstruksi melalui Pengadaan Langsung;',
@@ -147,6 +155,7 @@ export const DASAR_HUKUM = {
   ],
   konsultasi_konstruksi: [
     'Peraturan Presiden Nomor 16 Tahun 2018 sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021 tentang Pengadaan Barang/Jasa Pemerintah, Pasal 3 huruf c;',
+    'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah (Perka LKPP) Nomor 2 Tahun 2026 tentang Pedoman Pengadaan Barang/Jasa Pemerintah Melalui E-Purchasing;',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 12 Tahun 2021, Lampiran VI Jasa Konsultansi, khususnya bagian Konsultansi Konstruksi;',
     'Undang-Undang Nomor 2 Tahun 2017 tentang Jasa Konstruksi sebagaimana diubah dengan UU Nomor 11 Tahun 2020 (persyaratan SKA/SKK perencana/pengawas konstruksi);',
     'Peraturan Pemerintah Nomor 22 Tahun 2020 jo PP Nomor 14 Tahun 2021 tentang Peraturan Pelaksanaan UU Jasa Konstruksi;',
@@ -157,6 +166,7 @@ export const DASAR_HUKUM = {
   ],
   konsolidasi: [
     'Peraturan Presiden Nomor 16 Tahun 2018 sebagaimana telah diubah dengan Peraturan Presiden Nomor 12 Tahun 2021 tentang Pengadaan Barang/Jasa Pemerintah, khususnya Pasal 20 tentang Konsolidasi Pengadaan Barang/Jasa;',
+    'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah (Perka LKPP) Nomor 2 Tahun 2026 tentang Pedoman Pengadaan Barang/Jasa Pemerintah Melalui E-Purchasing;',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 11 Tahun 2021 tentang Pedoman Perencanaan Pengadaan Barang/Jasa Pemerintah (pengaturan konsolidasi dalam perencanaan);',
     'Peraturan Lembaga Kebijakan Pengadaan Barang/Jasa Pemerintah Nomor 9 Tahun 2021 tentang Toko Daring dan Katalog Elektronik;',
     'Surat Keputusan Penetapan Penyedia Terkonsolidasi dari Pejabat yang berwenang (UKPBJ/PA/KPA);',

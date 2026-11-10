@@ -168,15 +168,8 @@ export function detectProcurementCategory(pack, templateId = '', dppSpecs = {}) 
   const tpl = (templateId || '').toUpperCase();
   const jenisMaint = dppSpecs?.jenisPemeliharaan || 'kendaraan';
 
-  // 1. Cek Pemeliharaan dahulu
-  const isMaintenance = tpl === 'TPL-006F' || 
-    packName.includes('pemeliharaan') || 
-    packName.includes('perawatan') || 
-    packName.includes('servis') || 
-    packName.includes('service') ||
-    subGiat.includes('pemeliharaan');
-
-  if (isMaintenance) {
+  // 0. JIKA TEMPLATE EKSPLISIT DITENTUKAN, IKUTI TEMPLATE
+  if (tpl === 'TPL-006F') {
     if (jenisMaint === 'gedung' || packName.includes('gedung') || packName.includes('bangunan') || packName.includes('kantor')) {
       return PROCUREMENT_CATEGORIES.MAINTENANCE_GEDUNG;
     }
@@ -185,9 +178,15 @@ export function detectProcurementCategory(pack, templateId = '', dppSpecs = {}) 
     }
     return PROCUREMENT_CATEGORIES.MAINTENANCE_KENDARAAN;
   }
+  if (tpl === 'TPL-006B') return PROCUREMENT_CATEGORIES.MAMIN;
+  if (tpl === 'TPL-006G') return PROCUREMENT_CATEGORIES.KONSTRUKSI;
+  if (tpl === 'TPL-006C') return PROCUREMENT_CATEGORIES.MODAL;
+  if (tpl === 'TPL-006E') return PROCUREMENT_CATEGORIES.SERAGAM;
+  if (tpl === 'TPL-006D') return PROCUREMENT_CATEGORIES.JASA_LAINNYA;
+  if (tpl === 'TPL-006A') return PROCUREMENT_CATEGORIES.ATK;
 
-  // 2. Cek Makanan & Minuman
-  const isMamin = tpl === 'TPL-006B' ||
+  // 1. Cek Makanan & Minuman terlebih dahulu (sangat spesifik)
+  const isMamin = 
     packName.includes('makan') ||
     packName.includes('minum') ||
     packName.includes('mamin') ||
@@ -200,6 +199,24 @@ export function detectProcurementCategory(pack, templateId = '', dppSpecs = {}) 
 
   if (isMamin) {
     return PROCUREMENT_CATEGORIES.MAMIN;
+  }
+
+  // 2. Cek Pemeliharaan (Abaikan "pemeliharaan keutuhan" pada wawasan kebangsaan/NKRI)
+  const isMaintenance = 
+    packName.includes('servis') || 
+    packName.includes('service') ||
+    packName.includes('perawatan') || 
+    (packName.includes('pemeliharaan') && !packName.includes('pemeliharaan keutuhan')) ||
+    (subGiat.includes('pemeliharaan') && !subGiat.includes('pemeliharaan keutuhan'));
+
+  if (isMaintenance) {
+    if (jenisMaint === 'gedung' || packName.includes('gedung') || packName.includes('bangunan') || packName.includes('kantor')) {
+      return PROCUREMENT_CATEGORIES.MAINTENANCE_GEDUNG;
+    }
+    if (jenisMaint === 'lainnya' || packName.includes('ac') || packName.includes('genset') || packName.includes('pompa')) {
+      return PROCUREMENT_CATEGORIES.MAINTENANCE_LAINNYA;
+    }
+    return PROCUREMENT_CATEGORIES.MAINTENANCE_KENDARAAN;
   }
 
   // 3. Cek Konstruksi Fisik

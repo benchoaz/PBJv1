@@ -36,6 +36,7 @@ Sehubungan dengan kebutuhan operasional di lingkungan {{nama_satker}}, bersama i
 Nama Pekerjaan : {{nama_pekerjaan}}
 Nilai Pagu     : {{nilai_pagu}}
 Sumber Dana    : {{sumber_dana}}
+ID RUP (SiRUP) : {{id_rup}}
 
 Berkenaan dengan hal tersebut, mohon bantuan Saudara untuk dapat memproses pengadaan dimaksud sesuai dengan ketentuan perundang-undangan yang berlaku.
 
@@ -490,10 +491,14 @@ export default function TemplateSuratManager() {
     if (saved) {
       try { 
         let parsed = JSON.parse(saved);
-        // Force update TPL-006 templates to new structure
+        // Force update TPL-006 templates and TPL-001 (ID RUP) to new structure
         parsed = parsed.map(pt => {
           if (pt.id && pt.id.startsWith('TPL-006')) {
             const dt = DEFAULT_TEMPLATES.find(d => d.id === pt.id);
+            if (dt) return dt;
+          }
+          if (pt.id === 'TPL-001' && !pt.content.includes('{{id_rup}}') && !/ID\s*RUP/i.test(pt.content)) {
+            const dt = DEFAULT_TEMPLATES.find(d => d.id === 'TPL-001');
             if (dt) return dt;
           }
           return pt;

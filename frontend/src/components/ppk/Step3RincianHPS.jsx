@@ -6,6 +6,7 @@ import InaprocTaxHelper from '../common/InaprocTaxHelper';
 import { dialog } from '../../utils/dialog';
 import { getTimeConfigForPackage, getDefaultWaktuForPackage } from '../../config/procurementTimeConfig';
 import { formatTitleCase } from '../../config/maintenanceConfig';
+import { calculateItemTax, detectItemPpnFallback, validateItemPpnWithAI } from '../../utils/ppnDetector';
 
 const getDynamicProductLink = (vendorName, keyword) => {
   if (!vendorName) return '';
@@ -78,6 +79,7 @@ export default function Step3RincianHPS() {
     hpsPrices, setHpsPrices,
     negotiatedPrices, setNegotiatedPrices,
     negotiatedBeforeTaxPrices, setNegotiatedBeforeTaxPrices,
+    ppnExemptItems, setPpnExemptItems,
     techSpecs, setTechSpecs,
     packageMetadata, setPackageMetadata,
     selectedTplId, setSelectedTplId,
@@ -102,6 +104,140 @@ export default function Step3RincianHPS() {
 
   const [copiedDppKey, setCopiedDppKey] = useState(null);
   const [expandedTaxRows, setExpandedTaxRows] = useState({});
+  const [isValidatingPpn, setIsValidatingPpn] = useState(false);
+
+  const isItemPpnExempt = (itemName) => {
+    if (!ppnExemptItems) return false;
+    const entry = ppnExemptItems[itemName];
+    if (typeof entry === 'boolean') return entry;
+    return !!entry?.isExempt;
+  };
+
+  const getItemPpnDetails = (itemName, item) => {
+    const entry = ppnExemptItems?.[itemName];
+    if (entry && typeof entry === 'object') {
+      return entry;
+    }
+    const matchedAcc = dpaAccounts?.find(a => areAccountsCompatible(a.account, selectedPack?.mak));
+    return detectItemPpnFallback(item, {
+      account: matchedAcc?.account,
+      accountName: matchedAcc?.name,
+      kodeRekening: matchedAcc?.account,
+      uraianRekening: matchedAcc?.name,
+      vendor: item?.vendor,
+    });
+  };
+
+  // Initial detection for new items if not already set (runs locally with zero lag)
+  useEffect(() => {
+    const items = getPackageItems(selectedPack);
+    if (!items || items.length === 0) return;
+
+    const matchedAcc = dpaAccounts?.find(a => areAccountsCompatible(a.account, selectedPack?.mak));
+    let changed = false;
+    const newExemptMap = { ...(ppnExemptItems || {}) };
+
+    items.forEach(item => {
+      if (newExemptMap[item.name] === undefined) {
+        const det = detectItemPpnFallback(item, {
+          account: matchedAcc?.account,
+          accountName: matchedAcc?.name,
+          kodeRekening: matchedAcc?.account,
+          uraianRekening: matchedAcc?.name,
+          vendor: item.vendor,
+        });
+        if (det.isExempt) {
+          newExemptMap[item.name] = det;
+          changed = true;
+        }
+      }
+    });
+
+    if (changed) {
+      setPpnExemptItems(newExemptMap);
+    }
+  }, [selectedPack, dpaAccounts]);
+
+  const handleTogglePpnExempt = (item) => {
+    const currentExempt = isItemPpnExempt(item.name);
+    const newExempt = !currentExempt;
+    const dpa = item.price || 0;
+    const unitHps = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : dpa;
+    const currTotal = negotiatedPrices?.[item.name] || unitHps;
+
+    const newTax = calculateItemTax(currTotal, newExempt);
+
+    setPpnExemptItems(prev => ({
+      ...prev,
+      [item.name]: {
+        isExempt: newExempt,
+        rate: newExempt ? 0 : 11,
+        statusPpn: newExempt ? 'Bebas/Tidak Dikenakan PPN' : 'Dikenakan PPN',
+        dasarHukum: newExempt
+          ? 'Pasal 4A UU PPN jo. UU HKPD (Objek Pajak Daerah/PBJT, PPN = 0%)'
+          : 'Pasal 4 ayat (1) UU PPN jo. UU HPP (Barang Kena Pajak Umum)',
+        metodeDeteksi: 'manual',
+        confidence: 100,
+        ...newTax
+      }
+    }));
+
+    setNegotiatedBeforeTaxPrices(prev => ({ ...prev, [item.name]: newTax.dpp }));
+    setNegotiatedPrices(prev => ({ ...prev, [item.name]: newTax.total }));
+    setIsSigned(false);
+    if (step === 4) setStep(3);
+  };
+
+  const handleDetectAllPpnStatus = async () => {
+    const items = getPackageItems(selectedPack);
+    if (!items || items.length === 0) return;
+
+    setIsValidatingPpn(true);
+    const matchedAcc = dpaAccounts?.find(a => areAccountsCompatible(a.account, selectedPack?.mak));
+    const newExemptMap = { ...(ppnExemptItems || {}) };
+    const newBeforeTax = { ...(negotiatedBeforeTaxPrices || {}) };
+    const newNego = { ...(negotiatedPrices || {}) };
+
+    let exemptCount = 0;
+    let bkpCount = 0;
+
+    for (const item of items) {
+      const result = await validateItemPpnWithAI(item, {
+        account: matchedAcc?.account,
+        accountName: matchedAcc?.name,
+        kodeRekening: matchedAcc?.account,
+        uraianRekening: matchedAcc?.name,
+        vendor: item.vendor,
+      });
+
+      newExemptMap[item.name] = result;
+      if (result.isExempt) {
+        exemptCount++;
+      } else {
+        bkpCount++;
+      }
+
+      const dpa = item.price || 0;
+      const unitHps = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : dpa;
+      const currTotal = negotiatedPrices?.[item.name] || unitHps;
+      const tax = calculateItemTax(currTotal, result.isExempt);
+      newBeforeTax[item.name] = tax.dpp;
+      newNego[item.name] = tax.total;
+    }
+
+    setPpnExemptItems(newExemptMap);
+    setNegotiatedBeforeTaxPrices(newBeforeTax);
+    setNegotiatedPrices(newNego);
+    setIsValidatingPpn(false);
+
+    dialog.alert(
+      'Validasi Status PPN Selesai! 🛡️',
+      `Hasil validasi ${items.length} item pengadaan:\n\n` +
+      `• Bebas PPN (PBJT Daerah 0%): ${exemptCount} item\n` +
+      `• Dikenakan PPN (BKP 11%): ${bkpCount} item\n\n` +
+      `Status PPN dan DPP e-Katalog telah diperbarui otomatis. Anda juga dapat mengubah status per item secara manual kapan saja.`
+    );
+  };
 
   const handleCopyDpp = (dppValue, itemName) => {
     navigator.clipboard.writeText(dppValue.toString());
@@ -118,14 +254,26 @@ export default function Step3RincianHPS() {
     if (type === '2pct') targetNett = Math.floor(ceiling * 0.98);
     else if (type === '5pct') targetNett = Math.floor(ceiling * 0.95);
 
-    // Formula resmi INAPROC: PPN = (11/12 x DPP) x 12% = 11% Efektif
-    let dpp = Math.floor(targetNett / 1.11);
-    const vendorDpp = unitHps > 0 ? Math.floor(unitHps / 1.11) : 0;
-    if (vendorDpp > 0 && dpp >= vendorDpp && type === 'max') {
-      dpp = Math.max(0, vendorDpp - 1);
+    const isExempt = isItemPpnExempt(item.name);
+    let dpp, ppn, total;
+
+    if (isExempt) {
+      dpp = targetNett;
+      if (unitHps > 0 && dpp >= unitHps && type === 'max') {
+        dpp = Math.max(0, unitHps - 1);
+      }
+      ppn = 0;
+      total = dpp;
+    } else {
+      // Formula resmi INAPROC: PPN = (11/12 x DPP) x 12% = 11% Efektif
+      dpp = Math.floor(targetNett / 1.11);
+      const vendorDpp = unitHps > 0 ? Math.floor(unitHps / 1.11) : 0;
+      if (vendorDpp > 0 && dpp >= vendorDpp && type === 'max') {
+        dpp = Math.max(0, vendorDpp - 1);
+      }
+      ppn = Math.round((11 / 12) * dpp * 0.12);
+      total = dpp + ppn;
     }
-    const ppn = Math.round((11 / 12) * dpp * 0.12);
-    const total = dpp + ppn;
 
     setNegotiatedBeforeTaxPrices(prev => ({ ...prev, [item.name]: dpp }));
     setNegotiatedPrices(prev => ({ ...prev, [item.name]: total }));
@@ -142,17 +290,27 @@ export default function Step3RincianHPS() {
       const dpa = item.price || 0;
       const unitHps = hpsPrices[item.name] !== undefined ? hpsPrices[item.name] : dpa;
       const ceiling = (unitHps > 0 && unitHps < dpa) ? unitHps : dpa;
+      const isExempt = isItemPpnExempt(item.name);
 
-      const vendorDpp = unitHps > 0 ? Math.floor(unitHps / 1.11) : 0;
-      let dpp = Math.floor(ceiling / 1.11);
-      if (vendorDpp > 0 && dpp >= vendorDpp) {
-        dpp = Math.max(0, vendorDpp - 1);
+      if (isExempt) {
+        let dpp = ceiling;
+        if (unitHps > 0 && dpp >= unitHps) {
+          dpp = Math.max(0, unitHps - 1);
+        }
+        newBeforeTax[item.name] = dpp;
+        newNego[item.name] = dpp;
+      } else {
+        const vendorDpp = unitHps > 0 ? Math.floor(unitHps / 1.11) : 0;
+        let dpp = Math.floor(ceiling / 1.11);
+        if (vendorDpp > 0 && dpp >= vendorDpp) {
+          dpp = Math.max(0, vendorDpp - 1);
+        }
+        const ppn = Math.round((11 / 12) * dpp * 0.12);
+        const total = dpp + ppn;
+
+        newBeforeTax[item.name] = dpp;
+        newNego[item.name] = total;
       }
-      const ppn = Math.round((11 / 12) * dpp * 0.12);
-      const total = dpp + ppn;
-
-      newBeforeTax[item.name] = dpp;
-      newNego[item.name] = total;
     });
 
     setNegotiatedBeforeTaxPrices(newBeforeTax);
@@ -161,7 +319,7 @@ export default function Step3RincianHPS() {
     if (step === 4) setStep(3);
     dialog.alert(
       'Perhitungan Otomatis Selesai! ✅',
-      'Semua harga negosiasi sebelum pajak (DPP) telah dihitung otomatis sesuai ketentuan resmi e-Katalog LKPP:\n\n• PPN = (11/12 × Harga Produk) × 12% (11% Efektif)\n• Nilai tidak melebihi Pagu DPA & Harga Tayang\n\nSilakan klik tombol "Salin" pada produk untuk langsung mem-paste ke portal INAPROC.'
+      'Harga negosiasi sebelum pajak (DPP) telah dihitung otomatis:\n\n• Item BKP Umum: PPN = (11/12 × Harga) × 12% (11% Efektif)\n• Item Jasa Boga/Restoran: Bebas PPN (PBJT Daerah 0%)\n• Nilai tidak melebihi Pagu DPA & Harga Tayang\n\nSilakan klik tombol "Salin" pada produk untuk langsung mem-paste ke portal INAPROC.'
     );
   };
   const [isAiEditorOpen, setIsAiEditorOpen] = useState(true);
@@ -452,7 +610,7 @@ export default function Step3RincianHPS() {
     if (name.includes('nasi kotak') || name.includes('nasi bungkus') || name.includes('kotak')) return 'Mamin-Bungkus';
     if (name.includes('snack') || name.includes('kudapan')) return 'Mamin-Snack';
     if (name.includes('makan') || name.includes('minum') || name.includes('mamin') || name.includes('konsumsi')) return 'Mamin-Bungkus';
-    if (name.includes('jasa') || name.includes('pemeliharaan') || name.includes('service')) return 'Jasa';
+    if (name.includes('jasa') || (name.includes('pemeliharaan') && !name.includes('pemeliharaan keutuhan')) || name.includes('service') || name.includes('servis')) return 'Jasa';
     return 'ATK';
   };
 
@@ -1960,15 +2118,27 @@ export default function Step3RincianHPS() {
                         </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleAutoCalculateAllInaprocTax}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 shrink-0 self-stretch md:self-auto justify-center cursor-pointer"
-                      title="Hitung otomatis harga sebelum pajak yang aman di bawah DPA dan Tayang untuk semua barang"
-                    >
-                      <Sparkles className="w-4 h-4 text-emerald-200" />
-                      <span>⚡ Hitung Otomatis Nego e-Katalog Semua Item</span>
-                    </button>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 self-stretch md:self-auto">
+                      <button
+                        type="button"
+                        disabled={isValidatingPpn}
+                        onClick={handleDetectAllPpnStatus}
+                        className="px-3.5 py-2 bg-gradient-to-r from-amber-600 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 disabled:opacity-60 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 justify-center cursor-pointer"
+                        title="Deteksi otomatis status PPN (Bebas PPN Jasa Boga/Restoran vs PPN 11% BKP) via AI & Rekening DPA"
+                      >
+                        {isValidatingPpn ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <ShieldCheck className="w-4 h-4 text-amber-200" />}
+                        <span>{isValidatingPpn ? 'Menganalisis Pajak...' : '🛡️ Deteksi Status PPN (AI & DPA)'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAutoCalculateAllInaprocTax}
+                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 justify-center cursor-pointer"
+                        title="Hitung otomatis harga sebelum pajak yang aman di bawah DPA dan Tayang untuk semua barang"
+                      >
+                        <Sparkles className="w-4 h-4 text-emerald-200" />
+                        <span>⚡ Hitung Nego Semua Item</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="w-full">
@@ -2274,8 +2444,8 @@ export default function Step3RincianHPS() {
                                     <span className="md:hidden text-[9px] font-bold text-slate-400 uppercase tracking-wider inline-block w-32 font-sans">Pagu DPA:</span>
                                     <div>
                                       <span>Rp&nbsp;{(item.price || 0).toLocaleString()}</span>
-                                      <span className="block text-[8.5px] text-slate-400 font-sans mt-0.5" title="Nilai sebelum PPN 11% (DPP)">
-                                        Sblm PPN: Rp {Math.floor((item.price || 0) / 1.11).toLocaleString('id-ID')}
+                                      <span className="block text-[8.5px] text-slate-400 font-sans mt-0.5" title={isItemPpnExempt(item.name) ? "Bebas PPN (PBJT Daerah 0%)" : "Nilai sebelum PPN 11% (DPP)"}>
+                                        Sblm PPN: Rp {(isItemPpnExempt(item.name) ? (item.price || 0) : Math.floor((item.price || 0) / 1.11)).toLocaleString('id-ID')}
                                       </span>
                                     </div>
                                   </div>
@@ -2309,23 +2479,55 @@ export default function Step3RincianHPS() {
                                       title="Harga tayang resmi e-Katalog LKPP (termasuk pajak)"
                                     />
                                   </div>
-                                  <div className="text-[8.5px] text-slate-400 font-sans text-right mt-0.5" title="Nilai sebelum PPN 11% (DPP)">
-                                    Sblm PPN: Rp {Math.floor(unitHpsPrice / 1.11).toLocaleString('id-ID')}
+                                  <div className="text-[8.5px] text-slate-400 font-sans text-right mt-0.5" title={isItemPpnExempt(item.name) ? "Bebas PPN (PBJT Daerah 0%)" : "Nilai sebelum PPN 11% (DPP)"}>
+                                    Sblm PPN: Rp {(isItemPpnExempt(item.name) ? unitHpsPrice : Math.floor(unitHpsPrice / 1.11)).toLocaleString('id-ID')}
                                   </div>
                                   {isOverbudget && <div className="text-[9px] font-bold text-rose-500 text-right mt-1 animate-pulse">⚠️ Melebihi Pagu</div>}
                                 </td>
                                 <td className="block md:table-cell py-2 md:py-3 px-0 md:px-2 text-right mt-2 md:mt-0 bg-indigo-50/20 md:bg-indigo-50/30">
                                   <div className="md:hidden text-[9px] font-bold text-indigo-700 uppercase tracking-wider mb-1.5 text-left">Harga Negosiasi:</div>
                                   {(() => {
-                                    // Hitung sebelum pajak (DPP) & PPN: PPN = (11/12 x Harga Produk) x 12% = 11% Efektif
+                                    const isExempt = isItemPpnExempt(item.name);
+                                    const ppnDetails = getItemPpnDetails(item.name, item);
+
+                                    // Hitung sebelum pajak (DPP) & PPN
                                     const beforeTaxPrice = (negotiatedBeforeTaxPrices && negotiatedBeforeTaxPrices[item.name] !== undefined)
                                       ? negotiatedBeforeTaxPrices[item.name]
-                                      : Math.floor(unitNegoPrice / 1.11);
-                                    const ppnVal = Math.round((11 / 12) * beforeTaxPrice * 0.12);
+                                      : (isExempt ? unitNegoPrice : Math.floor(unitNegoPrice / 1.11));
+                                    const ppnVal = isExempt ? 0 : Math.round((11 / 12) * beforeTaxPrice * 0.12);
                                     const isCopied = copiedDppKey === item.name;
 
                                     return (
                                       <div className="flex flex-col gap-1.5 w-full">
+                                        {/* Status PPN & Interactive Manual Override Toggle */}
+                                        <div className="flex items-center justify-between gap-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleTogglePpnExempt(item)}
+                                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-extrabold border transition-all cursor-pointer ${
+                                              isExempt
+                                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+                                                : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
+                                            }`}
+                                            title={ppnDetails?.dasarHukum || (isExempt ? 'Bebas PPN (Objek PBJT Daerah 0%) - Klik untuk ubah' : 'Dikenakan PPN 11% (BKP) - Klik untuk ubah')}
+                                          >
+                                            {isExempt ? (
+                                              <>
+                                                <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
+                                                <span>Bebas PPN (PBJT 0%)</span>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                                <span>PPN 11% (BKP)</span>
+                                              </>
+                                            )}
+                                          </button>
+                                          <span className="text-[7.5px] text-slate-400 font-sans">
+                                            {isExempt ? (ppnDetails?.metodeDeteksi === 'dpa_account' ? 'via Rekening DPA' : ppnDetails?.metodeDeteksi === 'ai' ? 'via AI' : 'Bebas PBJT') : 'Ubah ↺'}
+                                          </span>
+                                        </div>
+
                                         {/* Card Input Nego Sebelum Pajak (Harga Produk untuk e-Katalog) */}
                                         <div className="bg-white border-2 border-emerald-300 rounded-xl p-2 shadow-xs text-left">
                                           <div className="flex items-center justify-between text-[9px] font-bold text-slate-700 mb-1">
@@ -2355,7 +2557,7 @@ export default function Step3RincianHPS() {
                                               value={beforeTaxPrice}
                                               onChange={(e) => {
                                                 const newDpp = Math.max(0, parseFloat(e.target.value) || 0);
-                                                const newPpn = Math.round((11 / 12) * newDpp * 0.12);
+                                                const newPpn = isExempt ? 0 : Math.round((11 / 12) * newDpp * 0.12);
                                                 const newTotal = newDpp + newPpn;
                                                 setNegotiatedBeforeTaxPrices(prev => ({ ...prev, [item.name]: newDpp }));
                                                 setNegotiatedPrices(prev => ({ ...prev, [item.name]: newTotal }));
@@ -2371,8 +2573,10 @@ export default function Step3RincianHPS() {
                                           {/* Breakdown Komponen PPN & Satuan Nett */}
                                           <div className="mt-1.5 pt-1.5 border-t border-dashed border-slate-200 flex flex-col gap-0.5 text-[8.5px]">
                                             <div className="flex justify-between text-slate-500 font-mono">
-                                              <span className="font-sans text-slate-400">PPN (11%):</span>
-                                              <span className="text-slate-600">Rp {ppnVal.toLocaleString('id-ID')}</span>
+                                              <span className="font-sans text-slate-400">{isExempt ? 'PPN (0% - PBJT):' : 'PPN (11%):'}</span>
+                                              <span className={isExempt ? 'text-emerald-700 font-bold' : 'text-slate-600'}>
+                                                {isExempt ? 'Rp 0 (Bebas)' : `Rp ${ppnVal.toLocaleString('id-ID')}`}
+                                              </span>
                                             </div>
                                             <div className="flex justify-between items-center font-bold text-slate-800">
                                               <span className="text-slate-500 text-[8px] uppercase">Satuan (+Pajak):</span>
@@ -2382,7 +2586,7 @@ export default function Step3RincianHPS() {
                                                   value={unitNegoPrice}
                                                   onChange={(e) => {
                                                     const newTotal = Math.max(0, parseFloat(e.target.value) || 0);
-                                                    const derivedDpp = Math.floor(newTotal / 1.11);
+                                                    const derivedDpp = isExempt ? newTotal : Math.floor(newTotal / 1.11);
                                                     setNegotiatedPrices(prev => ({ ...prev, [item.name]: newTotal }));
                                                     setNegotiatedBeforeTaxPrices(prev => ({ ...prev, [item.name]: derivedDpp }));
                                                     setIsSigned(false);

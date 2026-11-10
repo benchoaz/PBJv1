@@ -387,30 +387,37 @@ export default function Step4TemplateSurat() {
   
   const getPacketCategory = (packName) => {
     const name = (packName || '').toLowerCase();
-    if (name.includes('pemeliharaan') || name.includes('perawatan') || name.includes('servis') || name.includes('service')) return 'Pemeliharaan';
-    if (name.includes('prasmanan') || name.includes('katering')) return 'Mamin-Prasmanan';
+    // Prioritaskan Mamin & Konsumsi terlebih dahulu
+    if (name.includes('prasmanan') || name.includes('katering') || name.includes('catering')) return 'Mamin-Prasmanan';
     if (name.includes('nasi kotak') || name.includes('nasi bungkus')) return 'Mamin-Bungkus';
     if (name.includes('snack') || name.includes('kue')) return 'Mamin-Snack';
-    if (name.includes('mamin') || name.includes('makanan')) return 'Mamin-Bungkus';
-    if (name.includes('modal') || name.includes('mesin') || name.includes('elektronik') || name.includes('peralatan')) return 'Modal';
-    if (name.includes('konsolidasi')) return 'Konsolidasi';
-    if (name.includes('jasa')) return 'Jasa';
+    if (name.includes('mamin') || name.includes('makanan') || name.includes('minuman') || name.includes('konsumsi')) return 'Mamin-Bungkus';
+    // Belanja Modal & Peralatan
+    if (name.includes('modal') || name.includes('mesin') || name.includes('elektronik') || name.includes('peralatan') || name.includes('komputer') || name.includes('laptop') || name.includes('printer')) return 'Modal';
+    if (name.includes('konsolidasi') || name.includes('seragam')) return 'Konsolidasi';
+    // Jasa Pemeliharaan / Perawatan Teknis (Abaikan "pemeliharaan keutuhan" pada wawasan kebangsaan/NKRI)
+    if (name.includes('servis') || name.includes('service') || name.includes('perawatan') || (name.includes('pemeliharaan') && !name.includes('pemeliharaan keutuhan'))) return 'Pemeliharaan';
+    if (name.includes('jasa') || name.includes('konstruksi')) return 'Jasa';
     return 'ATK';
   };
 
   const cat = getPacketCategory(selectedPack?.packName || '');
   let defaultTplId = 'TPL-006A';
-  if (cat === 'Mamin') defaultTplId = 'TPL-006B';
+  if (cat.startsWith('Mamin')) defaultTplId = 'TPL-006B';
   else if (cat === 'Modal') defaultTplId = 'TPL-006C';
   else if (cat === 'Pemeliharaan') defaultTplId = 'TPL-006F';
   else if (cat === 'Jasa' || cat === 'Konstruksi') defaultTplId = 'TPL-006D';
   else if (cat === 'Konsolidasi') defaultTplId = 'TPL-006E';
 
-  const isMaintenanceDoc = selectedTplId === 'TPL-006F' ||
-    (!selectedTplId && (cat === 'Pemeliharaan' || defaultTplId === 'TPL-006F')) ||
-    (selectedPack?.packName || '').toLowerCase().includes('pemeliharaan') ||
-    (selectedPack?.packName || '').toLowerCase().includes('perawatan') ||
-    (selectedPack?.packName || '').toLowerCase().includes('servis');
+  // FIX: selectedTplId overrides automatic category detection
+  const activeTplId = selectedTplId || defaultTplId;
+  const isMaintenanceDoc = activeTplId === 'TPL-006F';
+
+  useEffect(() => {
+    if (!isMaintenanceDoc && (activeDocPreview === 'spk' || activeDocPreview === 'skp')) {
+      setActiveDocPreview('dpp');
+    }
+  }, [isMaintenanceDoc, activeDocPreview]);
 
   const currentJenis = dppSpecs.jenisPemeliharaan || 'kendaraan';
   const mConfig = getMaintenanceConfig(currentJenis);
@@ -543,7 +550,39 @@ export default function Step4TemplateSurat() {
   const totalHpsPemeliharaan = subtotalHpsBeforeTax + nilaiPpn;
 
   const getActiveSurveyData = () => surveyData;
-  const parseSmartColons = (t) => t;
+  const parseSmartColons = (text) => {
+    if (!text) return text;
+    const lines = text.split('\n');
+    let output = [];
+    let inTable = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const match = line.match(/^([A-Za-z0-9/ ()\-_.,]+?)\s*:\s*(.*)$/);
+      if (match && !line.includes('<') && match[1].length < 45) {
+        if (!inTable) {
+          inTable = true;
+          output.push('<table style="width: 100%; border: none; margin-top: 4px; margin-bottom: 4px; border-collapse: collapse;"><tbody>');
+        }
+        output[output.length - 1] += `<tr><td style="width: 1%; white-space: nowrap; padding-right: 15px; vertical-align: top; border: none; padding-top: 2px;">${match[1]}</td><td style="width: 1%; padding-right: 8px; vertical-align: top; border: none; padding-top: 2px;">:</td><td style="vertical-align: top; border: none; padding-top: 2px;">${match[2]}</td></tr>`;
+      } else {
+        if (inTable) {
+          if (line.trim() === '' || line.includes('<') || line.includes('>')) {
+            inTable = false;
+            output[output.length - 1] += '</tbody></table>';
+            output.push(line);
+          } else {
+            output[output.length - 1] = output[output.length - 1].replace(/<\/td><\/tr>$/, `<br/>${line}</td></tr>`);
+          }
+        } else {
+          output.push(line);
+        }
+      }
+    }
+    if (inTable) {
+      output[output.length - 1] += '</tbody></table>';
+    }
+    return output.join('\n');
+  };
 
   const handleExportWord = async () => {
     const printSheet = document.getElementById('print-sheet');
@@ -875,19 +914,121 @@ export default function Step4TemplateSurat() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nomor DPP (Manual)</label>
-                      <input type="text" value={packageMetadata.nomor_dpp || ''} onChange={(e) => setPackageMetadata({...packageMetadata, nomor_dpp: e.target.value})} placeholder="Opsional (Kosongi jika otomatis)" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                      <input 
+                        type="text" 
+                        value={packageMetadata.nomor_dpp || ''} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setPackageMetadata(prev => {
+                            const next = { ...prev, nomor_dpp: val };
+                            if (val.includes('DPP')) {
+                              const prevBahpExpected = (prev.nomor_dpp || '').replace(/DPP/gi, 'BAHP');
+                              if (!prev.nomor_bahp || prev.nomor_bahp === prevBahpExpected) {
+                                next.nomor_bahp = val.replace(/DPP/gi, 'BAHP');
+                              }
+                              const prevNdExpected = (prev.nomor_dpp || '').replace(/DPP/gi, 'ND');
+                              if (!prev.nomor_nd || prev.nomor_nd === prevNdExpected) {
+                                next.nomor_nd = val.replace(/DPP/gi, 'ND');
+                              }
+                            }
+                            return next;
+                          });
+                        }} 
+                        placeholder="Contoh: 000.3.1/014/DPP/KEC.BESUK/2026" 
+                        className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" 
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal DPP</label>
-                      <input type="date" value={packageMetadata.tanggal_dpp || ''} onChange={(e) => setPackageMetadata({...packageMetadata, tanggal_dpp: e.target.value})} className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                      <input 
+                        type="date" 
+                        value={packageMetadata.tanggal_dpp || ''} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setPackageMetadata(prev => ({
+                            ...prev, 
+                            tanggal_dpp: val,
+                            tanggal_nd: prev.tanggal_nd || val,
+                            tanggal_bahp: prev.tanggal_bahp || val,
+                          }));
+                        }} 
+                        className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" 
+                      />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nomor Nota Dinas (Manual)</label>
-                      <input type="text" value={packageMetadata.nomor_nd || ''} onChange={(e) => setPackageMetadata({...packageMetadata, nomor_nd: e.target.value})} placeholder="Opsional (Kosongi jika otomatis)" className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    <div className="bg-indigo-50/60 p-2.5 rounded-xl border border-indigo-200">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                          Nomor Nota Dinas (Manual)
+                        </label>
+                        {packageMetadata.nomor_dpp && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPackageMetadata(prev => ({
+                                ...prev,
+                                nomor_nd: (prev.nomor_dpp || '').includes('DPP')
+                                  ? (prev.nomor_dpp || '').replace(/DPP/gi, 'ND')
+                                  : `${prev.nomor_dpp || ''}/ND`
+                              }));
+                            }}
+                            className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                            title="Samakan dengan format nomor DPP (ganti DPP menjadi ND)"
+                          >
+                            ↺ Samakan dgn DPP
+                          </button>
+                        )}
+                      </div>
+                      <input 
+                        type="text" 
+                        value={packageMetadata.nomor_nd || ''} 
+                        onChange={(e) => setPackageMetadata({...packageMetadata, nomor_nd: e.target.value})} 
+                        placeholder="Contoh: 000.3.1/014/ND/KEC.BESUK/2026" 
+                        className="w-full text-xs px-3 py-2 border border-indigo-300 rounded-lg focus:border-indigo-600 bg-white font-mono font-bold text-indigo-950 outline-none transition-colors" 
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tanggal Nota Dinas</label>
                       <input type="date" value={packageMetadata.tanggal_nd || ''} onChange={(e) => setPackageMetadata({...packageMetadata, tanggal_nd: e.target.value})} className="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:border-indigo-500 outline-none transition-colors" />
+                    </div>
+                    <div className="bg-indigo-50/60 p-2.5 rounded-xl border border-indigo-200">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                          Nomor BAHP (Hasil Pemilihan)
+                        </label>
+                        {packageMetadata.nomor_dpp && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPackageMetadata(prev => ({
+                                ...prev,
+                                nomor_bahp: (prev.nomor_dpp || '').replace(/DPP/gi, 'BAHP')
+                              }));
+                            }}
+                            className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                            title="Samakan dengan format nomor DPP (ganti DPP menjadi BAHP)"
+                          >
+                            ↺ Samakan dgn DPP
+                          </button>
+                        )}
+                      </div>
+                      <input 
+                        type="text" 
+                        value={packageMetadata.nomor_bahp || ''} 
+                        onChange={(e) => setPackageMetadata({...packageMetadata, nomor_bahp: e.target.value})} 
+                        placeholder="Contoh: 000.3.1/014/BAHP/KEC.BESUK/2026" 
+                        className="w-full text-xs px-3 py-2 border border-indigo-300 rounded-lg focus:border-indigo-600 bg-white font-mono font-bold text-indigo-950 outline-none transition-colors" 
+                      />
+                    </div>
+                    <div className="bg-indigo-50/60 p-2.5 rounded-xl border border-indigo-200">
+                      <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider mb-1">
+                        Tanggal BAHP
+                      </label>
+                      <input 
+                        type="date" 
+                        value={packageMetadata.tanggal_bahp || ''} 
+                        onChange={(e) => setPackageMetadata({...packageMetadata, tanggal_bahp: e.target.value})} 
+                        className="w-full text-xs px-3 py-2 border border-indigo-300 rounded-lg focus:border-indigo-600 bg-white outline-none transition-colors" 
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ID RUP (SiRUP LKPP)</label>
@@ -939,18 +1080,24 @@ export default function Step4TemplateSurat() {
                     
                     <select
                       value={selectedTplId || ''}
-                      onChange={(e) => setSelectedTplId(e.target.value)}
-                      className="w-full bg-white text-xs px-3 py-2.5 border border-blue-300 rounded-lg focus:border-indigo-500 outline-none transition-colors"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedTplId(val);
+                        setSelectedPack(prev => prev ? ({ ...prev, dppTemplateId: val }) : prev);
+                        setDppSpecs(prev => ({ ...prev, templateId: val }));
+                      }}
+                      className="w-full bg-white text-xs px-3 py-2.5 border border-blue-300 rounded-lg focus:border-indigo-500 outline-none transition-colors font-medium text-slate-800"
                     >
-                      <option value="">-- Pilih Manual atau Biarkan Otomatis --</option>
+                      <option value="">-- Biarkan Otomatis ({DEFAULT_TEMPLATES.find(t => t.id === defaultTplId)?.name || defaultTplId}) --</option>
                       {(() => {
                           try {
                             const tStr = localStorage.getItem('pbj_templates');
                             let tpls = tStr ? JSON.parse(tStr) : [];
                             if (!tpls || tpls.length === 0) {
-                              tpls = DEFAULT_TEMPLATES.filter(t => t.category === 'Tahap Persiapan');
+                              tpls = DEFAULT_TEMPLATES;
                             }
-                            return tpls.map(t => (
+                            const dppTpls = tpls.filter(t => t.id && (t.id.startsWith('TPL-006') || t.name.toLowerCase().includes('dpp') || t.name.toLowerCase().includes('persiapan pengadaan')));
+                            return dppTpls.map(t => (
                               <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
                             ));
                           } catch(e) { return null; }
@@ -1576,7 +1723,7 @@ export default function Step4TemplateSurat() {
                       </div>
 
                       {(() => {
-                        const timeConfig = getTimeConfigForPackage(selectedPack, selectedTplId, dppSpecs);
+                        const timeConfig = getTimeConfigForPackage(selectedPack, activeTplId, dppSpecs);
                         return (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 bg-white/70 p-3 rounded-xl border border-indigo-100">
                             <div>
@@ -2078,15 +2225,25 @@ export default function Step4TemplateSurat() {
   // BERITA ACARA HASIL PEMILIHAN (BAHP E-PURCHASING)
   <BahpDocument
     templateId={(() => {
+      // 1. Prioritaskan template DPP yang aktif
+      if (activeTplId === 'TPL-006F') return 'pemeliharaan';
+      if (activeTplId === 'TPL-006B') return 'mamin';
+      if (activeTplId === 'TPL-006C') return 'modal';
+      if (activeTplId === 'TPL-006D') return 'jasa';
+      if (activeTplId === 'TPL-006E') return 'seragam';
+      if (activeTplId === 'TPL-006A') return 'atk';
+
+      // 2. Fallback deteksi cerdas dari nama paket
       const name = (selectedPack?.packName || '').toLowerCase();
-      if (name.includes('pemeliharaan') || name.includes('servis')) return 'pemeliharaan';
-      if (name.includes('mamin') || name.includes('snack') || name.includes('makan')) return 'mamin';
+      if (name.includes('mamin') || name.includes('snack') || name.includes('makan') || name.includes('minum') || name.includes('katering') || name.includes('prasmanan')) return 'mamin';
       if (name.includes('laptop') || name.includes('printer') || name.includes('komputer') || name.includes('mesin') || name.includes('modal')) return 'modal';
+      if (name.includes('servis') || name.includes('service') || name.includes('perawatan') || (name.includes('pemeliharaan') && !name.includes('pemeliharaan keutuhan'))) return 'pemeliharaan';
       if (name.includes('jasa') || name.includes('konstruksi')) return 'jasa';
       if (name.includes('seragam') || name.includes('konsolidasi')) return 'seragam';
       return 'atk';
     })()}
     submittedPack={selectedPack}
+    packageMetadata={packageMetadata}
     negotiatedItems={(() => {
       const map = {};
       const sData = getActiveSurveyData();
@@ -2168,6 +2325,17 @@ export default function Step4TemplateSurat() {
     const dynamicNd = packageMetadata.nomor_nd || '{{nomor_nd}}';
     content = `<div class="text-center mb-6"><div class="font-bold text-lg underline leading-none mb-1">NOTA DINAS</div><div class="leading-none">Nomor : ${dynamicNd}</div></div>\n` + content;
  }
+
+ // Pastikan ID RUP (SiRUP LKPP) ada di Nota Dinas jika belum ada
+ if (!content.includes('{{id_rup}}') && !content.includes('{{kode_rup}}') && !/ID\s*RUP/i.test(content)) {
+   if (content.includes('Sumber Dana')) {
+     content = content.replace(/(Sumber Dana\s*:[^\n]*)/i, `$1\nID RUP (SiRUP) : {{id_rup}}`);
+   } else if (content.includes('{{sumber_dana}}')) {
+     content = content.replace(/(\{\{sumber_dana\}\}[^\n]*)/i, `$1\nID RUP (SiRUP) : {{id_rup}}`);
+   } else if (content.includes('{{nilai_pagu}}')) {
+     content = content.replace(/(\{\{nilai_pagu\}\}[^\n]*)/i, `$1\nID RUP (SiRUP) : {{id_rup}}`);
+   }
+ }
  
  // Force remove legacy signature block from cached templates to prevent duplication
  content = content.replace(/Pejabat Pembuat Komitmen \(PPK\),?[\s\S]*?\{\{nama_ppk\}\}[\s\S]*?NIP\. \{\{nip_ppk\}\}/gi, '');
@@ -2192,7 +2360,7 @@ export default function Step4TemplateSurat() {
  '{{nama_ppk}}': ppkUser?.name || currentUser?.name || 'Handik Hariyanto, S.Kom., M.Si',
  '{{nip_ppk}}': ppkUser?.nip || currentUser?.nip || '197909102002121004',
  '{{nomor_surat}}': nomorBase.replace('{nomor}', '045.2'),
- '{{nomor_nd}}': nomorBase.replace('{nomor}', '011/ND'),
+ '{{nomor_nd}}': packageMetadata.nomor_nd || nomorBase.replace('{nomor}', '011/ND'),
  '{{nama_penyedia}}': '_______________________',
  '{{hari_tanggal_acara}}': '_______________________',
  '{{waktu_acara}}': '_______________________',
@@ -2204,7 +2372,8 @@ export default function Step4TemplateSurat() {
  '{{tanggal_ba}}': '_______________________',
  '{{harga_penawaran}}': '_______________________',
  '{{harga_negosiasi}}': '_______________________',
- '{{nomor_bahp}}': nomorBase.replace('{nomor}', '112/BAHP'),
+ '{{nomor_bahp}}': packageMetadata.nomor_bahp || (packageMetadata.nomor_dpp ? packageMetadata.nomor_dpp.replace(/DPP/gi, 'BAHP') : nomorBase.replace('{nomor}', '112/BAHP')),
+ '{{tanggal_bahp}}': formatTanggalIndo(packageMetadata.tanggal_bahp || packageMetadata.tanggal_dpp, tanggalSurat),
  '{{nilai_hps}}': '_______________________',
  '{{nama_penyedia_terpilih}}': '_______________________',
  '{{harga_final}}': '_______________________',
@@ -2227,7 +2396,9 @@ export default function Step4TemplateSurat() {
  '{{pra_dipa}}': selectedPack.praDipa ? 'Ya' : 'Tidak',
  '{{volume_pekerjaan}}': selectedPack.volume || '1 Paket',
  '{{uraian_pekerjaan}}': `Pengadaan ${selectedPack.packName || ''} untuk operasional`,
- '{{kode_rup}}': getSafeNoSirup(selectedPack, packageMetadata)
+ '{{kode_rup}}': getSafeNoSirup(selectedPack, packageMetadata) || packageMetadata?.id_rup || '-',
+ '{{id_rup}}': getSafeNoSirup(selectedPack, packageMetadata) || packageMetadata?.id_rup || '-',
+ '{{id_rup_sirup}}': getSafeNoSirup(selectedPack, packageMetadata) || packageMetadata?.id_rup || '-'
  };
  
  Object.keys(replacements).forEach(key => {
@@ -2297,13 +2468,13 @@ export default function Step4TemplateSurat() {
 
  const cat = getPacketCategory(selectedPack?.packName || '');
  let tplId = 'TPL-006A';
- if (cat === 'Mamin') tplId = 'TPL-006B';
+ if (cat.startsWith('Mamin')) tplId = 'TPL-006B';
  else if (cat === 'Modal') tplId = 'TPL-006C';
  else if (cat === 'Pemeliharaan') tplId = 'TPL-006F';
  else if (cat === 'Jasa' || cat === 'Konstruksi') tplId = 'TPL-006D';
  else if (cat === 'Konsolidasi') tplId = 'TPL-006E';
 
- const template = templates.find(t => t.id === selectedTplId) || templates.find(t => t.id === tplId);
+ const template = templates.find(t => t.id === activeTplId) || templates.find(t => t.id === selectedTplId) || templates.find(t => t.id === tplId);
  
  if (template && template.content.includes('{{komponen_dinamis_dpp}}')) {
  // Template parsing logic
@@ -2331,7 +2502,7 @@ export default function Step4TemplateSurat() {
  '{{nama_ppk}}': ppkUser?.name || currentUser?.name || 'Handik Hariyanto, S.Kom., M.Si',
  '{{nip_ppk}}': ppkUser?.nip || currentUser?.nip || '197909102002121004',
  '{{nomor_surat}}': nomorBase.replace('{nomor}', '045.2'),
- '{{nomor_nd}}': nomorBase.replace('{nomor}', '011/ND'),
+ '{{nomor_nd}}': packageMetadata.nomor_nd || nomorBase.replace('{nomor}', '011/ND'),
  '{{nama_penyedia}}': '_______________________',
  '{{hari_tanggal_acara}}': '_______________________',
  '{{waktu_acara}}': '_______________________',
@@ -2343,7 +2514,8 @@ export default function Step4TemplateSurat() {
  '{{tanggal_ba}}': '_______________________',
  '{{harga_penawaran}}': '_______________________',
  '{{harga_negosiasi}}': '_______________________',
- '{{nomor_bahp}}': nomorBase.replace('{nomor}', '112/BAHP'),
+ '{{nomor_bahp}}': packageMetadata.nomor_bahp || (packageMetadata.nomor_dpp ? packageMetadata.nomor_dpp.replace(/DPP/gi, 'BAHP') : nomorBase.replace('{nomor}', '112/BAHP')),
+ '{{tanggal_bahp}}': formatTanggalIndo(packageMetadata.tanggal_bahp || packageMetadata.tanggal_dpp, tanggalSurat),
  '{{nilai_hps}}': '_______________________',
  '{{nama_penyedia_terpilih}}': '_______________________',
  '{{harga_final}}': '_______________________',
@@ -2365,8 +2537,10 @@ export default function Step4TemplateSurat() {
  '{{usaha_kecil}}': 'Ya',
  '{{pra_dipa}}': selectedPack.praDipa ? 'Ya' : 'Tidak',
  '{{volume_pekerjaan}}': selectedPack.volume || '1 Paket',
- '{{uraian_pekerjaan}}': (selectedPack.packName || '').toLowerCase().includes('pemeliharaan') ? `Pelaksanaan pekerjaan ${selectedPack.packName || ''} untuk mendukung kelancaran operasional kedinasan` : `Pengadaan ${selectedPack.packName || ''} untuk operasional`,
- '{{kode_rup}}': getSafeNoSirup(selectedPack, packageMetadata)
+ '{{uraian_pekerjaan}}': isMaintenanceDoc ? `Pelaksanaan pekerjaan ${selectedPack.packName || ''} untuk mendukung kelancaran operasional kedinasan` : `Pengadaan ${selectedPack.packName || ''} untuk operasional`,
+ '{{kode_rup}}': getSafeNoSirup(selectedPack, packageMetadata) || packageMetadata?.id_rup || '-',
+ '{{id_rup}}': getSafeNoSirup(selectedPack, packageMetadata) || packageMetadata?.id_rup || '-',
+ '{{id_rup_sirup}}': getSafeNoSirup(selectedPack, packageMetadata) || packageMetadata?.id_rup || '-'
  };
 
  Object.keys(replacements).forEach(key => {
