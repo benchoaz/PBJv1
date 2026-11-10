@@ -181,7 +181,7 @@ export function detectProcurementCategory(pack, templateId = '', dppSpecs = {}) 
   if (tpl === 'TPL-006B') return PROCUREMENT_CATEGORIES.MAMIN;
   if (tpl === 'TPL-006G') return PROCUREMENT_CATEGORIES.KONSTRUKSI;
   if (tpl === 'TPL-006C') return PROCUREMENT_CATEGORIES.MODAL;
-  if (tpl === 'TPL-006E') return PROCUREMENT_CATEGORIES.SERAGAM;
+  if (tpl === 'TPL-006E') return PROCUREMENT_CATEGORIES.KONSOLIDASI;
   if (tpl === 'TPL-006D') return PROCUREMENT_CATEGORIES.JASA_LAINNYA;
   if (tpl === 'TPL-006A') return PROCUREMENT_CATEGORIES.ATK;
 

@@ -124,6 +124,22 @@ export default function ProcurementPanel() {
             rawDescription: parsedData
           };
           setSubmittedPack(convertedPack);
+          let initialBahpTpl = 'atk';
+          if (convertedPack.dppTemplateId === 'TPL-006F') initialBahpTpl = 'pemeliharaan';
+          else if (convertedPack.dppTemplateId === 'TPL-006B') initialBahpTpl = 'mamin';
+          else if (convertedPack.dppTemplateId === 'TPL-006C') initialBahpTpl = 'modal';
+          else if (convertedPack.dppTemplateId === 'TPL-006D') initialBahpTpl = 'jasa';
+          else if (convertedPack.dppTemplateId === 'TPL-006E') initialBahpTpl = 'seragam';
+          else if (convertedPack.dppTemplateId === 'TPL-006A') initialBahpTpl = 'atk';
+          else {
+            const name = (convertedPack.packName || '').toLowerCase();
+            if (name.includes('mamin') || name.includes('snack') || name.includes('makan') || name.includes('minum') || name.includes('katering') || name.includes('prasmanan')) initialBahpTpl = 'mamin';
+            else if (name.includes('laptop') || name.includes('printer') || name.includes('komputer') || name.includes('mesin') || name.includes('modal')) initialBahpTpl = 'modal';
+            else if (name.includes('servis') || name.includes('service') || name.includes('perawatan') || (name.includes('pemeliharaan') && !name.includes('pemeliharaan keutuhan'))) initialBahpTpl = 'pemeliharaan';
+            else if (name.includes('jasa') || name.includes('konstruksi')) initialBahpTpl = 'jasa';
+            else if (name.includes('seragam') || name.includes('konsolidasi')) initialBahpTpl = 'seragam';
+          }
+          setBahpTemplateId(initialBahpTpl);
         } else {
           setSubmittedPack(null);
         }
