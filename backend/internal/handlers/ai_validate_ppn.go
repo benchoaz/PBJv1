@@ -84,6 +84,7 @@ Ubah status PPN menjadi "Bebas/Tidak Dikenakan PPN" (Nilai PPN = 0, tarif = 0%%,
 - Alasan Hukum: Makanan dan minuman yang disajikan oleh restoran, hotel, warung, dan sejenisnya serta jasa boga/catering merupakan objek Pajak Barang dan Jasa Tertentu (PBJT) daerah, sehingga Dikecualikan dari Objek PPN Pusat untuk menghindari pajak ganda (Pasal 4A UU PPN jo. UU HKPD No. 1/2022).
 
 PERHATIAN: Barang fisik/wadah (contoh: kotak plastik mika kosong, styrofoam, dus kosong, tumbler, piring) atau makanan olahan kemasan pabrikan industri retail yang tahan lama TETAP DIKENAKAN PPN (BKP Umum).
+KHUSUSNYA: Air mineral dalam kemasan botol/galon (Aqua, Le Minerale, Club, dll.), minuman botol kemasan (Teh Botol, jus kemasan, softdrink), dan produk FMCG retail lainnya TETAP DIKENAKAN PPN 12% (BKP Umum) meskipun dibeli pada rekening belanja makan minum, karena produk ini adalah produk industri retail bukan jasa boga/catering. Hanya makanan/minuman yang disiapkan/disajikan langsung oleh vendor jasa boga/katering/restoran yang bebas PPN.
 
 Data Item:
 - Nama Barang: "%s"
@@ -163,7 +164,11 @@ func evaluateFallbackPPN(itemName, vendor, specs, kodeRekening, uraianRekening s
 	// Pengecualian negatif (kontainer/wadah plastik kosong bukan makanan)
 	isPhysicalEquipment := regexp.MustCompile(`(kontainer|container|kotak mika|mika plastik|box mika|piring|gelas plastik kosong|dus kosong|sendok garpu|plastik klip)`).MatchString(cleanItem)
 
-	if isMakanMinumAccount && !isPhysicalEquipment {
+	// Pengecualian: Barang kemasan pabrikan industri retail (BKP Umum, tetap kena PPN)
+	// Air mineral botol/galon kemasan, minuman kemasan kaleng, produk FMCG retail
+	isPackagedRetailGoods := regexp.MustCompile(`(air mineral|aqua|le minerale|club air|primavera|vit air|nestle pure|cleo|viro|amidis|airmineral|galon|air isi ulang|minuman kemasan|minuman botol|softdrink|soft drink|teh botol|teh kemasan|jus kemasan|susu kemasan|susu uht|susu kotak)`).MatchString(cleanItem)
+
+	if isMakanMinumAccount && !isPhysicalEquipment && !isPackagedRetailGoods {
 		return AIValidatePPNResponse{
 			Success:        true,
 			NamaBarang:     itemName,
@@ -202,7 +207,7 @@ func evaluateFallbackPPN(itemName, vendor, specs, kodeRekening, uraianRekening s
 	}
 
 	// Negative penalty
-	if isPhysicalEquipment {
+	if isPhysicalEquipment || isPackagedRetailGoods {
 		score -= 100
 	}
 

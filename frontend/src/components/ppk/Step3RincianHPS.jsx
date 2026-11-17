@@ -2507,9 +2507,9 @@ export default function Step3RincianHPS() {
                                             className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-extrabold border transition-all cursor-pointer ${
                                               isExempt
                                                 ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 shadow-2xs'
-                                                : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
+                                                : 'bg-orange-50 text-orange-800 border-orange-300 hover:bg-orange-100'
                                             }`}
-                                            title={ppnDetails?.dasarHukum || (isExempt ? 'Bebas PPN (Objek PBJT Daerah 0%) - Klik untuk ubah' : 'Dikenakan PPN 11% (BKP) - Klik untuk ubah')}
+                                            title={ppnDetails?.dasarHukum || (isExempt ? 'Bebas PPN (Objek PBJT Daerah 0%) — klik untuk ubah ke PPN 12%' : 'Golongan PPN 12% (BKP Umum) — klik untuk ubah ke Bebas PPN')}
                                           >
                                             {isExempt ? (
                                               <>
@@ -2518,13 +2518,16 @@ export default function Step3RincianHPS() {
                                               </>
                                             ) : (
                                               <>
-                                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                                <span>PPN 11% (BKP)</span>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                                                <span>Golongan PPN 12%</span>
                                               </>
                                             )}
                                           </button>
-                                          <span className="text-[7.5px] text-slate-400 font-sans">
-                                            {isExempt ? (ppnDetails?.metodeDeteksi === 'dpa_account' ? 'via Rekening DPA' : ppnDetails?.metodeDeteksi === 'ai' ? 'via AI' : 'Bebas PBJT') : 'Ubah ↺'}
+                                          <span className="text-[7.5px] text-slate-400 font-sans" title="Klik tombol di kiri untuk mengubah status PPN item ini secara manual">
+                                            {isExempt
+                                              ? (ppnDetails?.metodeDeteksi === 'dpa_account' ? '✓ via Rek. DPA' : ppnDetails?.metodeDeteksi === 'ai' ? '✓ via AI' : ppnDetails?.metodeDeteksi === 'manual' ? '✎ Manual' : '✓ Bebas PBJT')
+                                              : (ppnDetails?.metodeDeteksi === 'manual' ? '✎ Manual' : 'Ubah ↺')
+                                            }
                                           </span>
                                         </div>
 

@@ -68,7 +68,13 @@ export function detectItemPpnFallback(item = {}, context = {}) {
     cleanItem
   );
 
-  if (isMakanMinumAccount && !isPhysicalEquipment) {
+  // Pengecualian negatif: Barang kemasan pabrikan industri retail (BKP Umum, tetap kena PPN 12%)
+  // Air mineral botol/galon kemasan, minuman kemasan kaleng/botol, produk FMCG retail
+  const isPackagedRetailGoods = /(air mineral|aqua|le minerale|club air|primavera|vit air|nestle pure|cleo|viro|amidis|airmineral|galon|air isi ulang|minuman kemasan|minuman botol|softdrink|soft drink|teh botol|teh kemasan|jus kemasan|susu kemasan|susu uht|susu kotak)/i.test(
+    cleanItem
+  );
+
+  if (isMakanMinumAccount && !isPhysicalEquipment && !isPackagedRetailGoods) {
     const tax = calculateItemTax(price, true);
     return {
       isExempt: true,
@@ -105,8 +111,8 @@ export function detectItemPpnFallback(item = {}, context = {}) {
     score += 20;
   }
 
-  // Hukuman jika merupakan peralatan / wadah plastik
-  if (isPhysicalEquipment) {
+  // Hukuman jika merupakan peralatan / wadah plastik atau barang kemasan pabrikan retail
+  if (isPhysicalEquipment || isPackagedRetailGoods) {
     score -= 100;
   }
 
